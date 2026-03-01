@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
+import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { Input } from "#/components/ui/input";
 import { Select } from "#/components/ui/select";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
@@ -23,6 +24,12 @@ function AdminUsersPage() {
 	const [selectedUserId, setSelectedUserId] = useState<Id<"users"> | null>(
 		null,
 	);
+	const [statusChangeTarget, setStatusChangeTarget] = useState<{
+		id: Id<"users">;
+		name: string;
+		nextIsActive: boolean;
+	} | null>(null);
+	const [isStatusChangePending, setIsStatusChangePending] = useState(false);
 
 	const users = useQuery(api.users.list, {
 		search: search || undefined,
@@ -37,6 +44,23 @@ function AdminUsersPage() {
 
 	const updateRole = useMutation(api.users.updateRole);
 	const setActive = useMutation(api.users.setActive);
+
+	async function confirmStatusChange() {
+		if (!statusChangeTarget) {
+			return;
+		}
+
+		setIsStatusChangePending(true);
+		try {
+			await setActive({
+				userId: statusChangeTarget.id,
+				isActive: statusChangeTarget.nextIsActive,
+			});
+		} finally {
+			setIsStatusChangePending(false);
+			setStatusChangeTarget(null);
+		}
+	}
 
 	if (me && me.globalRole !== "admin") {
 		return <Navigate to="/unauthorized" />;
@@ -122,9 +146,10 @@ function AdminUsersPage() {
 											size="sm"
 											variant="secondary"
 											onClick={() =>
-												setActive({
-													userId: user._id,
-													isActive: !user.isActive,
+												setStatusChangeTarget({
+													id: user._id,
+													name: user.name,
+													nextIsActive: !user.isActive,
 												})
 											}
 										>
@@ -192,6 +217,26 @@ function AdminUsersPage() {
 					</CardContent>
 				</Card>
 			</div>
+
+			<ConfirmDialog
+				open={Boolean(statusChangeTarget)}
+				title={
+					statusChangeTarget?.nextIsActive ? "Activate user" : "Deactivate user"
+				}
+				description={
+					statusChangeTarget?.nextIsActive
+						? `Activate ${statusChangeTarget.name}? They will regain workspace access.`
+						: `Deactivate ${statusChangeTarget?.name}? They will immediately lose workspace access.`
+				}
+				confirmLabel={
+					statusChangeTarget?.nextIsActive ? "Activate" : "Deactivate"
+				}
+				confirmingLabel="Updating..."
+				confirmVariant={statusChangeTarget?.nextIsActive ? "primary" : "danger"}
+				isConfirming={isStatusChangePending}
+				onCancel={() => setStatusChangeTarget(null)}
+				onConfirm={confirmStatusChange}
+			/>
 		</div>
 	);
 }

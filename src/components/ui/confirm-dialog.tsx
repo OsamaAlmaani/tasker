@@ -7,7 +7,9 @@ type ConfirmDialogProps = {
 	title: string;
 	description: string;
 	confirmLabel?: string;
+	confirmingLabel?: string;
 	cancelLabel?: string;
+	confirmVariant?: "primary" | "danger";
 	isConfirming?: boolean;
 	onConfirm: () => void | Promise<void>;
 	onCancel: () => void;
@@ -18,7 +20,9 @@ export function ConfirmDialog({
 	title,
 	description,
 	confirmLabel = "Confirm",
+	confirmingLabel = "Working...",
 	cancelLabel = "Cancel",
+	confirmVariant = "danger",
 	isConfirming = false,
 	onConfirm,
 	onCancel,
@@ -72,13 +76,13 @@ export function ConfirmDialog({
 					</Button>
 					<Button
 						type="button"
-						variant="danger"
+						variant={confirmVariant}
 						onClick={() => {
 							void onConfirm();
 						}}
 						disabled={isConfirming}
 					>
-						{isConfirming ? "Deleting..." : confirmLabel}
+						{isConfirming ? confirmingLabel : confirmLabel}
 					</Button>
 				</div>
 			</div>

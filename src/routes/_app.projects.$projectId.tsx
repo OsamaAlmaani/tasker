@@ -12,6 +12,7 @@ import { type FormEvent, useMemo, useState } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
+import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Select } from "#/components/ui/select";
@@ -107,7 +108,18 @@ function ProjectDetailPage() {
 	const [inviteMessage, setInviteMessage] = useState<string | null>(null);
 	const [inviteError, setInviteError] = useState<string | null>(null);
 	const [isSendingInvite, setIsSendingInvite] = useState(false);
-	const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
+	const [memberToRemove, setMemberToRemove] = useState<{
+		id: Id<"users">;
+		name: string;
+	} | null>(null);
+	const [isRemovingMember, setIsRemovingMember] = useState(false);
+	const [inviteToRevoke, setInviteToRevoke] = useState<{
+		id: Id<"projectInvites">;
+		email: string;
+	} | null>(null);
+	const [isRevokingInvite, setIsRevokingInvite] = useState(false);
+	const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
+	const [isTogglingArchive, setIsTogglingArchive] = useState(false);
 	const inviteCandidates = useQuery(
 		api.projects.searchInviteCandidates,
 		projectData?.canManageMembers
@@ -240,6 +252,53 @@ function ProjectDetailPage() {
 		}
 	}
 
+	async function confirmRemoveMember() {
+		if (!memberToRemove) {
+			return;
+		}
+		setIsRemovingMember(true);
+		try {
+			await removeMember({
+				projectId,
+				userId: memberToRemove.id,
+			});
+		} finally {
+			setIsRemovingMember(false);
+			setMemberToRemove(null);
+		}
+	}
+
+	async function confirmRevokeInvite() {
+		if (!inviteToRevoke) {
+			return;
+		}
+		setIsRevokingInvite(true);
+		try {
+			await revokeProjectInvite({
+				projectInviteId: inviteToRevoke.id,
+			});
+		} finally {
+			setIsRevokingInvite(false);
+			setInviteToRevoke(null);
+		}
+	}
+
+	async function confirmArchiveToggle() {
+		if (!projectData) {
+			return;
+		}
+		setIsTogglingArchive(true);
+		try {
+			await archiveProject({
+				projectId,
+				archived: !projectData.project.archived,
+			});
+		} finally {
+			setIsTogglingArchive(false);
+			setIsArchiveConfirmOpen(false);
+		}
+	}
+
 	return (
 		<div>
 			<PageHeader
@@ -268,12 +327,7 @@ function ProjectDetailPage() {
 						{canWrite ? (
 							<Button
 								variant="ghost"
-								onClick={() =>
-									archiveProject({
-										projectId,
-										archived: !projectData.project.archived,
-									})
-								}
+								onClick={() => setIsArchiveConfirmOpen(true)}
 							>
 								<Archive className="mr-2 h-4 w-4" />
 								{projectData.project.archived ? "Unarchive" : "Archive"}
@@ -648,9 +702,9 @@ function ProjectDetailPage() {
 											variant="ghost"
 											size="sm"
 											onClick={() =>
-												removeMember({
-													projectId,
-													userId: row.user._id,
+												setMemberToRemove({
+													id: row.user._id,
+													name: row.user.name,
 												})
 											}
 										>
@@ -725,21 +779,14 @@ function ProjectDetailPage() {
 														type="button"
 														size="sm"
 														variant="ghost"
-														disabled={revokingInviteId === row.invite._id}
-														onClick={async () => {
-															setRevokingInviteId(row.invite._id);
-															try {
-																await revokeProjectInvite({
-																	projectInviteId: row.invite._id,
-																});
-															} finally {
-																setRevokingInviteId(null);
-															}
-														}}
+														onClick={() =>
+															setInviteToRevoke({
+																id: row.invite._id,
+																email: row.invite.email,
+															})
+														}
 													>
-														{revokingInviteId === row.invite._id
-															? "Revoking..."
-															: "Revoke"}
+														Revoke
 													</Button>
 												</div>
 											))}
@@ -797,6 +844,45 @@ function ProjectDetailPage() {
 					) : null}
 				</div>
 			</div>
+
+			<ConfirmDialog
+				open={Boolean(memberToRemove)}
+				title="Remove project member"
+				description={`Remove ${memberToRemove?.name ?? "this user"} from the project? They will lose access immediately.`}
+				confirmLabel="Remove member"
+				confirmingLabel="Removing..."
+				isConfirming={isRemovingMember}
+				onCancel={() => setMemberToRemove(null)}
+				onConfirm={confirmRemoveMember}
+			/>
+
+			<ConfirmDialog
+				open={Boolean(inviteToRevoke)}
+				title="Revoke invite"
+				description={`Revoke invite for ${inviteToRevoke?.email ?? "this email"}? They will no longer be able to join using this invite.`}
+				confirmLabel="Revoke invite"
+				confirmingLabel="Revoking..."
+				isConfirming={isRevokingInvite}
+				onCancel={() => setInviteToRevoke(null)}
+				onConfirm={confirmRevokeInvite}
+			/>
+
+			<ConfirmDialog
+				open={isArchiveConfirmOpen}
+				title={
+					projectData.project.archived ? "Unarchive project" : "Archive project"
+				}
+				description={
+					projectData.project.archived
+						? "Unarchive this project and make it active again?"
+						: "Archive this project? It will be hidden from active project views."
+				}
+				confirmLabel={projectData.project.archived ? "Unarchive" : "Archive"}
+				confirmingLabel="Updating..."
+				isConfirming={isTogglingArchive}
+				onCancel={() => setIsArchiveConfirmOpen(false)}
+				onConfirm={confirmArchiveToggle}
+			/>
 		</div>
 	);
 }
