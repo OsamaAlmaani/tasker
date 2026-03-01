@@ -2,6 +2,10 @@
 
 Tasker is a production-minded project and issue management system for focused execution.
 
+## Built With Codex 🤫
+
+This project was built end-to-end by **GPT-5.3-Codex**, covering architecture, backend modeling, authorization, frontend implementation, and iterative product refinement.
+
 ## Product Overview
 
 - Project-based workspaces with scoped membership and permissions.
