@@ -1,6 +1,6 @@
 import { UserButton } from "@clerk/clerk-react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import {
 	CircleDot,
 	Command,
@@ -9,12 +9,13 @@ import {
 	Settings,
 	Shield,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import ThemeToggle from "#/components/ThemeToggle";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { api } from "#convex/_generated/api";
+import type { Id } from "#convex/_generated/dataModel";
 import { globalRoleLabel } from "../model";
 
 const navItems = [
@@ -27,9 +28,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	const navigate = useNavigate();
 	const [commandOpen, setCommandOpen] = useState(false);
 	const [commandSearch, setCommandSearch] = useState("");
+	const [listModalProject, setListModalProject] = useState<{
+		id: Id<"projects">;
+		name: string;
+	} | null>(null);
+	const [newListName, setNewListName] = useState("");
+	const [listError, setListError] = useState<string | null>(null);
+	const [isCreatingList, setIsCreatingList] = useState(false);
 
 	const me = useQuery(api.users.me);
-	const projects = useQuery(api.projects.list, { includeArchived: false });
+	const sidebarProjects = useQuery(api.projects.sidebar, {
+		includeArchived: false,
+	});
+	const createIssueList = useMutation(api.issueLists.create);
+	const canManageIssueLists =
+		me?.globalRole === "admin" || me?.globalRole === "member";
 
 	const quickCommands = useMemo(() => {
 		const commandRows = [
@@ -46,12 +59,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			});
 		}
 
-		if (projects) {
-			for (const project of projects.slice(0, 10)) {
+		if (sidebarProjects) {
+			for (const row of sidebarProjects.slice(0, 10)) {
 				commandRows.push({
-					id: `project-${project._id}`,
-					label: `Open ${project.key} · ${project.name}`,
-					to: `/projects/${project._id}`,
+					id: `project-${row.project._id}`,
+					label: `Open ${row.project.key} · ${row.project.name}`,
+					to: `/projects/${row.project._id}`,
 				});
 			}
 		}
@@ -64,7 +77,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 		return commandRows.filter((item) =>
 			item.label.toLowerCase().includes(query),
 		);
-	}, [commandSearch, me?.globalRole, projects]);
+	}, [commandSearch, me?.globalRole, sidebarProjects]);
+
+	async function submitCreateList(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		if (!listModalProject) {
+			return;
+		}
+
+		const name = newListName.trim();
+		setListError(null);
+		if (!name) {
+			setListError("List name is required.");
+			return;
+		}
+
+		setIsCreatingList(true);
+		try {
+			await createIssueList({
+				projectId: listModalProject.id,
+				name,
+			});
+			setListModalProject(null);
+			setNewListName("");
+		} catch (error) {
+			setListError(
+				error instanceof Error ? error.message : "Failed to create issue list.",
+			);
+		} finally {
+			setIsCreatingList(false);
+		}
+	}
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -140,26 +183,62 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 						</Button>
 					</div>
 
-					<div className="max-h-[34vh] space-y-1 overflow-auto pr-1">
-						{(projects ?? []).map((project) => (
-							<Link
-								key={project._id}
-								to="/projects/$projectId"
-								params={{ projectId: project._id }}
-								className="project-item"
-								activeProps={{ className: "project-item project-item-active" }}
-							>
-								<span
-									className="project-dot"
-									style={{ backgroundColor: project.color ?? "#6b7280" }}
-								/>
-								<span className="truncate">{project.name}</span>
-								<span className="ml-auto text-[10px] text-[var(--muted-text)]">
-									{project.key}
-								</span>
-							</Link>
+					<div className="max-h-[34vh] space-y-2 overflow-auto pr-1">
+						{(sidebarProjects ?? []).map((row) => (
+							<div key={row.project._id} className="space-y-1">
+								<div className="flex items-center gap-1">
+									<Link
+										to="/projects/$projectId"
+										params={{ projectId: row.project._id }}
+										className="project-item min-w-0 flex-1"
+										activeProps={{
+											className:
+												"project-item project-item-active min-w-0 flex-1",
+										}}
+									>
+										<span
+											className="project-dot"
+											style={{
+												backgroundColor: row.project.color ?? "#6b7280",
+											}}
+										/>
+										<span className="truncate">{row.project.name}</span>
+									</Link>
+									{canManageIssueLists ? (
+										<Button
+											type="button"
+											size="sm"
+											variant="ghost"
+											className="h-7 w-7 px-0"
+											onClick={() => {
+												setNewListName("");
+												setListError(null);
+												setListModalProject({
+													id: row.project._id,
+													name: row.project.name,
+												});
+											}}
+										>
+											+
+										</Button>
+									) : null}
+								</div>
+								{row.issueLists.length ? (
+									<div className="ml-6 space-y-0.5">
+										{row.issueLists.map((list) => (
+											<div
+												key={list._id}
+												className="truncate rounded px-2 py-1 text-xs text-[var(--muted-text)]"
+												title={list.name}
+											>
+												• {list.name}
+											</div>
+										))}
+									</div>
+								) : null}
+							</div>
 						))}
-						{!projects?.length ? (
+						{!sidebarProjects?.length ? (
 							<p className="m-0 rounded-md border border-dashed border-[var(--line)] px-3 py-4 text-xs text-[var(--muted-text)]">
 								No projects yet.
 							</p>
@@ -261,6 +340,56 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 								</p>
 							) : null}
 						</div>
+					</div>
+				</div>
+			) : null}
+
+			{listModalProject ? (
+				<div
+					className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,12,26,0.42)] px-4"
+					role="dialog"
+					aria-modal="true"
+					aria-label="Create issue list"
+				>
+					<div className="w-full max-w-md rounded-xl border border-[var(--line)] bg-card p-4 shadow-[0_24px_64px_rgba(0,0,0,0.25)]">
+						<div className="mb-3">
+							<h2 className="m-0 text-base font-semibold text-[var(--text)]">
+								New Issue List
+							</h2>
+							<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
+								{listModalProject.name}
+							</p>
+						</div>
+
+						<form onSubmit={submitCreateList} className="space-y-3">
+							<Input
+								autoFocus
+								value={newListName}
+								onChange={(event) => setNewListName(event.target.value)}
+								placeholder="List name"
+							/>
+							{listError ? (
+								<p className="m-0 text-sm text-[var(--danger)]">{listError}</p>
+							) : null}
+							<div className="flex items-center justify-end gap-2">
+								<Button
+									type="button"
+									variant="ghost"
+									onClick={() => setListModalProject(null)}
+									disabled={isCreatingList}
+								>
+									Cancel
+								</Button>
+								<Button
+									type="submit"
+									variant="secondary"
+									className="whitespace-nowrap"
+									disabled={isCreatingList}
+								>
+									{isCreatingList ? "Creating..." : "Create list"}
+								</Button>
+							</div>
+						</form>
 					</div>
 				</div>
 			) : null}

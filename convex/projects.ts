@@ -51,6 +51,48 @@ export const list = query({
   },
 })
 
+export const sidebar = query({
+  args: {
+    includeArchived: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx)
+
+    const projects =
+      user.globalRole === 'admin'
+        ? await ctx.db.query('projects').collect()
+        : (
+            await Promise.all(
+              (await getAccessibleProjectIds(ctx, user._id)).map((projectId) =>
+                ctx.db.get(projectId),
+              ),
+            )
+          ).filter(
+            (project): project is NonNullable<typeof project> => Boolean(project),
+          )
+
+    const visibleProjects = projects
+      .filter((project) => args.includeArchived || !project.archived)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+
+    const rows = await Promise.all(
+      visibleProjects.map(async (project) => {
+        const issueLists = await ctx.db
+          .query('issueLists')
+          .withIndex('by_projectId_position', (q) => q.eq('projectId', project._id))
+          .collect()
+
+        return {
+          project,
+          issueLists,
+        }
+      }),
+    )
+
+    return rows
+  },
+})
+
 export const getById = query({
   args: {
     projectId: v.id('projects'),

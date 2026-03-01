@@ -23,6 +23,7 @@ import {
 	IssuePriorityBadge,
 	IssueStatusBadge,
 } from "#/features/tasker/components/IssueBadges";
+import { MemberAvatarStack } from "#/features/tasker/components/MemberAvatarStack";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatDate, formatRelative } from "#/features/tasker/format";
 import {
@@ -49,6 +50,7 @@ function ProjectDetailPage() {
 	const [priority, setPriority] = useState<string>("");
 	const [assigneeId, setAssigneeId] = useState<string>("");
 	const [listFilter, setListFilter] = useState<string>("all");
+	const [groupBy, setGroupBy] = useState<"list" | "status">("list");
 	const [sortBy, setSortBy] = useState<
 		"updated_desc" | "created_desc" | "priority_desc" | "due_asc"
 	>("updated_desc");
@@ -80,8 +82,6 @@ function ProjectDetailPage() {
 	const updateIssue = useMutation(api.issues.update);
 	const updateProject = useMutation(api.projects.update);
 	const archiveProject = useMutation(api.projects.archive);
-	const createIssueList = useMutation(api.issueLists.create);
-	const removeIssueList = useMutation(api.issueLists.remove);
 	const addMember = useMutation(api.projects.addMember);
 	const removeMember = useMutation(api.projects.removeMember);
 	const sendProjectInvite = useAction(api.invitationsActions.sendProjectInvite);
@@ -127,18 +127,11 @@ function ProjectDetailPage() {
 		id: Id<"projectInvites">;
 		email: string;
 	} | null>(null);
+	const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
 	const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 	const [isRevokingInvite, setIsRevokingInvite] = useState(false);
 	const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
 	const [isTogglingArchive, setIsTogglingArchive] = useState(false);
-	const [newIssueListName, setNewIssueListName] = useState("");
-	const [isCreatingIssueList, setIsCreatingIssueList] = useState(false);
-	const [issueListError, setIssueListError] = useState<string | null>(null);
-	const [issueListToDelete, setIssueListToDelete] = useState<{
-		id: Id<"issueLists">;
-		name: string;
-	} | null>(null);
-	const [isDeletingIssueList, setIsDeletingIssueList] = useState(false);
 	const issueLists = useQuery(api.issueLists.listByProject, { projectId });
 	const inviteCandidates = useQuery(
 		api.projects.searchInviteCandidates,
@@ -160,6 +153,15 @@ function ProjectDetailPage() {
 		() => projectData?.membershipRows ?? [],
 		[projectData?.membershipRows],
 	);
+	const membersForStack = useMemo(
+		() =>
+			memberRows.map((row) => ({
+				_id: row.user._id,
+				name: row.user.name,
+				imageUrl: row.user.imageUrl,
+			})),
+		[memberRows],
+	);
 	const issueListById = useMemo(
 		() => new Map((issueLists ?? []).map((list) => [list._id, list])),
 		[issueLists],
@@ -177,9 +179,15 @@ function ProjectDetailPage() {
 		>();
 
 		for (const issue of rows) {
-			const key = issue.listId ?? "none";
-			const list = issue.listId ? issueListById.get(issue.listId) : undefined;
+			const key =
+				groupBy === "status" ? issue.status : (issue.listId ?? "none");
+			const list =
+				groupBy === "list" && issue.listId
+					? issueListById.get(issue.listId)
+					: undefined;
 			const group = groups.get(key);
+			const statusPosition =
+				groupBy === "status" ? ISSUE_STATUSES.indexOf(issue.status) : -1;
 
 			if (group) {
 				group.items.push(issue);
@@ -188,8 +196,14 @@ function ProjectDetailPage() {
 
 			groups.set(key, {
 				key,
-				title: list?.name ?? "No List",
-				position: list?.position ?? Number.MAX_SAFE_INTEGER,
+				title:
+					groupBy === "status"
+						? issueStatusLabel[issue.status]
+						: (list?.name ?? "No List"),
+				position:
+					groupBy === "status"
+						? statusPosition
+						: (list?.position ?? Number.MAX_SAFE_INTEGER),
 				items: [issue],
 			});
 		}
@@ -200,7 +214,7 @@ function ProjectDetailPage() {
 			}
 			return a.title.localeCompare(b.title);
 		});
-	}, [issues, issueListById]);
+	}, [issues, issueListById, groupBy]);
 
 	if (!projectData) {
 		return <div className="page-loading">Loading project…</div>;
@@ -364,48 +378,6 @@ function ProjectDetailPage() {
 		}
 	}
 
-	async function submitIssueList(event: FormEvent<HTMLFormElement>) {
-		event.preventDefault();
-		setIssueListError(null);
-
-		const name = newIssueListName.trim();
-		if (!name) {
-			setIssueListError("List name is required.");
-			return;
-		}
-
-		setIsCreatingIssueList(true);
-		try {
-			await createIssueList({
-				projectId,
-				name,
-			});
-			setNewIssueListName("");
-		} catch (error) {
-			setIssueListError(
-				error instanceof Error ? error.message : "Failed to create issue list.",
-			);
-		} finally {
-			setIsCreatingIssueList(false);
-		}
-	}
-
-	async function confirmDeleteIssueList() {
-		if (!issueListToDelete) {
-			return;
-		}
-		setIsDeletingIssueList(true);
-		try {
-			await removeIssueList({ issueListId: issueListToDelete.id });
-			if (listFilter === issueListToDelete.id) {
-				setListFilter("all");
-			}
-		} finally {
-			setIsDeletingIssueList(false);
-			setIssueListToDelete(null);
-		}
-	}
-
 	return (
 		<div>
 			<PageHeader
@@ -413,6 +385,16 @@ function ProjectDetailPage() {
 				description={projectData.project.description}
 				actions={
 					<>
+						<Button
+							variant="secondary"
+							onClick={() => setIsMembersModalOpen(true)}
+							className="gap-2"
+						>
+							<MemberAvatarStack members={membersForStack} maxVisible={5} />
+							<span className="text-xs text-[var(--muted-text)]">
+								{memberRows.length}
+							</span>
+						</Button>
 						{canWrite ? (
 							<Button
 								variant="secondary"
@@ -670,305 +652,253 @@ function ProjectDetailPage() {
 				</Card>
 			) : null}
 
-			<div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
-				<div className="space-y-4">
-					<Card>
-						<CardHeader>
-							<CardTitle>Issues</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="mb-3 grid gap-2 md:grid-cols-6">
-								<Input
-									value={search}
-									onChange={(event) => setSearch(event.target.value)}
-									placeholder="Search issues"
-								/>
-								<Select
-									value={status}
-									onChange={(event) => setStatus(event.target.value)}
-								>
-									<option value="">All status</option>
-									{ISSUE_STATUSES.map((value) => (
-										<option key={value} value={value}>
-											{issueStatusLabel[value]}
-										</option>
-									))}
-								</Select>
-								<Select
-									value={priority}
-									onChange={(event) => setPriority(event.target.value)}
-								>
-									<option value="">All priority</option>
-									{ISSUE_PRIORITIES.map((value) => (
-										<option key={value} value={value}>
-											{value}
-										</option>
-									))}
-								</Select>
-								<Select
-									value={assigneeId}
-									onChange={(event) => setAssigneeId(event.target.value)}
-								>
-									<option value="">All assignees</option>
-									{(assignableUsers ?? []).map((user) => (
-										<option key={user._id} value={user._id}>
-											{user.name}
-										</option>
-									))}
-								</Select>
-								<Select
-									value={listFilter}
-									onChange={(event) => setListFilter(event.target.value)}
-								>
-									<option value="all">All lists</option>
-									<option value="none">No list</option>
-									{(issueLists ?? []).map((list) => (
-										<option key={list._id} value={list._id}>
-											{list.name}
-										</option>
-									))}
-								</Select>
-								<Select
-									value={sortBy}
-									onChange={(event) =>
-										setSortBy(
-											event.target.value as
-												| "updated_desc"
-												| "created_desc"
-												| "priority_desc"
-												| "due_asc",
-										)
-									}
-								>
-									<option value="updated_desc">Updated</option>
-									<option value="created_desc">Created</option>
-									<option value="priority_desc">Priority</option>
-									<option value="due_asc">Due date</option>
-								</Select>
-							</div>
-
-							<div className="space-y-4">
-								{groupedIssues.map((group) => (
-									<div key={group.key} className="space-y-2">
-										<div className="flex items-center justify-between">
-											<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
-												{group.title}
-											</p>
-											<Badge>{group.items.length}</Badge>
-										</div>
-
-										{group.items.map((issue) => (
-											<div
-												key={issue._id}
-												className="issue-row flex-wrap gap-y-2"
-											>
-												<Link
-													to="/issues/$issueId"
-													params={{ issueId: issue._id }}
-													className="flex min-w-0 flex-1 no-underline"
-												>
-													<div className="min-w-0">
-														<p className="m-0 truncate text-sm font-medium text-[var(--text)]">
-															{issue.title}
-														</p>
-														<p className="m-0 text-xs text-[var(--muted-text)]">
-															#{issue.issueNumber} · Updated{" "}
-															{formatRelative(issue.updatedAt)}
-														</p>
-													</div>
-												</Link>
-												<div className="ml-auto flex items-center gap-2">
-													{issue.dueDate ? (
-														<Badge>{formatDate(issue.dueDate)}</Badge>
-													) : null}
-													<IssuePriorityBadge priority={issue.priority} />
-													<IssueStatusBadge status={issue.status} />
-													{canWrite ? (
-														<>
-															<Select
-																className="w-36"
-																value={issue.listId ?? ""}
-																onChange={(event) => {
-																	void updateIssue({
-																		issueId: issue._id,
-																		listId: (event.target.value ||
-																			null) as Id<"issueLists"> | null,
-																	});
-																}}
-															>
-																<option value="">No list</option>
-																{(issueLists ?? []).map((list) => (
-																	<option key={list._id} value={list._id}>
-																		{list.name}
-																	</option>
-																))}
-															</Select>
-															<Select
-																className="w-36"
-																value={issue.status}
-																onChange={(event) => {
-																	void updateIssue({
-																		issueId: issue._id,
-																		status: event.target
-																			.value as (typeof ISSUE_STATUSES)[number],
-																	});
-																}}
-															>
-																{ISSUE_STATUSES.map((value) => (
-																	<option key={value} value={value}>
-																		{issueStatusLabel[value]}
-																	</option>
-																))}
-															</Select>
-														</>
-													) : null}
-												</div>
-											</div>
-										))}
-									</div>
+			<div className="space-y-4">
+				<Card>
+					<CardHeader>
+						<CardTitle>Issues</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div className="mb-3 grid gap-2 md:grid-cols-7">
+							<Input
+								value={search}
+								onChange={(event) => setSearch(event.target.value)}
+								placeholder="Search issues"
+							/>
+							<Select
+								value={status}
+								onChange={(event) => setStatus(event.target.value)}
+							>
+								<option value="">All status</option>
+								{ISSUE_STATUSES.map((value) => (
+									<option key={value} value={value}>
+										{issueStatusLabel[value]}
+									</option>
 								))}
-								{issues && issues.length === 0 ? (
-									<p className="m-0 text-sm text-[var(--muted-text)]">
-										No issues found.
-									</p>
-								) : null}
-							</div>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardHeader>
-							<CardTitle>Project Activity</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<ActivityFeed activities={projectData.recentActivity} />
-						</CardContent>
-					</Card>
-				</div>
-
-				<div className="space-y-4">
-					<Card>
-						<CardHeader>
-							<CardTitle>Issue Lists ({issueLists?.length ?? 0})</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-3">
-							{canWrite ? (
-								<form onSubmit={submitIssueList} className="space-y-2">
-									<div className="flex gap-2">
-										<Input
-											value={newIssueListName}
-											onChange={(event) =>
-												setNewIssueListName(event.target.value)
-											}
-											placeholder="New list name"
-										/>
-										<Button
-											type="submit"
-											size="md"
-											variant="secondary"
-											className="whitespace-nowrap"
-											disabled={isCreatingIssueList}
-										>
-											{isCreatingIssueList ? "Adding..." : "Add"}
-										</Button>
-									</div>
-									{issueListError ? (
-										<p className="m-0 text-sm text-[var(--danger)]">
-											{issueListError}
-										</p>
-									) : null}
-								</form>
-							) : null}
-
-							<div className="space-y-2">
+							</Select>
+							<Select
+								value={priority}
+								onChange={(event) => setPriority(event.target.value)}
+							>
+								<option value="">All priority</option>
+								{ISSUE_PRIORITIES.map((value) => (
+									<option key={value} value={value}>
+										{value}
+									</option>
+								))}
+							</Select>
+							<Select
+								value={assigneeId}
+								onChange={(event) => setAssigneeId(event.target.value)}
+							>
+								<option value="">All assignees</option>
+								{(assignableUsers ?? []).map((user) => (
+									<option key={user._id} value={user._id}>
+										{user.name}
+									</option>
+								))}
+							</Select>
+							<Select
+								value={listFilter}
+								onChange={(event) => setListFilter(event.target.value)}
+							>
+								<option value="all">All lists</option>
+								<option value="none">No list</option>
 								{(issueLists ?? []).map((list) => (
-									<div
-										key={list._id}
-										className="flex items-center justify-between rounded-md border border-[var(--line)] px-3 py-2"
-									>
-										<div>
-											<p className="m-0 text-sm font-medium text-[var(--text)]">
-												{list.name}
-											</p>
-										</div>
-										<div className="flex items-center gap-1">
-											<Button
-												size="sm"
-												variant="ghost"
-												onClick={() => setListFilter(list._id)}
-											>
-												View
-											</Button>
-											{canWrite ? (
-												<Button
-													size="sm"
-													variant="ghost"
-													onClick={() =>
-														setIssueListToDelete({
-															id: list._id,
-															name: list.name,
-														})
-													}
-												>
-													Delete
-												</Button>
-											) : null}
-										</div>
-									</div>
+									<option key={list._id} value={list._id}>
+										{list.name}
+									</option>
 								))}
-								<Button
-									size="sm"
-									variant="ghost"
-									onClick={() => setListFilter("none")}
-								>
-									View issues with no list
-								</Button>
-								<Button
-									size="sm"
-									variant="ghost"
-									onClick={() => setListFilter("all")}
-								>
-									Show all lists
-								</Button>
-								{!issueLists?.length ? (
-									<p className="m-0 text-sm text-[var(--muted-text)]">
-										No lists yet.
-									</p>
-								) : null}
-							</div>
-						</CardContent>
-					</Card>
+							</Select>
+							<Select
+								value={groupBy}
+								onChange={(event) =>
+									setGroupBy(event.target.value as "list" | "status")
+								}
+							>
+								<option value="list">Group: List</option>
+								<option value="status">Group: Status</option>
+							</Select>
+							<Select
+								value={sortBy}
+								onChange={(event) =>
+									setSortBy(
+										event.target.value as
+											| "updated_desc"
+											| "created_desc"
+											| "priority_desc"
+											| "due_asc",
+									)
+								}
+							>
+								<option value="updated_desc">Updated</option>
+								<option value="created_desc">Created</option>
+								<option value="priority_desc">Priority</option>
+								<option value="due_asc">Due date</option>
+							</Select>
+						</div>
 
-					<Card>
-						<CardHeader className="flex flex-row items-center justify-between gap-3">
-							<CardTitle className="flex items-center gap-2">
+						<div className="space-y-4">
+							{groupedIssues.map((group) => (
+								<div key={group.key} className="space-y-2">
+									<div className="flex items-center justify-between">
+										<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
+											{group.title}
+										</p>
+										<Badge>{group.items.length}</Badge>
+									</div>
+
+									{group.items.map((issue) => (
+										<div
+											key={issue._id}
+											className="issue-row flex-wrap gap-y-2"
+										>
+											<Link
+												to="/issues/$issueId"
+												params={{ issueId: issue._id }}
+												className="flex min-w-0 flex-1 no-underline"
+											>
+												<div className="min-w-0">
+													<p className="m-0 truncate text-sm font-medium text-[var(--text)]">
+														{issue.title}
+													</p>
+													<p className="m-0 text-xs text-[var(--muted-text)]">
+														#{issue.issueNumber} · Updated{" "}
+														{formatRelative(issue.updatedAt)}
+													</p>
+												</div>
+											</Link>
+											<div className="ml-auto flex items-center gap-2">
+												{issue.dueDate ? (
+													<Badge>{formatDate(issue.dueDate)}</Badge>
+												) : null}
+												<IssuePriorityBadge priority={issue.priority} />
+												<IssueStatusBadge status={issue.status} />
+												{canWrite ? (
+													<>
+														<Select
+															className="w-36"
+															value={issue.listId ?? ""}
+															onChange={(event) => {
+																void updateIssue({
+																	issueId: issue._id,
+																	listId: (event.target.value ||
+																		null) as Id<"issueLists"> | null,
+																});
+															}}
+														>
+															<option value="">No list</option>
+															{(issueLists ?? []).map((list) => (
+																<option key={list._id} value={list._id}>
+																	{list.name}
+																</option>
+															))}
+														</Select>
+														<Select
+															className="w-36"
+															value={issue.status}
+															onChange={(event) => {
+																void updateIssue({
+																	issueId: issue._id,
+																	status: event.target
+																		.value as (typeof ISSUE_STATUSES)[number],
+																});
+															}}
+														>
+															{ISSUE_STATUSES.map((value) => (
+																<option key={value} value={value}>
+																	{issueStatusLabel[value]}
+																</option>
+															))}
+														</Select>
+													</>
+												) : null}
+											</div>
+										</div>
+									))}
+								</div>
+							))}
+							{issues && issues.length === 0 ? (
+								<p className="m-0 text-sm text-[var(--muted-text)]">
+									No issues found.
+								</p>
+							) : null}
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle>Project Activity</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<ActivityFeed activities={projectData.recentActivity} />
+					</CardContent>
+				</Card>
+			</div>
+
+			{isMembersModalOpen ? (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,12,26,0.45)] px-4">
+					<div
+						role="dialog"
+						aria-modal="true"
+						aria-label="Project members"
+						className="w-full max-w-xl rounded-xl border border-[var(--line)] bg-card p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
+					>
+						<div className="mb-4 flex items-center justify-between gap-3">
+							<h2 className="m-0 flex items-center gap-2 text-base font-semibold text-[var(--text)]">
 								<Users className="h-4 w-4" />
 								Members ({memberRows.length})
-							</CardTitle>
-							{projectData.canManageMembers ? (
+							</h2>
+							<div className="flex items-center gap-2">
+								{projectData.canManageMembers ? (
+									<Button
+										size="sm"
+										variant="secondary"
+										onClick={() => {
+											setIsMembersModalOpen(false);
+											setIsInviteModalOpen(true);
+										}}
+									>
+										<UserPlus className="mr-1.5 h-3.5 w-3.5" />
+										Invite members
+									</Button>
+								) : null}
 								<Button
 									size="sm"
-									variant="secondary"
-									onClick={() => setIsInviteModalOpen(true)}
+									variant="ghost"
+									onClick={() => setIsMembersModalOpen(false)}
 								>
-									<UserPlus className="mr-1.5 h-3.5 w-3.5" />
-									Invite members
+									Close
 								</Button>
-							) : null}
-						</CardHeader>
-						<CardContent className="space-y-2">
+							</div>
+						</div>
+
+						<div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
 							{memberRows.map((row) => (
 								<div
 									key={row.membership._id}
 									className="flex items-center justify-between rounded-md border border-[var(--line)] px-3 py-2"
 								>
-									<div>
-										<p className="m-0 text-sm font-medium text-[var(--text)]">
-											{row.user.name}
-										</p>
-										<p className="m-0 text-xs text-[var(--muted-text)]">
-											{row.user.email}
-										</p>
+									<div className="flex items-center gap-3">
+										<div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-[var(--line)] bg-[var(--surface-muted)] text-[11px] font-semibold text-[var(--muted-text)]">
+											{row.user.imageUrl ? (
+												<img
+													src={row.user.imageUrl}
+													alt={row.user.name}
+													className="h-full w-full object-cover"
+												/>
+											) : (
+												row.user.name.slice(0, 2).toUpperCase()
+											)}
+										</div>
+										<div>
+											<p className="m-0 text-sm font-medium text-[var(--text)]">
+												{row.user.name}
+											</p>
+											<p className="m-0 text-xs text-[var(--muted-text)]">
+												{row.user.email}
+											</p>
+										</div>
 									</div>
 									{projectData.canManageMembers &&
 									row.user._id !== projectData.project.createdBy ? (
@@ -987,10 +917,10 @@ function ProjectDetailPage() {
 									) : null}
 								</div>
 							))}
-						</CardContent>
-					</Card>
+						</div>
+					</div>
 				</div>
-			</div>
+			) : null}
 
 			{projectData.canManageMembers && isInviteModalOpen ? (
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,12,26,0.45)] px-4">
@@ -1155,17 +1085,6 @@ function ProjectDetailPage() {
 				isConfirming={isRevokingInvite}
 				onCancel={() => setInviteToRevoke(null)}
 				onConfirm={confirmRevokeInvite}
-			/>
-
-			<ConfirmDialog
-				open={Boolean(issueListToDelete)}
-				title="Delete issue list"
-				description={`Delete ${issueListToDelete?.name ?? "this list"}? Issues in this list will remain in the project and move to No List.`}
-				confirmLabel="Delete list"
-				confirmingLabel="Deleting..."
-				isConfirming={isDeletingIssueList}
-				onCancel={() => setIssueListToDelete(null)}
-				onConfirm={confirmDeleteIssueList}
 			/>
 
 			<ConfirmDialog
