@@ -1,4 +1,6 @@
+import { Laptop, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import { cn } from "#/lib/utils";
 
 type ThemeMode = "light" | "dark" | "auto";
 
@@ -54,28 +56,60 @@ export default function ThemeToggle() {
 		};
 	}, [mode]);
 
-	function toggleMode() {
-		const nextMode: ThemeMode =
-			mode === "light" ? "dark" : mode === "dark" ? "auto" : "light";
+	function setThemeMode(nextMode: ThemeMode) {
 		setMode(nextMode);
 		applyThemeMode(nextMode);
 		window.localStorage.setItem("theme", nextMode);
 	}
 
-	const label =
-		mode === "auto"
-			? "Theme mode: auto (system). Click to switch to light mode."
-			: `Theme mode: ${mode}. Click to switch mode.`;
-
 	return (
-		<button
-			type="button"
-			onClick={toggleMode}
-			aria-label={label}
-			title={label}
-			className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-1.5 text-sm font-medium text-[var(--text)] shadow-[0_8px_22px_rgba(4,12,24,0.08)] transition hover:-translate-y-0.5"
-		>
-			{mode === "auto" ? "Auto" : mode === "dark" ? "Dark" : "Light"}
-		</button>
+		<fieldset className="inline-flex items-center rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-1 shadow-[0_8px_22px_rgba(4,12,24,0.08)]">
+			<legend className="sr-only">Theme mode</legend>
+			<button
+				type="button"
+				aria-label="Light mode"
+				title="Light mode"
+				aria-pressed={mode === "light"}
+				onClick={() => setThemeMode("light")}
+				className={cn(
+					"inline-flex h-7 w-7 items-center justify-center rounded text-[var(--muted-text)] transition",
+					mode === "light"
+						? "bg-[var(--surface)] text-[var(--text)]"
+						: "hover:bg-[var(--surface)] hover:text-[var(--text)]",
+				)}
+			>
+				<Sun className="h-4 w-4" />
+			</button>
+			<button
+				type="button"
+				aria-label="Dark mode"
+				title="Dark mode"
+				aria-pressed={mode === "dark"}
+				onClick={() => setThemeMode("dark")}
+				className={cn(
+					"inline-flex h-7 w-7 items-center justify-center rounded text-[var(--muted-text)] transition",
+					mode === "dark"
+						? "bg-[var(--surface)] text-[var(--text)]"
+						: "hover:bg-[var(--surface)] hover:text-[var(--text)]",
+				)}
+			>
+				<Moon className="h-4 w-4" />
+			</button>
+			<button
+				type="button"
+				aria-label="Auto mode (system)"
+				title="Auto mode (system)"
+				aria-pressed={mode === "auto"}
+				onClick={() => setThemeMode("auto")}
+				className={cn(
+					"inline-flex h-7 w-7 items-center justify-center rounded text-[var(--muted-text)] transition",
+					mode === "auto"
+						? "bg-[var(--surface)] text-[var(--text)]"
+						: "hover:bg-[var(--surface)] hover:text-[var(--text)]",
+				)}
+			>
+				<Laptop className="h-4 w-4" />
+			</button>
+		</fieldset>
 	);
 }
