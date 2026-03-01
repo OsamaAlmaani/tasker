@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
 	Archive,
+	History,
+	ListTodo,
 	Plus,
 	RefreshCw,
 	Settings2,
@@ -64,6 +66,9 @@ function ProjectDetailPage() {
 		routeSearch.list ?? "all",
 	);
 	const [groupBy, setGroupBy] = useState<"list" | "status">("list");
+	const [projectView, setProjectView] = useState<"issues" | "activity">(
+		"issues",
+	);
 	const [sortBy, setSortBy] = useState<
 		"updated_desc" | "created_desc" | "priority_desc" | "due_asc"
 	>("updated_desc");
@@ -158,6 +163,10 @@ function ProjectDetailPage() {
 	const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
 	const [isTogglingArchive, setIsTogglingArchive] = useState(false);
 	const issueLists = useQuery(api.issueLists.listByProject, { projectId });
+	const projectActivity = useQuery(
+		api.projects.activity,
+		projectView === "activity" ? { projectId, limit: 80 } : "skip",
+	);
 	const inviteCandidates = useQuery(
 		api.projects.searchInviteCandidates,
 		projectData?.canManageMembers
@@ -442,15 +451,26 @@ function ProjectDetailPage() {
 								New Issue
 							</Button>
 						) : null}
-						{canWrite ? (
-							<Button
-								variant="ghost"
-								onClick={() => setIsArchiveConfirmOpen(true)}
-							>
-								<Archive className="mr-2 h-4 w-4" />
-								{projectData.project.archived ? "Unarchive" : "Archive"}
-							</Button>
-						) : null}
+						<Button
+							variant="secondary"
+							onClick={() =>
+								setProjectView((prev) =>
+									prev === "issues" ? "activity" : "issues",
+								)
+							}
+						>
+							{projectView === "issues" ? (
+								<>
+									<History className="mr-2 h-4 w-4" />
+									Activity
+								</>
+							) : (
+								<>
+									<ListTodo className="mr-2 h-4 w-4" />
+									Issues
+								</>
+							)}
+						</Button>
 					</>
 				}
 			/>
@@ -532,6 +552,22 @@ function ProjectDetailPage() {
 							</div>
 							<div className="md:col-span-2">
 								<Button type="submit">Save project</Button>
+							</div>
+							<div className="md:col-span-2">
+								<div className="flex justify-end border-t border-[var(--line)] pt-3">
+									<Button
+										type="button"
+										variant={
+											projectData.project.archived ? "secondary" : "danger"
+										}
+										onClick={() => setIsArchiveConfirmOpen(true)}
+									>
+										<Archive className="mr-2 h-4 w-4" />
+										{projectData.project.archived
+											? "Unarchive project"
+											: "Archive project"}
+									</Button>
+								</div>
 							</div>
 						</form>
 					</CardContent>
@@ -682,215 +718,223 @@ function ProjectDetailPage() {
 			) : null}
 
 			<div className="space-y-4">
-				<Card>
-					<CardHeader>
-						<CardTitle>Issues</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="mb-3 grid gap-2 md:grid-cols-7">
-							<Input
-								value={search}
-								onChange={(event) => setSearch(event.target.value)}
-								placeholder="Search issues"
-							/>
-							<Select
-								value={statusPicker}
-								onChange={(event) => addStatusFilter(event.target.value)}
-							>
-								<option value="">Add status filter</option>
-								{ISSUE_STATUSES.map((value) => (
-									<option
-										key={value}
-										value={value}
-										disabled={selectedStatuses.includes(value)}
-									>
-										{issueStatusLabel[value]}
-									</option>
-								))}
-							</Select>
-							<Select
-								value={priority}
-								onChange={(event) => setPriority(event.target.value)}
-							>
-								<option value="">All priority</option>
-								{ISSUE_PRIORITIES.map((value) => (
-									<option key={value} value={value}>
-										{value}
-									</option>
-								))}
-							</Select>
-							<Select
-								value={assigneeId}
-								onChange={(event) => setAssigneeId(event.target.value)}
-							>
-								<option value="">All assignees</option>
-								{(assignableUsers ?? []).map((user) => (
-									<option key={user._id} value={user._id}>
-										{user.name}
-									</option>
-								))}
-							</Select>
-							<Select
-								value={listFilter}
-								onChange={(event) => setListFilter(event.target.value)}
-							>
-								<option value="all">All lists</option>
-								<option value="none">No list</option>
-								{(issueLists ?? []).map((list) => (
-									<option key={list._id} value={list._id}>
-										{list.name}
-									</option>
-								))}
-							</Select>
-							<Select
-								value={groupBy}
-								onChange={(event) =>
-									setGroupBy(event.target.value as "list" | "status")
-								}
-							>
-								<option value="list">Group: List</option>
-								<option value="status">Group: Status</option>
-							</Select>
-							<Select
-								value={sortBy}
-								onChange={(event) =>
-									setSortBy(
-										event.target.value as
-											| "updated_desc"
-											| "created_desc"
-											| "priority_desc"
-											| "due_asc",
-									)
-								}
-							>
-								<option value="updated_desc">Updated</option>
-								<option value="created_desc">Created</option>
-								<option value="priority_desc">Priority</option>
-								<option value="due_asc">Due date</option>
-							</Select>
-						</div>
-
-						{selectedStatuses.length ? (
-							<div className="mb-3 flex flex-wrap items-center gap-2">
-								{selectedStatuses.map((value) => (
-									<RemovableIssueStatusBadge
-										key={value}
-										status={value}
-										onRemove={() =>
-											setSelectedStatuses((prev) =>
-												prev.filter((item) => item !== value),
-											)
-										}
-									/>
-								))}
-								<Button
-									type="button"
-									size="sm"
-									variant="ghost"
-									onClick={() => setSelectedStatuses([])}
+				{projectView === "issues" ? (
+					<Card>
+						<CardHeader>
+							<CardTitle>Issues</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<div className="mb-3 grid gap-2 md:grid-cols-7">
+								<Input
+									value={search}
+									onChange={(event) => setSearch(event.target.value)}
+									placeholder="Search issues"
+								/>
+								<Select
+									value={statusPicker}
+									onChange={(event) => addStatusFilter(event.target.value)}
 								>
-									Clear statuses
-								</Button>
-							</div>
-						) : null}
-
-						<div className="space-y-4">
-							{groupedIssues.map((group) => (
-								<div key={group.key} className="space-y-2">
-									<div className="flex items-center justify-between">
-										<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
-											{group.title}
-										</p>
-										<Badge>{group.items.length}</Badge>
-									</div>
-
-									{group.items.map((issue) => (
-										<div
-											key={issue._id}
-											className="issue-row flex-wrap gap-y-2"
+									<option value="">Add status filter</option>
+									{ISSUE_STATUSES.map((value) => (
+										<option
+											key={value}
+											value={value}
+											disabled={selectedStatuses.includes(value)}
 										>
-											<Link
-												to="/issues/$issueId"
-												params={{ issueId: issue._id }}
-												className="flex min-w-0 flex-1 no-underline"
-											>
-												<div className="min-w-0">
-													<p className="m-0 truncate text-sm font-medium text-[var(--text)]">
-														{issue.title}
-													</p>
-													<p className="m-0 text-xs text-[var(--muted-text)]">
-														#{issue.issueNumber} · Updated{" "}
-														{formatRelative(issue.updatedAt)}
-													</p>
-												</div>
-											</Link>
-											<div className="ml-auto flex items-center gap-2">
-												{issue.dueDate ? (
-													<Badge>{formatDate(issue.dueDate)}</Badge>
-												) : null}
-												<IssuePriorityBadge priority={issue.priority} />
-												<IssueStatusBadge status={issue.status} />
-												{canWrite ? (
-													<>
-														<Select
-															className="w-36"
-															value={issue.listId ?? ""}
-															onChange={(event) => {
-																void updateIssue({
-																	issueId: issue._id,
-																	listId: (event.target.value ||
-																		null) as Id<"issueLists"> | null,
-																});
-															}}
-														>
-															<option value="">No list</option>
-															{(issueLists ?? []).map((list) => (
-																<option key={list._id} value={list._id}>
-																	{list.name}
-																</option>
-															))}
-														</Select>
-														<Select
-															className="w-36"
-															value={issue.status}
-															onChange={(event) => {
-																void updateIssue({
-																	issueId: issue._id,
-																	status: event.target
-																		.value as (typeof ISSUE_STATUSES)[number],
-																});
-															}}
-														>
-															{ISSUE_STATUSES.map((value) => (
-																<option key={value} value={value}>
-																	{issueStatusLabel[value]}
-																</option>
-															))}
-														</Select>
-													</>
-												) : null}
-											</div>
-										</div>
+											{issueStatusLabel[value]}
+										</option>
 									))}
-								</div>
-							))}
-							{issues && issues.length === 0 ? (
-								<p className="m-0 text-sm text-[var(--muted-text)]">
-									No issues found.
-								</p>
-							) : null}
-						</div>
-					</CardContent>
-				</Card>
+								</Select>
+								<Select
+									value={priority}
+									onChange={(event) => setPriority(event.target.value)}
+								>
+									<option value="">All priority</option>
+									{ISSUE_PRIORITIES.map((value) => (
+										<option key={value} value={value}>
+											{value}
+										</option>
+									))}
+								</Select>
+								<Select
+									value={assigneeId}
+									onChange={(event) => setAssigneeId(event.target.value)}
+								>
+									<option value="">All assignees</option>
+									{(assignableUsers ?? []).map((user) => (
+										<option key={user._id} value={user._id}>
+											{user.name}
+										</option>
+									))}
+								</Select>
+								<Select
+									value={listFilter}
+									onChange={(event) => setListFilter(event.target.value)}
+								>
+									<option value="all">All lists</option>
+									<option value="none">No list</option>
+									{(issueLists ?? []).map((list) => (
+										<option key={list._id} value={list._id}>
+											{list.name}
+										</option>
+									))}
+								</Select>
+								<Select
+									value={groupBy}
+									onChange={(event) =>
+										setGroupBy(event.target.value as "list" | "status")
+									}
+								>
+									<option value="list">Group: List</option>
+									<option value="status">Group: Status</option>
+								</Select>
+								<Select
+									value={sortBy}
+									onChange={(event) =>
+										setSortBy(
+											event.target.value as
+												| "updated_desc"
+												| "created_desc"
+												| "priority_desc"
+												| "due_asc",
+										)
+									}
+								>
+									<option value="updated_desc">Updated</option>
+									<option value="created_desc">Created</option>
+									<option value="priority_desc">Priority</option>
+									<option value="due_asc">Due date</option>
+								</Select>
+							</div>
 
-				<Card>
-					<CardHeader>
-						<CardTitle>Project Activity</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<ActivityFeed activities={projectData.recentActivity} />
-					</CardContent>
-				</Card>
+							{selectedStatuses.length ? (
+								<div className="mb-3 flex flex-wrap items-center gap-2">
+									{selectedStatuses.map((value) => (
+										<RemovableIssueStatusBadge
+											key={value}
+											status={value}
+											onRemove={() =>
+												setSelectedStatuses((prev) =>
+													prev.filter((item) => item !== value),
+												)
+											}
+										/>
+									))}
+									<Button
+										type="button"
+										size="sm"
+										variant="ghost"
+										onClick={() => setSelectedStatuses([])}
+									>
+										Clear statuses
+									</Button>
+								</div>
+							) : null}
+
+							<div className="space-y-4">
+								{groupedIssues.map((group) => (
+									<div key={group.key} className="space-y-2">
+										<div className="flex items-center justify-between">
+											<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
+												{group.title}
+											</p>
+											<Badge>{group.items.length}</Badge>
+										</div>
+
+										{group.items.map((issue) => (
+											<div
+												key={issue._id}
+												className="issue-row flex-wrap gap-y-2"
+											>
+												<Link
+													to="/issues/$issueId"
+													params={{ issueId: issue._id }}
+													className="flex min-w-0 flex-1 no-underline"
+												>
+													<div className="min-w-0">
+														<p className="m-0 truncate text-sm font-medium text-[var(--text)]">
+															{issue.title}
+														</p>
+														<p className="m-0 text-xs text-[var(--muted-text)]">
+															#{issue.issueNumber} · Updated{" "}
+															{formatRelative(issue.updatedAt)}
+														</p>
+													</div>
+												</Link>
+												<div className="ml-auto flex items-center gap-2">
+													{issue.dueDate ? (
+														<Badge>{formatDate(issue.dueDate)}</Badge>
+													) : null}
+													<IssuePriorityBadge priority={issue.priority} />
+													<IssueStatusBadge status={issue.status} />
+													{canWrite ? (
+														<>
+															<Select
+																className="w-36"
+																value={issue.listId ?? ""}
+																onChange={(event) => {
+																	void updateIssue({
+																		issueId: issue._id,
+																		listId: (event.target.value ||
+																			null) as Id<"issueLists"> | null,
+																	});
+																}}
+															>
+																<option value="">No list</option>
+																{(issueLists ?? []).map((list) => (
+																	<option key={list._id} value={list._id}>
+																		{list.name}
+																	</option>
+																))}
+															</Select>
+															<Select
+																className="w-36"
+																value={issue.status}
+																onChange={(event) => {
+																	void updateIssue({
+																		issueId: issue._id,
+																		status: event.target
+																			.value as (typeof ISSUE_STATUSES)[number],
+																	});
+																}}
+															>
+																{ISSUE_STATUSES.map((value) => (
+																	<option key={value} value={value}>
+																		{issueStatusLabel[value]}
+																	</option>
+																))}
+															</Select>
+														</>
+													) : null}
+												</div>
+											</div>
+										))}
+									</div>
+								))}
+								{issues && issues.length === 0 ? (
+									<p className="m-0 text-sm text-[var(--muted-text)]">
+										No issues found.
+									</p>
+								) : null}
+							</div>
+						</CardContent>
+					</Card>
+				) : (
+					<Card className="min-h-[calc(100dvh-220px)]">
+						<CardHeader>
+							<CardTitle>Project Activity</CardTitle>
+						</CardHeader>
+						<CardContent>
+							{projectActivity === undefined ? (
+								<p className="m-0 text-sm text-[var(--muted-text)]">
+									Loading activity…
+								</p>
+							) : (
+								<ActivityFeed activities={projectActivity} />
+							)}
+						</CardContent>
+					</Card>
+				)}
 			</div>
 
 			{isMembersModalOpen ? (

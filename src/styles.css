@@ -114,6 +114,7 @@ body {
     radial-gradient(1400px 700px at 110% -12%, rgba(37, 99, 235, 0.2), transparent 62%),
     radial-gradient(900px 480px at -10% 8%, rgba(245, 158, 11, 0.16), transparent 68%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-strong) 100%);
+  background-attachment: fixed, fixed, fixed;
   overflow-x: hidden;
 }
 
@@ -179,37 +180,53 @@ button:disabled,
   align-items: center;
   gap: 8px;
   border-radius: 8px;
+  border: 1px solid transparent;
   padding: 8px 10px;
   color: var(--muted-text);
+  background: transparent;
   text-decoration: none;
   font-size: 0.875rem;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .nav-item:hover,
 .project-item:hover {
-  background: var(--surface-muted);
+  background: color-mix(in oklab, var(--surface-muted) 96%, var(--accent) 4%);
+  border-color: color-mix(in oklab, var(--line) 84%, var(--accent) 16%);
   color: var(--text);
 }
 
 .nav-item-active,
 .project-item-active {
-  background: var(--surface-muted);
+  background: color-mix(in oklab, var(--surface-muted) 96%, var(--accent) 4%);
   color: var(--text);
-  border: 1px solid var(--line);
+  border-color: color-mix(in oklab, var(--line) 84%, var(--accent) 16%);
+  font-weight: 500;
 }
 
 .project-subitem {
   display: block;
   border-radius: 8px;
-  padding: 4px 8px;
+  border: 1px solid transparent;
+  padding: 6px 8px;
   color: var(--muted-text);
+  background: transparent;
   text-decoration: none;
   font-size: 0.75rem;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .project-subitem:hover {
-  background: var(--surface-muted);
+  background: color-mix(in oklab, var(--surface-muted) 96%, var(--accent) 4%);
+  border-color: color-mix(in oklab, var(--line) 84%, var(--accent) 16%);
   color: var(--text);
+}
+
+.project-subitem-active {
+  background: color-mix(in oklab, var(--surface-muted) 96%, var(--accent) 4%);
+  color: var(--text);
+  border-color: color-mix(in oklab, var(--line) 84%, var(--accent) 16%);
+  font-weight: 500;
 }
 
 .project-dot {

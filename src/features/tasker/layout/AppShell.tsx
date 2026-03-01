@@ -192,6 +192,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 										params={{ projectId: row.project._id }}
 										search={{}}
 										className="project-item min-w-0 flex-1"
+										activeOptions={{
+											exact: true,
+											includeSearch: true,
+											explicitUndefined: true,
+										}}
 										activeProps={{
 											className:
 												"project-item project-item-active min-w-0 flex-1",
@@ -233,6 +238,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 												params={{ projectId: row.project._id }}
 												search={{ list: list._id }}
 												className="project-subitem truncate"
+												activeOptions={{ exact: true, includeSearch: true }}
+												activeProps={{
+													className:
+														"project-subitem project-subitem-active truncate",
+												}}
 												title={list.name}
 											>
 												• {list.name}

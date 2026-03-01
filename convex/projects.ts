@@ -136,18 +136,11 @@ export const getById = query({
       },
     )
 
-    const recentActivity = await ctx.db
-      .query('activities')
-      .withIndex('by_projectId', (q) => q.eq('projectId', args.projectId))
-      .order('desc')
-      .take(30)
-
     return {
       project,
       issueCounts,
       members: uniqueUsers(members.map((item) => item.user)),
       membershipRows: members,
-      recentActivity,
       canEdit: canWrite(user.globalRole),
       canManageMembers:
         user.globalRole === 'admin' ||
