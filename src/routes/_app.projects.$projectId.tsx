@@ -10,7 +10,13 @@ import {
 	UserPlus,
 	Users,
 } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import {
+	type FormEvent,
+	type ReactNode,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 import { z } from "zod";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -33,9 +39,11 @@ import { formatDate, formatRelative } from "#/features/tasker/format";
 import {
 	ISSUE_PRIORITIES,
 	ISSUE_STATUSES,
+	issuePriorityLabel,
 	issueStatusLabel,
 } from "#/features/tasker/model";
 import { issueFormSchema } from "#/features/tasker/validation";
+import { cn } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Doc, Id } from "#convex/_generated/dataModel";
 
@@ -47,6 +55,82 @@ export const Route = createFileRoute("/_app/projects/$projectId")({
 	validateSearch: projectSearchSchema,
 	component: ProjectDetailPage,
 });
+
+function InlineSelectTrigger({
+	ariaLabel,
+	value,
+	options,
+	onChange,
+	children,
+	className,
+}: {
+	ariaLabel: string;
+	value: string;
+	options: Array<{ value: string; label: string; disabled?: boolean }>;
+	onChange: (value: string) => void;
+	children: ReactNode;
+	className?: string;
+}) {
+	return (
+		<label className={cn("issue-inline-select", className)}>
+			<span className="issue-inline-select-display">{children}</span>
+			<select
+				aria-label={ariaLabel}
+				className="issue-inline-select-native"
+				value={value}
+				onChange={(event) => onChange(event.target.value)}
+			>
+				{options.map((option) => (
+					<option
+						key={option.value}
+						value={option.value}
+						disabled={option.disabled}
+					>
+						{option.label}
+					</option>
+				))}
+			</select>
+		</label>
+	);
+}
+
+function AssigneeAvatar({
+	name,
+	imageUrl,
+	unassigned = false,
+}: {
+	name?: string;
+	imageUrl?: string;
+	unassigned?: boolean;
+}) {
+	const initials =
+		name
+			?.split(" ")
+			.map((part) => part[0])
+			.join("")
+			.slice(0, 2)
+			.toUpperCase() ?? "?";
+
+	return (
+		<span
+			className={cn(
+				"issue-assignee-avatar",
+				unassigned ? "issue-assignee-avatar-unassigned" : "",
+			)}
+			title={name ?? "Unassigned"}
+		>
+			{imageUrl && !unassigned ? (
+				<img
+					src={imageUrl}
+					alt={name ?? "Assignee"}
+					className="h-full w-full object-cover"
+				/>
+			) : unassigned ? null : (
+				initials
+			)}
+		</span>
+	);
+}
 
 function ProjectDetailPage() {
 	const { projectId: projectIdParam } = Route.useParams();
@@ -203,6 +287,10 @@ function ProjectDetailPage() {
 	const issueListById = useMemo(
 		() => new Map((issueLists ?? []).map((list) => [list._id, list])),
 		[issueLists],
+	);
+	const assignableUserById = useMemo(
+		() => new Map((assignableUsers ?? []).map((user) => [user._id, user])),
+		[assignableUsers],
 	);
 	const groupedIssues = useMemo(() => {
 		const rows = issues ?? [];
@@ -841,74 +929,151 @@ function ProjectDetailPage() {
 											<Badge>{group.items.length}</Badge>
 										</div>
 
-										{group.items.map((issue) => (
-											<div
-												key={issue._id}
-												className="issue-row flex-wrap gap-y-2"
-											>
-												<Link
-													to="/issues/$issueId"
-													params={{ issueId: issue._id }}
-													className="flex min-w-0 flex-1 no-underline"
+										{group.items.map((issue) => {
+											const listLabel =
+												issue.listId && issueListById.has(issue.listId)
+													? issueListById.get(issue.listId)?.name
+													: "No list";
+											const assignee = issue.assigneeId
+												? assignableUserById.get(issue.assigneeId)
+												: null;
+
+											return (
+												<div
+													key={issue._id}
+													className="issue-row issue-row-compact"
 												>
-													<div className="min-w-0">
-														<p className="m-0 truncate text-sm font-medium text-[var(--text)]">
-															{issue.title}
-														</p>
-														<p className="m-0 text-xs text-[var(--muted-text)]">
-															#{issue.issueNumber} · Updated{" "}
-															{formatRelative(issue.updatedAt)}
-														</p>
+													<Link
+														to="/issues/$issueId"
+														params={{ issueId: issue._id }}
+														className="issue-row-main no-underline"
+													>
+														<div className="min-w-0">
+															<p className="m-0 break-words text-sm font-medium text-[var(--text)]">
+																{issue.title}
+															</p>
+															<p className="m-0 text-xs text-[var(--muted-text)]">
+																#{issue.issueNumber} · Updated{" "}
+																{formatRelative(issue.updatedAt)}
+															</p>
+														</div>
+													</Link>
+
+													<div className="issue-row-controls">
+														{canWrite ? (
+															<InlineSelectTrigger
+																ariaLabel="Assign issue"
+																value={issue.assigneeId ?? ""}
+																onChange={(nextAssigneeId) => {
+																	void updateIssue({
+																		issueId: issue._id,
+																		assigneeId: (nextAssigneeId ||
+																			null) as Id<"users"> | null,
+																	});
+																}}
+																options={[
+																	{ value: "", label: "Unassigned" },
+																	...(assignableUsers ?? []).map((user) => ({
+																		value: user._id,
+																		label: user.name,
+																	})),
+																]}
+																className="issue-inline-select-assignee"
+															>
+																<AssigneeAvatar
+																	name={assignee?.name}
+																	imageUrl={assignee?.imageUrl}
+																	unassigned={!assignee}
+																/>
+															</InlineSelectTrigger>
+														) : (
+															<AssigneeAvatar
+																name={assignee?.name}
+																imageUrl={assignee?.imageUrl}
+																unassigned={!assignee}
+															/>
+														)}
+
+														{issue.dueDate ? (
+															<Badge>{formatDate(issue.dueDate)}</Badge>
+														) : null}
+
+														{canWrite ? (
+															<>
+																<InlineSelectTrigger
+																	ariaLabel="Update status"
+																	value={issue.status}
+																	onChange={(nextStatus) => {
+																		void updateIssue({
+																			issueId: issue._id,
+																			status:
+																				nextStatus as (typeof ISSUE_STATUSES)[number],
+																		});
+																	}}
+																	options={ISSUE_STATUSES.map((value) => ({
+																		value,
+																		label: issueStatusLabel[value],
+																	}))}
+																>
+																	<IssueStatusBadge status={issue.status} />
+																</InlineSelectTrigger>
+
+																<InlineSelectTrigger
+																	ariaLabel="Update priority"
+																	value={issue.priority}
+																	onChange={(nextPriority) => {
+																		void updateIssue({
+																			issueId: issue._id,
+																			priority:
+																				nextPriority as (typeof ISSUE_PRIORITIES)[number],
+																		});
+																	}}
+																	options={ISSUE_PRIORITIES.map((value) => ({
+																		value,
+																		label: issuePriorityLabel[value],
+																	}))}
+																>
+																	<IssuePriorityBadge
+																		priority={issue.priority}
+																	/>
+																</InlineSelectTrigger>
+
+																<InlineSelectTrigger
+																	ariaLabel="Move issue list"
+																	value={issue.listId ?? ""}
+																	onChange={(nextListId) => {
+																		void updateIssue({
+																			issueId: issue._id,
+																			listId: (nextListId ||
+																				null) as Id<"issueLists"> | null,
+																		});
+																	}}
+																	options={[
+																		{ value: "", label: "No list" },
+																		...(issueLists ?? []).map((list) => ({
+																			value: list._id,
+																			label: list.name,
+																		})),
+																	]}
+																>
+																	<Badge className="border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300">
+																		{listLabel ?? "No list"}
+																	</Badge>
+																</InlineSelectTrigger>
+															</>
+														) : (
+															<>
+																<IssueStatusBadge status={issue.status} />
+																<IssuePriorityBadge priority={issue.priority} />
+																<Badge className="border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300">
+																	{listLabel ?? "No list"}
+																</Badge>
+															</>
+														)}
 													</div>
-												</Link>
-												<div className="ml-auto flex items-center gap-2">
-													{issue.dueDate ? (
-														<Badge>{formatDate(issue.dueDate)}</Badge>
-													) : null}
-													<IssuePriorityBadge priority={issue.priority} />
-													<IssueStatusBadge status={issue.status} />
-													{canWrite ? (
-														<>
-															<Select
-																className="w-36"
-																value={issue.listId ?? ""}
-																onChange={(event) => {
-																	void updateIssue({
-																		issueId: issue._id,
-																		listId: (event.target.value ||
-																			null) as Id<"issueLists"> | null,
-																	});
-																}}
-															>
-																<option value="">No list</option>
-																{(issueLists ?? []).map((list) => (
-																	<option key={list._id} value={list._id}>
-																		{list.name}
-																	</option>
-																))}
-															</Select>
-															<Select
-																className="w-36"
-																value={issue.status}
-																onChange={(event) => {
-																	void updateIssue({
-																		issueId: issue._id,
-																		status: event.target
-																			.value as (typeof ISSUE_STATUSES)[number],
-																	});
-																}}
-															>
-																{ISSUE_STATUSES.map((value) => (
-																	<option key={value} value={value}>
-																		{issueStatusLabel[value]}
-																	</option>
-																))}
-															</Select>
-														</>
-													) : null}
 												</div>
-											</div>
-										))}
+											);
+										})}
 									</div>
 								))}
 								{issues && issues.length === 0 ? (

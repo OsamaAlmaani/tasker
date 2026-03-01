@@ -275,6 +275,69 @@ button:disabled,
   border-color: color-mix(in oklab, var(--accent) 40%, var(--line));
 }
 
+.issue-row-compact {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.issue-row-main {
+  min-width: min(360px, 100%);
+  flex: 1 1 360px;
+}
+
+.issue-row-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.issue-inline-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.issue-inline-select-display {
+  display: inline-flex;
+  align-items: center;
+}
+
+.issue-inline-select-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.issue-inline-select-assignee {
+  margin-right: 2px;
+}
+
+.issue-assignee-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--line) 78%, transparent 22%);
+  background: color-mix(in oklab, var(--surface-muted) 94%, transparent 6%);
+  color: var(--muted-text);
+  font-size: 0.62rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.issue-assignee-avatar-unassigned {
+  background: transparent;
+  border-style: dashed;
+}
+
 .page-loading {
   min-height: 40vh;
   display: flex;
@@ -718,6 +781,17 @@ button:disabled,
   .app-sidebar-toggle,
   .app-sidebar-close {
     display: inline-flex;
+  }
+
+  .issue-row-main {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .issue-row-controls {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .stitch-landing-main {
