@@ -10,7 +10,13 @@ import {
 	UserPlus,
 	Users,
 } from "lucide-react";
-import { type FormEvent, type ReactNode, useMemo, useState } from "react";
+import {
+	type DragEvent,
+	type FormEvent,
+	type ReactNode,
+	useMemo,
+	useState,
+} from "react";
 import { z } from "zod";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -49,6 +55,7 @@ const ISSUE_SORT_OPTIONS = [
 ] as const;
 const ISSUE_GROUP_OPTIONS = ["list", "status"] as const;
 const PROJECT_VIEW_OPTIONS = ["issues", "activity"] as const;
+const ISSUE_LAYOUT_OPTIONS = ["list", "kanban"] as const;
 
 const projectSearchSchema = z.object({
 	list: z.string().optional(),
@@ -59,6 +66,7 @@ const projectSearchSchema = z.object({
 	groupBy: z.enum(ISSUE_GROUP_OPTIONS).optional(),
 	view: z.enum(PROJECT_VIEW_OPTIONS).optional(),
 	sort: z.enum(ISSUE_SORT_OPTIONS).optional(),
+	layout: z.enum(ISSUE_LAYOUT_OPTIONS).optional(),
 });
 
 type ProjectSearch = z.infer<typeof projectSearchSchema>;
@@ -188,6 +196,7 @@ function ProjectDetailPage() {
 	const groupBy = routeSearch.groupBy ?? "list";
 	const projectView = routeSearch.view ?? "issues";
 	const sortBy = routeSearch.sort ?? "updated_desc";
+	const issueLayout = routeSearch.layout ?? "list";
 
 	function updateProjectSearch(
 		patch: Partial<ProjectSearch>,
@@ -225,6 +234,9 @@ function ProjectDetailPage() {
 				}
 				if (next.sort === "updated_desc" || !next.sort) {
 					delete next.sort;
+				}
+				if (next.layout === "list" || !next.layout) {
+					delete next.layout;
 				}
 
 				return next;
@@ -326,6 +338,12 @@ function ProjectDetailPage() {
 	const [isRevokingInvite, setIsRevokingInvite] = useState(false);
 	const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
 	const [isTogglingArchive, setIsTogglingArchive] = useState(false);
+	const [draggingIssueId, setDraggingIssueId] = useState<Id<"issues"> | null>(
+		null,
+	);
+	const [dragOverStatus, setDragOverStatus] = useState<
+		(typeof ISSUE_STATUSES)[number] | null
+	>(null);
 	const issueLists = useQuery(api.issueLists.listByProject, { projectId });
 	const projectActivity = useQuery(
 		api.projects.activity,
@@ -417,6 +435,15 @@ function ProjectDetailPage() {
 			return a.title.localeCompare(b.title);
 		});
 	}, [issues, issueListById, groupBy]);
+	const kanbanColumns = useMemo(
+		() =>
+			ISSUE_STATUSES.map((status) => ({
+				status,
+				title: issueStatusLabel[status],
+				items: (issues ?? []).filter((issue) => issue.status === status),
+			})),
+		[issues],
+	);
 
 	if (!projectData) {
 		return <div className="page-loading">Loading project…</div>;
@@ -589,6 +616,82 @@ function ProjectDetailPage() {
 			allowMemberInvites: projectData.project.allowMemberInvites ?? true,
 			allowIssueDelete: projectData.project.allowIssueDelete ?? true,
 		});
+	}
+
+	function handleKanbanDragStart(
+		event: DragEvent<HTMLElement>,
+		issue: Doc<"issues">,
+	) {
+		if (!canWrite) {
+			return;
+		}
+		event.dataTransfer.effectAllowed = "move";
+		event.dataTransfer.setData(
+			"application/tasker-issue",
+			JSON.stringify({
+				issueId: issue._id,
+				status: issue.status,
+			}),
+		);
+		setDraggingIssueId(issue._id);
+	}
+
+	function handleKanbanDragEnd() {
+		setDraggingIssueId(null);
+		setDragOverStatus(null);
+	}
+
+	function handleKanbanColumnDragOver(
+		event: DragEvent<HTMLElement>,
+		status: (typeof ISSUE_STATUSES)[number],
+	) {
+		if (!canWrite) {
+			return;
+		}
+		event.preventDefault();
+		event.dataTransfer.dropEffect = "move";
+		if (dragOverStatus !== status) {
+			setDragOverStatus(status);
+		}
+	}
+
+	function handleKanbanColumnDrop(
+		event: DragEvent<HTMLElement>,
+		nextStatus: (typeof ISSUE_STATUSES)[number],
+	) {
+		if (!canWrite) {
+			return;
+		}
+
+		event.preventDefault();
+		const payload =
+			event.dataTransfer.getData("application/tasker-issue") ||
+			event.dataTransfer.getData("text/plain");
+		if (!payload) {
+			handleKanbanDragEnd();
+			return;
+		}
+
+		try {
+			const parsed = JSON.parse(payload) as {
+				issueId?: string;
+				status?: (typeof ISSUE_STATUSES)[number];
+			};
+			if (!parsed.issueId || !parsed.status) {
+				handleKanbanDragEnd();
+				return;
+			}
+			if (parsed.status !== nextStatus) {
+				void updateIssue({
+					issueId: parsed.issueId as Id<"issues">,
+					status: nextStatus,
+				});
+			}
+		} catch {
+			// Ignore malformed drag payloads.
+		} finally {
+			handleKanbanDragEnd();
+		}
 	}
 
 	return (
@@ -909,7 +1012,54 @@ function ProjectDetailPage() {
 							<CardTitle>Issues</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<div className="mb-3 grid gap-2 md:grid-cols-6">
+							<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+								<div className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-1">
+									<Button
+										type="button"
+										size="sm"
+										variant={issueLayout === "list" ? "secondary" : "ghost"}
+										className="h-7 px-3"
+										onClick={() =>
+											updateProjectSearch(
+												{
+													layout: "list",
+												},
+												{ replace: true },
+											)
+										}
+									>
+										List
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										variant={issueLayout === "kanban" ? "secondary" : "ghost"}
+										className="h-7 px-3"
+										onClick={() =>
+											updateProjectSearch(
+												{
+													layout: "kanban",
+												},
+												{ replace: true },
+											)
+										}
+									>
+										Kanban
+									</Button>
+								</div>
+								{issueLayout === "kanban" ? (
+									<p className="m-0 text-xs text-[var(--muted-text)]">
+										Drag cards between status columns to update status.
+									</p>
+								) : null}
+							</div>
+
+							<div
+								className={cn(
+									"mb-3 grid gap-2",
+									issueLayout === "list" ? "md:grid-cols-6" : "md:grid-cols-5",
+								)}
+							>
 								<Input
 									value={search}
 									onChange={(event) =>
@@ -970,20 +1120,23 @@ function ProjectDetailPage() {
 										</option>
 									))}
 								</Select>
-								<Select
-									value={groupBy}
-									onChange={(event) =>
-										updateProjectSearch(
-											{
-												groupBy: event.target.value as ProjectSearch["groupBy"],
-											},
-											{ replace: true },
-										)
-									}
-								>
-									<option value="list">Group: List</option>
-									<option value="status">Group: Status</option>
-								</Select>
+								{issueLayout === "list" ? (
+									<Select
+										value={groupBy}
+										onChange={(event) =>
+											updateProjectSearch(
+												{
+													groupBy: event.target
+														.value as ProjectSearch["groupBy"],
+												},
+												{ replace: true },
+											)
+										}
+									>
+										<option value="list">Group: List</option>
+										<option value="status">Group: Status</option>
+									</Select>
+								) : null}
 								<Select
 									value={sortBy}
 									onChange={(event) =>
@@ -1038,160 +1191,266 @@ function ProjectDetailPage() {
 								</div>
 							) : null}
 
-							<div className="space-y-4">
-								{groupedIssues.map((group) => (
-									<div key={group.key} className="space-y-2">
-										<div className="flex items-center justify-between">
-											<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
-												{group.title}
-											</p>
-											<Badge>{group.items.length}</Badge>
-										</div>
+							{issueLayout === "list" ? (
+								<div className="space-y-4">
+									{groupedIssues.map((group) => (
+										<div key={group.key} className="space-y-2">
+											<div className="flex items-center justify-between">
+												<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
+													{group.title}
+												</p>
+												<Badge>{group.items.length}</Badge>
+											</div>
 
-										{group.items.map((issue) => {
-											const assignee = issue.assigneeId
-												? assignableUserById.get(issue.assigneeId)
-												: null;
+											{group.items.map((issue) => {
+												const assignee = issue.assigneeId
+													? assignableUserById.get(issue.assigneeId)
+													: null;
 
-											return (
-												<div
-													key={issue._id}
-													className="issue-row issue-row-compact"
-												>
-													<Link
-														to="/issues/$issueId"
-														params={{ issueId: issue._id }}
-														className="issue-row-main no-underline"
+												return (
+													<div
+														key={issue._id}
+														className="issue-row issue-row-compact"
 													>
-														<div className="min-w-0">
-															<div className="flex min-w-0 items-center gap-2">
-																<Badge className="issue-row-id-badge">
-																	#{issue.issueNumber}
-																</Badge>
-																<p className="m-0 truncate whitespace-nowrap text-sm font-medium text-[var(--text)]">
-																	{issue.title}
+														<Link
+															to="/issues/$issueId"
+															params={{ issueId: issue._id }}
+															className="issue-row-main no-underline"
+														>
+															<div className="min-w-0">
+																<div className="flex min-w-0 items-center gap-2">
+																	<Badge className="issue-row-id-badge">
+																		#{issue.issueNumber}
+																	</Badge>
+																	<p className="m-0 truncate whitespace-nowrap text-sm font-medium text-[var(--text)]">
+																		{issue.title}
+																	</p>
+																</div>
+																<p className="m-0 truncate whitespace-nowrap text-xs text-[var(--muted-text)]">
+																	{issue.description?.trim() ||
+																		"No description"}
 																</p>
 															</div>
-															<p className="m-0 truncate whitespace-nowrap text-xs text-[var(--muted-text)]">
-																{issue.description?.trim() || "No description"}
-															</p>
-														</div>
-													</Link>
+														</Link>
 
-													<div className="issue-row-col issue-row-col-assignee">
-														{canWrite ? (
-															<InlineSelectTrigger
-																ariaLabel="Assign issue"
-																value={issue.assigneeId ?? ""}
-																onChange={(nextAssigneeId) => {
-																	void updateIssue({
-																		issueId: issue._id,
-																		assigneeId: (nextAssigneeId ||
-																			null) as Id<"users"> | null,
-																	});
-																}}
-																options={[
-																	{ value: "", label: "Unassigned" },
-																	...(assignableUsers ?? []).map((user) => ({
-																		value: user._id,
-																		label: user.name,
-																	})),
-																]}
-																className="issue-inline-select-assignee"
-															>
+														<div className="issue-row-col issue-row-col-assignee">
+															{canWrite ? (
+																<InlineSelectTrigger
+																	ariaLabel="Assign issue"
+																	value={issue.assigneeId ?? ""}
+																	onChange={(nextAssigneeId) => {
+																		void updateIssue({
+																			issueId: issue._id,
+																			assigneeId: (nextAssigneeId ||
+																				null) as Id<"users"> | null,
+																		});
+																	}}
+																	options={[
+																		{ value: "", label: "Unassigned" },
+																		...(assignableUsers ?? []).map((user) => ({
+																			value: user._id,
+																			label: user.name,
+																		})),
+																	]}
+																	className="issue-inline-select-assignee"
+																>
+																	<AssigneeAvatar
+																		name={assignee?.name}
+																		imageUrl={assignee?.imageUrl}
+																		unassigned={!assignee}
+																	/>
+																</InlineSelectTrigger>
+															) : (
 																<AssigneeAvatar
 																	name={assignee?.name}
 																	imageUrl={assignee?.imageUrl}
 																	unassigned={!assignee}
 																/>
-															</InlineSelectTrigger>
-														) : (
-															<AssigneeAvatar
-																name={assignee?.name}
-																imageUrl={assignee?.imageUrl}
-																unassigned={!assignee}
-															/>
-														)}
-													</div>
+															)}
+														</div>
 
-													<div className="issue-row-col issue-row-col-due">
-														<Badge className="issue-row-badge">
-															{issue.dueDate
-																? formatDate(issue.dueDate)
-																: "No due"}
-														</Badge>
-													</div>
+														<div className="issue-row-col issue-row-col-due">
+															<Badge className="issue-row-badge">
+																{issue.dueDate
+																	? formatDate(issue.dueDate)
+																	: "No due"}
+															</Badge>
+														</div>
 
-													<div className="issue-row-col issue-row-col-status">
-														{canWrite ? (
-															<InlineSelectTrigger
-																ariaLabel="Update status"
-																value={issue.status}
-																onChange={(nextStatus) => {
-																	void updateIssue({
-																		issueId: issue._id,
-																		status:
-																			nextStatus as (typeof ISSUE_STATUSES)[number],
-																	});
-																}}
-																options={ISSUE_STATUSES.map((value) => ({
-																	value,
-																	label: issueStatusLabel[value],
-																}))}
-																className="issue-inline-select-full"
-															>
+														<div className="issue-row-col issue-row-col-status">
+															{canWrite ? (
+																<InlineSelectTrigger
+																	ariaLabel="Update status"
+																	value={issue.status}
+																	onChange={(nextStatus) => {
+																		void updateIssue({
+																			issueId: issue._id,
+																			status:
+																				nextStatus as (typeof ISSUE_STATUSES)[number],
+																		});
+																	}}
+																	options={ISSUE_STATUSES.map((value) => ({
+																		value,
+																		label: issueStatusLabel[value],
+																	}))}
+																	className="issue-inline-select-full"
+																>
+																	<span className="issue-row-badge-slot">
+																		<IssueStatusBadge status={issue.status} />
+																	</span>
+																</InlineSelectTrigger>
+															) : (
 																<span className="issue-row-badge-slot">
 																	<IssueStatusBadge status={issue.status} />
 																</span>
-															</InlineSelectTrigger>
-														) : (
-															<span className="issue-row-badge-slot">
-																<IssueStatusBadge status={issue.status} />
-															</span>
-														)}
-													</div>
+															)}
+														</div>
 
-													<div className="issue-row-col issue-row-col-priority">
-														{canWrite ? (
-															<InlineSelectTrigger
-																ariaLabel="Update priority"
-																value={issue.priority}
-																onChange={(nextPriority) => {
-																	void updateIssue({
-																		issueId: issue._id,
-																		priority:
-																			nextPriority as (typeof ISSUE_PRIORITIES)[number],
-																	});
-																}}
-																options={ISSUE_PRIORITIES.map((value) => ({
-																	value,
-																	label: issuePriorityLabel[value],
-																}))}
-																className="issue-inline-select-full"
-															>
+														<div className="issue-row-col issue-row-col-priority">
+															{canWrite ? (
+																<InlineSelectTrigger
+																	ariaLabel="Update priority"
+																	value={issue.priority}
+																	onChange={(nextPriority) => {
+																		void updateIssue({
+																			issueId: issue._id,
+																			priority:
+																				nextPriority as (typeof ISSUE_PRIORITIES)[number],
+																		});
+																	}}
+																	options={ISSUE_PRIORITIES.map((value) => ({
+																		value,
+																		label: issuePriorityLabel[value],
+																	}))}
+																	className="issue-inline-select-full"
+																>
+																	<span className="issue-row-badge-slot">
+																		<IssuePriorityBadge
+																			priority={issue.priority}
+																		/>
+																	</span>
+																</InlineSelectTrigger>
+															) : (
 																<span className="issue-row-badge-slot">
 																	<IssuePriorityBadge
 																		priority={issue.priority}
 																	/>
 																</span>
-															</InlineSelectTrigger>
-														) : (
-															<span className="issue-row-badge-slot">
-																<IssuePriorityBadge priority={issue.priority} />
-															</span>
-														)}
+															)}
+														</div>
 													</div>
-												</div>
-											);
-										})}
-									</div>
-								))}
-								{issues && issues.length === 0 ? (
-									<p className="m-0 text-sm text-[var(--muted-text)]">
-										No issues found.
-									</p>
-								) : null}
-							</div>
+												);
+											})}
+										</div>
+									))}
+									{issues && issues.length === 0 ? (
+										<p className="m-0 text-sm text-[var(--muted-text)]">
+											No issues found.
+										</p>
+									) : null}
+								</div>
+							) : (
+								<div className="kanban-board">
+									{kanbanColumns.map((column) => (
+										<section
+											key={column.status}
+											aria-label={`${column.title} column`}
+											className={cn(
+												"kanban-column",
+												dragOverStatus === column.status
+													? "kanban-column-active"
+													: "",
+											)}
+											onDragOver={(event) =>
+												handleKanbanColumnDragOver(event, column.status)
+											}
+											onDragLeave={() =>
+												setDragOverStatus((current) =>
+													current === column.status ? null : current,
+												)
+											}
+											onDrop={(event) =>
+												handleKanbanColumnDrop(event, column.status)
+											}
+										>
+											<div className="kanban-column-header">
+												<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
+													{column.title}
+												</p>
+												<Badge>{column.items.length}</Badge>
+											</div>
+											<div className="kanban-column-body">
+												{column.items.length ? (
+													column.items.map((issue) => {
+														const assignee = issue.assigneeId
+															? assignableUserById.get(issue.assigneeId)
+															: null;
+
+														return (
+															<article
+																key={issue._id}
+																aria-label={`Issue ${issue.issueNumber}`}
+																className={cn(
+																	"kanban-card",
+																	draggingIssueId === issue._id
+																		? "kanban-card-dragging"
+																		: "",
+																)}
+																draggable={canWrite}
+																onDragStart={(event) =>
+																	handleKanbanDragStart(event, issue)
+																}
+																onDragEnd={handleKanbanDragEnd}
+															>
+																<Link
+																	to="/issues/$issueId"
+																	params={{ issueId: issue._id }}
+																	className="kanban-card-link no-underline"
+																>
+																	<div className="flex items-center gap-2">
+																		<Badge className="issue-row-id-badge">
+																			#{issue.issueNumber}
+																		</Badge>
+																		<p className="m-0 truncate text-sm font-medium text-[var(--text)]">
+																			{issue.title}
+																		</p>
+																	</div>
+																	<p className="m-0 mt-1 truncate text-xs text-[var(--muted-text)]">
+																		{issue.description?.trim() ||
+																			"No description"}
+																	</p>
+																</Link>
+
+																<div className="mt-2 flex items-center justify-between gap-2">
+																	<div className="flex items-center gap-1.5">
+																		<AssigneeAvatar
+																			name={assignee?.name}
+																			imageUrl={assignee?.imageUrl}
+																			unassigned={!assignee}
+																		/>
+																		{issue.dueDate ? (
+																			<Badge className="px-1.5 py-0 text-[10px]">
+																				{formatDate(issue.dueDate)}
+																			</Badge>
+																		) : null}
+																	</div>
+																	<IssuePriorityBadge
+																		priority={issue.priority}
+																	/>
+																</div>
+															</article>
+														);
+													})
+												) : (
+													<p className="kanban-empty">
+														No issues in this status.
+													</p>
+												)}
+											</div>
+										</section>
+									))}
+								</div>
+							)}
 						</CardContent>
 					</Card>
 				) : (
@@ -1218,7 +1477,7 @@ function ProjectDetailPage() {
 						role="dialog"
 						aria-modal="true"
 						aria-label="Project members"
-						className="w-full max-w-xl rounded-xl border border-[var(--line)] bg-card p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
+						className="w-full max-w-xl rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
 					>
 						<div className="mb-4 flex items-center justify-between gap-3">
 							<h2 className="m-0 flex items-center gap-2 text-base font-semibold text-[var(--text)]">
@@ -1304,7 +1563,7 @@ function ProjectDetailPage() {
 						role="dialog"
 						aria-modal="true"
 						aria-label="Invite members"
-						className="w-full max-w-2xl rounded-xl border border-[var(--line)] bg-card p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
+						className="w-full max-w-2xl rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
 					>
 						<div className="mb-4 flex items-center justify-between">
 							<h2 className="m-0 flex items-center gap-2 text-base font-semibold text-[var(--text)]">
