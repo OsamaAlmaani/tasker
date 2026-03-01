@@ -241,7 +241,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 									<Link
 										to="/projects/$projectId"
 										params={{ projectId: row.project._id }}
-										search={{}}
+										search={(previous) => {
+											const { list: _ignored, ...rest } = previous;
+											return rest;
+										}}
 										className="project-item min-w-0 flex-1"
 										activeOptions={{
 											exact: true,
@@ -288,7 +291,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 												key={list._id}
 												to="/projects/$projectId"
 												params={{ projectId: row.project._id }}
-												search={{ list: list._id }}
+												search={(previous) => ({
+													...previous,
+													list: list._id,
+												})}
 												className="project-subitem truncate"
 												activeOptions={{ exact: true, includeSearch: true }}
 												activeProps={{

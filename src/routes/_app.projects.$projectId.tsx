@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
 	Archive,
@@ -10,13 +10,7 @@ import {
 	UserPlus,
 	Users,
 } from "lucide-react";
-import {
-	type FormEvent,
-	type ReactNode,
-	useEffect,
-	useMemo,
-	useState,
-} from "react";
+import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import { z } from "zod";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -47,9 +41,51 @@ import { cn } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Doc, Id } from "#convex/_generated/dataModel";
 
+const ISSUE_SORT_OPTIONS = [
+	"updated_desc",
+	"created_desc",
+	"priority_desc",
+	"due_asc",
+] as const;
+const ISSUE_GROUP_OPTIONS = ["list", "status"] as const;
+const PROJECT_VIEW_OPTIONS = ["issues", "activity"] as const;
+
 const projectSearchSchema = z.object({
 	list: z.string().optional(),
+	q: z.string().optional(),
+	statuses: z.string().optional(),
+	priority: z.enum(ISSUE_PRIORITIES).optional(),
+	assignee: z.string().optional(),
+	groupBy: z.enum(ISSUE_GROUP_OPTIONS).optional(),
+	view: z.enum(PROJECT_VIEW_OPTIONS).optional(),
+	sort: z.enum(ISSUE_SORT_OPTIONS).optional(),
 });
+
+type ProjectSearch = z.infer<typeof projectSearchSchema>;
+
+function parseStatusFilters(raw?: string): (typeof ISSUE_STATUSES)[number][] {
+	if (!raw) {
+		return [];
+	}
+
+	const allowed = new Set<string>(ISSUE_STATUSES);
+	return raw
+		.split(",")
+		.map((value) => value.trim())
+		.filter((value): value is (typeof ISSUE_STATUSES)[number] =>
+			allowed.has(value),
+		);
+}
+
+function serializeStatusFilters(
+	values: (typeof ISSUE_STATUSES)[number][],
+): string | undefined {
+	if (!values.length) {
+		return undefined;
+	}
+
+	return [...new Set(values)].join(",");
+}
 
 export const Route = createFileRoute("/_app/projects/$projectId")({
 	validateSearch: projectSearchSchema,
@@ -135,27 +171,66 @@ function AssigneeAvatar({
 function ProjectDetailPage() {
 	const { projectId: projectIdParam } = Route.useParams();
 	const routeSearch = Route.useSearch();
+	const navigate = useNavigate();
 	const projectId = projectIdParam as Id<"projects">;
 	const projectData = useQuery(api.projects.getById, { projectId });
 	const me = useQuery(api.users.me);
 
-	const [search, setSearch] = useState("");
 	const [statusPicker, setStatusPicker] = useState<string>("");
-	const [selectedStatuses, setSelectedStatuses] = useState<
-		(typeof ISSUE_STATUSES)[number][]
-	>([]);
-	const [priority, setPriority] = useState<string>("");
-	const [assigneeId, setAssigneeId] = useState<string>("");
-	const [listFilter, setListFilter] = useState<string>(
-		routeSearch.list ?? "all",
+	const search = routeSearch.q ?? "";
+	const selectedStatuses = useMemo(
+		() => parseStatusFilters(routeSearch.statuses),
+		[routeSearch.statuses],
 	);
-	const [groupBy, setGroupBy] = useState<"list" | "status">("list");
-	const [projectView, setProjectView] = useState<"issues" | "activity">(
-		"issues",
-	);
-	const [sortBy, setSortBy] = useState<
-		"updated_desc" | "created_desc" | "priority_desc" | "due_asc"
-	>("updated_desc");
+	const priority = routeSearch.priority ?? "";
+	const assigneeId = routeSearch.assignee ?? "";
+	const listFilter = routeSearch.list ?? "all";
+	const groupBy = routeSearch.groupBy ?? "list";
+	const projectView = routeSearch.view ?? "issues";
+	const sortBy = routeSearch.sort ?? "updated_desc";
+
+	function updateProjectSearch(
+		patch: Partial<ProjectSearch>,
+		options?: { replace?: boolean },
+	) {
+		void navigate({
+			to: "/projects/$projectId",
+			params: { projectId },
+			replace: options?.replace ?? false,
+			search: (previous) => {
+				const next: ProjectSearch = { ...previous, ...patch };
+				const normalizedStatuses = serializeStatusFilters(
+					parseStatusFilters(next.statuses),
+				);
+				next.statuses = normalizedStatuses;
+
+				next.q = next.q?.trim();
+				if (!next.q) {
+					delete next.q;
+				}
+				if (!next.statuses) {
+					delete next.statuses;
+				}
+				if (!next.assignee) {
+					delete next.assignee;
+				}
+				if (next.list === "all" || !next.list) {
+					delete next.list;
+				}
+				if (next.groupBy === "list" || !next.groupBy) {
+					delete next.groupBy;
+				}
+				if (next.view === "issues" || !next.view) {
+					delete next.view;
+				}
+				if (next.sort === "updated_desc" || !next.sort) {
+					delete next.sort;
+				}
+
+				return next;
+			},
+		});
+	}
 
 	const issues = useQuery(api.issues.listByProject, {
 		projectId,
@@ -175,16 +250,21 @@ function ProjectDetailPage() {
 	});
 
 	function addStatusFilter(nextStatus: string) {
-		if (!nextStatus) {
+		if (
+			!nextStatus ||
+			!ISSUE_STATUSES.includes(nextStatus as (typeof ISSUE_STATUSES)[number])
+		) {
 			return;
 		}
 
-		setSelectedStatuses((prev) => {
-			if (prev.includes(nextStatus as (typeof ISSUE_STATUSES)[number])) {
-				return prev;
-			}
-			return [...prev, nextStatus as (typeof ISSUE_STATUSES)[number]];
-		});
+		const statusValue = nextStatus as (typeof ISSUE_STATUSES)[number];
+		const nextStatuses = selectedStatuses.includes(statusValue)
+			? selectedStatuses
+			: [...selectedStatuses, statusValue];
+		updateProjectSearch(
+			{ statuses: serializeStatusFilters(nextStatuses) },
+			{ replace: true },
+		);
 		setStatusPicker("");
 	}
 
@@ -264,10 +344,6 @@ function ProjectDetailPage() {
 		api.invitations.listByProject,
 		projectData?.canManageMembers ? { projectId } : "skip",
 	);
-
-	useEffect(() => {
-		setListFilter(routeSearch.list ?? "all");
-	}, [routeSearch.list]);
 
 	const canWrite = me?.globalRole === "admin" || me?.globalRole === "member";
 
@@ -542,8 +618,11 @@ function ProjectDetailPage() {
 						<Button
 							variant="secondary"
 							onClick={() =>
-								setProjectView((prev) =>
-									prev === "issues" ? "activity" : "issues",
+								updateProjectSearch(
+									{
+										view: projectView === "issues" ? "activity" : "issues",
+									},
+									{ replace: true },
 								)
 							}
 						>
@@ -815,7 +894,12 @@ function ProjectDetailPage() {
 							<div className="mb-3 grid gap-2 md:grid-cols-7">
 								<Input
 									value={search}
-									onChange={(event) => setSearch(event.target.value)}
+									onChange={(event) =>
+										updateProjectSearch(
+											{ q: event.target.value },
+											{ replace: true },
+										)
+									}
 									placeholder="Search issues"
 								/>
 								<Select
@@ -835,7 +919,15 @@ function ProjectDetailPage() {
 								</Select>
 								<Select
 									value={priority}
-									onChange={(event) => setPriority(event.target.value)}
+									onChange={(event) =>
+										updateProjectSearch(
+											{
+												priority: (event.target.value ||
+													undefined) as ProjectSearch["priority"],
+											},
+											{ replace: true },
+										)
+									}
 								>
 									<option value="">All priority</option>
 									{ISSUE_PRIORITIES.map((value) => (
@@ -846,7 +938,12 @@ function ProjectDetailPage() {
 								</Select>
 								<Select
 									value={assigneeId}
-									onChange={(event) => setAssigneeId(event.target.value)}
+									onChange={(event) =>
+										updateProjectSearch(
+											{ assignee: event.target.value || undefined },
+											{ replace: true },
+										)
+									}
 								>
 									<option value="">All assignees</option>
 									{(assignableUsers ?? []).map((user) => (
@@ -857,7 +954,17 @@ function ProjectDetailPage() {
 								</Select>
 								<Select
 									value={listFilter}
-									onChange={(event) => setListFilter(event.target.value)}
+									onChange={(event) =>
+										updateProjectSearch(
+											{
+												list:
+													event.target.value === "all"
+														? undefined
+														: event.target.value,
+											},
+											{ replace: true },
+										)
+									}
 								>
 									<option value="all">All lists</option>
 									<option value="none">No list</option>
@@ -870,7 +977,12 @@ function ProjectDetailPage() {
 								<Select
 									value={groupBy}
 									onChange={(event) =>
-										setGroupBy(event.target.value as "list" | "status")
+										updateProjectSearch(
+											{
+												groupBy: event.target.value as ProjectSearch["groupBy"],
+											},
+											{ replace: true },
+										)
 									}
 								>
 									<option value="list">Group: List</option>
@@ -879,12 +991,11 @@ function ProjectDetailPage() {
 								<Select
 									value={sortBy}
 									onChange={(event) =>
-										setSortBy(
-											event.target.value as
-												| "updated_desc"
-												| "created_desc"
-												| "priority_desc"
-												| "due_asc",
+										updateProjectSearch(
+											{
+												sort: event.target.value as ProjectSearch["sort"],
+											},
+											{ replace: true },
 										)
 									}
 								>
@@ -902,8 +1013,13 @@ function ProjectDetailPage() {
 											key={value}
 											status={value}
 											onRemove={() =>
-												setSelectedStatuses((prev) =>
-													prev.filter((item) => item !== value),
+												updateProjectSearch(
+													{
+														statuses: serializeStatusFilters(
+															selectedStatuses.filter((item) => item !== value),
+														),
+													},
+													{ replace: true },
 												)
 											}
 										/>
@@ -912,7 +1028,14 @@ function ProjectDetailPage() {
 										type="button"
 										size="sm"
 										variant="ghost"
-										onClick={() => setSelectedStatuses([])}
+										onClick={() =>
+											updateProjectSearch(
+												{
+													statuses: undefined,
+												},
+												{ replace: true },
+											)
+										}
 									>
 										Clear statuses
 									</Button>
