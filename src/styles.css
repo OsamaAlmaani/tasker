@@ -277,7 +277,7 @@ button:disabled,
 
 .issue-row-compact {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) 40px 92px 126px 120px 156px;
+  grid-template-columns: minmax(260px, 1fr) 40px 92px 126px 120px;
   align-items: center;
   column-gap: 10px;
   row-gap: 8px;
@@ -300,8 +300,7 @@ button:disabled,
 
 .issue-row-col-due,
 .issue-row-col-status,
-.issue-row-col-priority,
-.issue-row-col-list {
+.issue-row-col-priority {
   justify-content: flex-start;
 }
 
@@ -330,8 +329,11 @@ button:disabled,
   text-overflow: ellipsis;
 }
 
-.issue-row-list-badge {
-  justify-content: flex-start;
+.issue-row-id-badge {
+  flex: none;
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  line-height: 1;
 }
 
 .issue-inline-select {
@@ -852,10 +854,6 @@ button:disabled,
 
   .issue-row-col-priority {
     grid-column: 4 / 5;
-  }
-
-  .issue-row-col-list {
-    grid-column: 1 / -1;
   }
 
   .stitch-landing-main {

@@ -909,7 +909,7 @@ function ProjectDetailPage() {
 							<CardTitle>Issues</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<div className="mb-3 grid gap-2 md:grid-cols-7">
+							<div className="mb-3 grid gap-2 md:grid-cols-6">
 								<Input
 									value={search}
 									onChange={(event) =>
@@ -967,28 +967,6 @@ function ProjectDetailPage() {
 									{(assignableUsers ?? []).map((user) => (
 										<option key={user._id} value={user._id}>
 											{user.name}
-										</option>
-									))}
-								</Select>
-								<Select
-									value={listFilter}
-									onChange={(event) =>
-										updateProjectSearch(
-											{
-												list:
-													event.target.value === "all"
-														? undefined
-														: event.target.value,
-											},
-											{ replace: true },
-										)
-									}
-								>
-									<option value="all">All lists</option>
-									<option value="none">No list</option>
-									{(issueLists ?? []).map((list) => (
-										<option key={list._id} value={list._id}>
-											{list.name}
 										</option>
 									))}
 								</Select>
@@ -1071,10 +1049,6 @@ function ProjectDetailPage() {
 										</div>
 
 										{group.items.map((issue) => {
-											const listLabel =
-												issue.listId && issueListById.has(issue.listId)
-													? issueListById.get(issue.listId)?.name
-													: "No list";
 											const assignee = issue.assigneeId
 												? assignableUserById.get(issue.assigneeId)
 												: null;
@@ -1090,12 +1064,16 @@ function ProjectDetailPage() {
 														className="issue-row-main no-underline"
 													>
 														<div className="min-w-0">
-															<p className="m-0 truncate whitespace-nowrap text-sm font-medium text-[var(--text)]">
-																{issue.title}
-															</p>
-															<p className="m-0 text-xs text-[var(--muted-text)]">
-																#{issue.issueNumber} · Updated{" "}
-																{formatRelative(issue.updatedAt)}
+															<div className="flex min-w-0 items-center gap-2">
+																<Badge className="issue-row-id-badge">
+																	#{issue.issueNumber}
+																</Badge>
+																<p className="m-0 truncate whitespace-nowrap text-sm font-medium text-[var(--text)]">
+																	{issue.title}
+																</p>
+															</div>
+															<p className="m-0 truncate whitespace-nowrap text-xs text-[var(--muted-text)]">
+																{issue.description?.trim() || "No description"}
 															</p>
 														</div>
 													</Link>
@@ -1201,38 +1179,6 @@ function ProjectDetailPage() {
 															<span className="issue-row-badge-slot">
 																<IssuePriorityBadge priority={issue.priority} />
 															</span>
-														)}
-													</div>
-
-													<div className="issue-row-col issue-row-col-list">
-														{canWrite ? (
-															<InlineSelectTrigger
-																ariaLabel="Move issue list"
-																value={issue.listId ?? ""}
-																onChange={(nextListId) => {
-																	void updateIssue({
-																		issueId: issue._id,
-																		listId: (nextListId ||
-																			null) as Id<"issueLists"> | null,
-																	});
-																}}
-																options={[
-																	{ value: "", label: "No list" },
-																	...(issueLists ?? []).map((list) => ({
-																		value: list._id,
-																		label: list.name,
-																	})),
-																]}
-																className="issue-inline-select-full"
-															>
-																<Badge className="issue-row-badge issue-row-list-badge border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300">
-																	{listLabel ?? "No list"}
-																</Badge>
-															</InlineSelectTrigger>
-														) : (
-															<Badge className="issue-row-badge issue-row-list-badge border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300">
-																{listLabel ?? "No list"}
-															</Badge>
 														)}
 													</div>
 												</div>
