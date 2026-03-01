@@ -125,6 +125,16 @@ a:hover {
   opacity: 0.95;
 }
 
+button,
+[role='button'] {
+  cursor: pointer;
+}
+
+button:disabled,
+[role='button'][aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
 .app-shell-grid {
   display: grid;
   grid-template-columns: 270px 1fr;
@@ -186,6 +196,20 @@ a:hover {
   background: var(--surface-muted);
   color: var(--text);
   border: 1px solid var(--line);
+}
+
+.project-subitem {
+  display: block;
+  border-radius: 8px;
+  padding: 4px 8px;
+  color: var(--muted-text);
+  text-decoration: none;
+  font-size: 0.75rem;
+}
+
+.project-subitem:hover {
+  background: var(--surface-muted);
+  color: var(--text);
 }
 
 .project-dot {

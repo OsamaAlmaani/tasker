@@ -8,7 +8,8 @@ import {
 	UserPlus,
 	Users,
 } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
@@ -22,6 +23,7 @@ import { ActivityFeed } from "#/features/tasker/components/ActivityFeed";
 import {
 	IssuePriorityBadge,
 	IssueStatusBadge,
+	RemovableIssueStatusBadge,
 } from "#/features/tasker/components/IssueBadges";
 import { MemberAvatarStack } from "#/features/tasker/components/MemberAvatarStack";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
@@ -35,21 +37,32 @@ import { issueFormSchema } from "#/features/tasker/validation";
 import { api } from "#convex/_generated/api";
 import type { Doc, Id } from "#convex/_generated/dataModel";
 
+const projectSearchSchema = z.object({
+	list: z.string().optional(),
+});
+
 export const Route = createFileRoute("/_app/projects/$projectId")({
+	validateSearch: projectSearchSchema,
 	component: ProjectDetailPage,
 });
 
 function ProjectDetailPage() {
 	const { projectId: projectIdParam } = Route.useParams();
+	const routeSearch = Route.useSearch();
 	const projectId = projectIdParam as Id<"projects">;
 	const projectData = useQuery(api.projects.getById, { projectId });
 	const me = useQuery(api.users.me);
 
 	const [search, setSearch] = useState("");
-	const [status, setStatus] = useState<string>("");
+	const [statusPicker, setStatusPicker] = useState<string>("");
+	const [selectedStatuses, setSelectedStatuses] = useState<
+		(typeof ISSUE_STATUSES)[number][]
+	>([]);
 	const [priority, setPriority] = useState<string>("");
 	const [assigneeId, setAssigneeId] = useState<string>("");
-	const [listFilter, setListFilter] = useState<string>("all");
+	const [listFilter, setListFilter] = useState<string>(
+		routeSearch.list ?? "all",
+	);
 	const [groupBy, setGroupBy] = useState<"list" | "status">("list");
 	const [sortBy, setSortBy] = useState<
 		"updated_desc" | "created_desc" | "priority_desc" | "due_asc"
@@ -58,9 +71,7 @@ function ProjectDetailPage() {
 	const issues = useQuery(api.issues.listByProject, {
 		projectId,
 		search: search || undefined,
-		status: (status || undefined) as
-			| (typeof ISSUE_STATUSES)[number]
-			| undefined,
+		statuses: selectedStatuses.length ? selectedStatuses : undefined,
 		priority: (priority || undefined) as
 			| (typeof ISSUE_PRIORITIES)[number]
 			| undefined,
@@ -73,6 +84,20 @@ function ProjectDetailPage() {
 					: (listFilter as Id<"issueLists">),
 		sortBy,
 	});
+
+	function addStatusFilter(nextStatus: string) {
+		if (!nextStatus) {
+			return;
+		}
+
+		setSelectedStatuses((prev) => {
+			if (prev.includes(nextStatus as (typeof ISSUE_STATUSES)[number])) {
+				return prev;
+			}
+			return [...prev, nextStatus as (typeof ISSUE_STATUSES)[number]];
+		});
+		setStatusPicker("");
+	}
 
 	const assignableUsers = useQuery(api.users.listAssignableUsers, {
 		projectId,
@@ -146,6 +171,10 @@ function ProjectDetailPage() {
 		api.invitations.listByProject,
 		projectData?.canManageMembers ? { projectId } : "skip",
 	);
+
+	useEffect(() => {
+		setListFilter(routeSearch.list ?? "all");
+	}, [routeSearch.list]);
 
 	const canWrite = me?.globalRole === "admin" || me?.globalRole === "member";
 
@@ -665,12 +694,16 @@ function ProjectDetailPage() {
 								placeholder="Search issues"
 							/>
 							<Select
-								value={status}
-								onChange={(event) => setStatus(event.target.value)}
+								value={statusPicker}
+								onChange={(event) => addStatusFilter(event.target.value)}
 							>
-								<option value="">All status</option>
+								<option value="">Add status filter</option>
 								{ISSUE_STATUSES.map((value) => (
-									<option key={value} value={value}>
+									<option
+										key={value}
+										value={value}
+										disabled={selectedStatuses.includes(value)}
+									>
 										{issueStatusLabel[value]}
 									</option>
 								))}
@@ -736,6 +769,30 @@ function ProjectDetailPage() {
 								<option value="due_asc">Due date</option>
 							</Select>
 						</div>
+
+						{selectedStatuses.length ? (
+							<div className="mb-3 flex flex-wrap items-center gap-2">
+								{selectedStatuses.map((value) => (
+									<RemovableIssueStatusBadge
+										key={value}
+										status={value}
+										onRemove={() =>
+											setSelectedStatuses((prev) =>
+												prev.filter((item) => item !== value),
+											)
+										}
+									/>
+								))}
+								<Button
+									type="button"
+									size="sm"
+									variant="ghost"
+									onClick={() => setSelectedStatuses([])}
+								>
+									Clear statuses
+								</Button>
+							</div>
+						) : null}
 
 						<div className="space-y-4">
 							{groupedIssues.map((group) => (

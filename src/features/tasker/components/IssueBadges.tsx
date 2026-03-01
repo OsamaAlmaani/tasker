@@ -33,6 +33,30 @@ export function IssueStatusBadge({ status }: { status: IssueStatus }) {
 	);
 }
 
+export function RemovableIssueStatusBadge({
+	status,
+	onRemove,
+	removeLabel,
+}: {
+	status: IssueStatus;
+	onRemove: () => void;
+	removeLabel?: string;
+}) {
+	return (
+		<Badge className={statusClasses[status]}>
+			<span>{issueStatusLabel[status]}</span>
+			<button
+				type="button"
+				className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] leading-none hover:bg-[var(--surface)]"
+				aria-label={removeLabel ?? `Remove ${issueStatusLabel[status]} filter`}
+				onClick={onRemove}
+			>
+				x
+			</button>
+		</Badge>
+	);
+}
+
 export function IssuePriorityBadge({ priority }: { priority: IssuePriority }) {
 	return (
 		<Badge className={priorityClasses[priority]}>

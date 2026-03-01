@@ -71,6 +71,7 @@ export const listByProject = query({
     projectId: v.id('projects'),
     search: v.optional(v.string()),
     status: v.optional(issueStatusValidator),
+    statuses: v.optional(v.array(issueStatusValidator)),
     priority: v.optional(issuePriorityValidator),
     assigneeId: v.optional(v.id('users')),
     creatorId: v.optional(v.id('users')),
@@ -115,6 +116,9 @@ export const listByProject = query({
         return false
       }
       if (args.status && issue.status !== args.status) {
+        return false
+      }
+      if (args.statuses?.length && !args.statuses.includes(issue.status)) {
         return false
       }
       if (args.priority && issue.priority !== args.priority) {
