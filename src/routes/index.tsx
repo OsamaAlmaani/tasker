@@ -18,13 +18,13 @@ function HomePage() {
 						Project and issue management for teams that move fast.
 					</h1>
 					<p className="landing-subtitle">
-						Tasker is a production-grade TanStack Start + Convex + Clerk app
-						with strict role-based access and Linear-inspired workflows.
+						Tasker gives your team one clear place to plan, assign, and ship
+						work with confidence and speed.
 					</p>
 					<div className="mt-6 flex flex-wrap items-center gap-3">
 						<SignedOut>
 							<SignInButton mode="modal">
-								<Button size="lg">Sign in with Clerk</Button>
+								<Button size="lg">Sign in</Button>
 							</SignInButton>
 						</SignedOut>
 						<SignedIn>

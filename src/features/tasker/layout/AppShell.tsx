@@ -135,7 +135,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 					<div>
 						<p className="m-0 text-sm font-semibold">Tasker</p>
 						<p className="m-0 text-xs text-[var(--muted-text)]">
-							Linear-inspired
+							Focused team workspace
 						</p>
 					</div>
 				</div>

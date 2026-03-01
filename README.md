@@ -1,10 +1,7 @@
 # Tasker
 
-Production-ready task management system inspired by Linear, built on:
-
-- TanStack Start (frontend + routing)
-- Convex (backend + database)
-- Clerk (authentication)
+Production-ready task management workspace focused on clear ownership,
+fast planning, and reliable execution.
 
 ## What is implemented
 
