@@ -276,22 +276,62 @@ button:disabled,
 }
 
 .issue-row-compact {
-  gap: 10px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 40px 92px 126px 120px 156px;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 8px;
 }
 
 .issue-row-main {
-  min-width: min(360px, 100%);
-  flex: 1 1 360px;
+  min-width: 0;
+  display: block;
 }
 
-.issue-row-controls {
-  margin-left: auto;
+.issue-row-col {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
+  min-width: 0;
+}
+
+.issue-row-col-assignee {
+  justify-content: center;
+}
+
+.issue-row-col-due,
+.issue-row-col-status,
+.issue-row-col-priority,
+.issue-row-col-list {
+  justify-content: flex-start;
+}
+
+.issue-row-badge-slot {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+}
+
+.issue-row-badge-slot > * {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.issue-row-badge {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.issue-row-list-badge {
+  justify-content: flex-start;
 }
 
 .issue-inline-select {
@@ -303,6 +343,11 @@ button:disabled,
 .issue-inline-select-display {
   display: inline-flex;
   align-items: center;
+  width: 100%;
+}
+
+.issue-inline-select-full {
+  width: 100%;
 }
 
 .issue-inline-select-native {
@@ -315,7 +360,7 @@ button:disabled,
 }
 
 .issue-inline-select-assignee {
-  margin-right: 2px;
+  margin-right: 0;
 }
 
 .issue-assignee-avatar {
@@ -784,14 +829,33 @@ button:disabled,
   }
 
   .issue-row-main {
-    flex-basis: 100%;
-    min-width: 0;
+    grid-column: 1 / -1;
   }
 
-  .issue-row-controls {
-    margin-left: 0;
-    width: 100%;
+  .issue-row-compact {
+    grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, max-content));
+    align-items: start;
+  }
+
+  .issue-row-col-assignee {
+    grid-column: 1 / 2;
     justify-content: flex-start;
+  }
+
+  .issue-row-col-due {
+    grid-column: 2 / 3;
+  }
+
+  .issue-row-col-status {
+    grid-column: 3 / 4;
+  }
+
+  .issue-row-col-priority {
+    grid-column: 4 / 5;
+  }
+
+  .issue-row-col-list {
+    grid-column: 1 / -1;
   }
 
   .stitch-landing-main {

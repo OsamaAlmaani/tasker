@@ -949,7 +949,7 @@ function ProjectDetailPage() {
 														className="issue-row-main no-underline"
 													>
 														<div className="min-w-0">
-															<p className="m-0 break-words text-sm font-medium text-[var(--text)]">
+															<p className="m-0 truncate whitespace-nowrap text-sm font-medium text-[var(--text)]">
 																{issue.title}
 															</p>
 															<p className="m-0 text-xs text-[var(--muted-text)]">
@@ -959,7 +959,7 @@ function ProjectDetailPage() {
 														</div>
 													</Link>
 
-													<div className="issue-row-controls">
+													<div className="issue-row-col issue-row-col-assignee">
 														{canWrite ? (
 															<InlineSelectTrigger
 																ariaLabel="Assign issue"
@@ -993,82 +993,105 @@ function ProjectDetailPage() {
 																unassigned={!assignee}
 															/>
 														)}
+													</div>
 
-														{issue.dueDate ? (
-															<Badge>{formatDate(issue.dueDate)}</Badge>
-														) : null}
+													<div className="issue-row-col issue-row-col-due">
+														<Badge className="issue-row-badge">
+															{issue.dueDate
+																? formatDate(issue.dueDate)
+																: "No due"}
+														</Badge>
+													</div>
 
+													<div className="issue-row-col issue-row-col-status">
 														{canWrite ? (
-															<>
-																<InlineSelectTrigger
-																	ariaLabel="Update status"
-																	value={issue.status}
-																	onChange={(nextStatus) => {
-																		void updateIssue({
-																			issueId: issue._id,
-																			status:
-																				nextStatus as (typeof ISSUE_STATUSES)[number],
-																		});
-																	}}
-																	options={ISSUE_STATUSES.map((value) => ({
-																		value,
-																		label: issueStatusLabel[value],
-																	}))}
-																>
+															<InlineSelectTrigger
+																ariaLabel="Update status"
+																value={issue.status}
+																onChange={(nextStatus) => {
+																	void updateIssue({
+																		issueId: issue._id,
+																		status:
+																			nextStatus as (typeof ISSUE_STATUSES)[number],
+																	});
+																}}
+																options={ISSUE_STATUSES.map((value) => ({
+																	value,
+																	label: issueStatusLabel[value],
+																}))}
+																className="issue-inline-select-full"
+															>
+																<span className="issue-row-badge-slot">
 																	<IssueStatusBadge status={issue.status} />
-																</InlineSelectTrigger>
+																</span>
+															</InlineSelectTrigger>
+														) : (
+															<span className="issue-row-badge-slot">
+																<IssueStatusBadge status={issue.status} />
+															</span>
+														)}
+													</div>
 
-																<InlineSelectTrigger
-																	ariaLabel="Update priority"
-																	value={issue.priority}
-																	onChange={(nextPriority) => {
-																		void updateIssue({
-																			issueId: issue._id,
-																			priority:
-																				nextPriority as (typeof ISSUE_PRIORITIES)[number],
-																		});
-																	}}
-																	options={ISSUE_PRIORITIES.map((value) => ({
-																		value,
-																		label: issuePriorityLabel[value],
-																	}))}
-																>
+													<div className="issue-row-col issue-row-col-priority">
+														{canWrite ? (
+															<InlineSelectTrigger
+																ariaLabel="Update priority"
+																value={issue.priority}
+																onChange={(nextPriority) => {
+																	void updateIssue({
+																		issueId: issue._id,
+																		priority:
+																			nextPriority as (typeof ISSUE_PRIORITIES)[number],
+																	});
+																}}
+																options={ISSUE_PRIORITIES.map((value) => ({
+																	value,
+																	label: issuePriorityLabel[value],
+																}))}
+																className="issue-inline-select-full"
+															>
+																<span className="issue-row-badge-slot">
 																	<IssuePriorityBadge
 																		priority={issue.priority}
 																	/>
-																</InlineSelectTrigger>
-
-																<InlineSelectTrigger
-																	ariaLabel="Move issue list"
-																	value={issue.listId ?? ""}
-																	onChange={(nextListId) => {
-																		void updateIssue({
-																			issueId: issue._id,
-																			listId: (nextListId ||
-																				null) as Id<"issueLists"> | null,
-																		});
-																	}}
-																	options={[
-																		{ value: "", label: "No list" },
-																		...(issueLists ?? []).map((list) => ({
-																			value: list._id,
-																			label: list.name,
-																		})),
-																	]}
-																>
-																	<Badge className="border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300">
-																		{listLabel ?? "No list"}
-																	</Badge>
-																</InlineSelectTrigger>
-															</>
+																</span>
+															</InlineSelectTrigger>
 														) : (
-															<>
-																<IssueStatusBadge status={issue.status} />
+															<span className="issue-row-badge-slot">
 																<IssuePriorityBadge priority={issue.priority} />
-																<Badge className="border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300">
+															</span>
+														)}
+													</div>
+
+													<div className="issue-row-col issue-row-col-list">
+														{canWrite ? (
+															<InlineSelectTrigger
+																ariaLabel="Move issue list"
+																value={issue.listId ?? ""}
+																onChange={(nextListId) => {
+																	void updateIssue({
+																		issueId: issue._id,
+																		listId: (nextListId ||
+																			null) as Id<"issueLists"> | null,
+																	});
+																}}
+																options={[
+																	{ value: "", label: "No list" },
+																	...(issueLists ?? []).map((list) => ({
+																		value: list._id,
+																		label: list.name,
+																	})),
+																]}
+																className="issue-inline-select-full"
+															>
+																<Badge className="issue-row-badge issue-row-list-badge border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300">
 																	{listLabel ?? "No list"}
 																</Badge>
-															</>
+															</InlineSelectTrigger>
+														) : (
+															<Badge className="issue-row-badge issue-row-list-badge border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300">
+																{listLabel ?? "No list"}
+															</Badge>
 														)}
 													</div>
 												</div>

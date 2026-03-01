@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
-import { Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -62,6 +62,8 @@ function IssueDetailPage() {
 	const updateComment = useMutation(api.comments.update);
 
 	const [comment, setComment] = useState("");
+	const [editingTitle, setEditingTitle] = useState(false);
+	const [titleDraft, setTitleDraft] = useState("");
 	const [editingDescription, setEditingDescription] = useState(false);
 	const [descriptionDraft, setDescriptionDraft] = useState("");
 	const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -101,6 +103,18 @@ function IssueDetailPage() {
 	}
 	const projectId = issueData.project._id;
 
+	function goBack() {
+		if (typeof window !== "undefined" && window.history.length > 1) {
+			window.history.back();
+			return;
+		}
+
+		void navigate({
+			to: "/projects/$projectId",
+			params: { projectId },
+		});
+	}
+
 	async function submitComment(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		const parsed = commentFormSchema.safeParse({ body: comment });
@@ -130,20 +144,52 @@ function IssueDetailPage() {
 		}
 	}
 
+	async function saveTitle() {
+		const nextTitle = titleDraft.trim();
+		if (!nextTitle || nextTitle === issueData.issue.title) {
+			setEditingTitle(false);
+			return;
+		}
+
+		await updateIssue({
+			issueId,
+			title: nextTitle,
+		});
+		setEditingTitle(false);
+	}
+
 	return (
 		<div>
 			<PageHeader
-				title={`${issueData.project.key}-${issueData.issue.issueNumber} · ${issueData.issue.title}`}
+				title={
+					<span className="inline-flex items-center gap-2">
+						<Button
+							type="button"
+							size="sm"
+							variant="ghost"
+							className="h-8 w-8 p-0"
+							aria-label="Go back"
+							title="Go back"
+							onClick={goBack}
+						>
+							<ArrowLeft className="h-4 w-4" />
+						</Button>
+						<span>{`${issueData.project.key}-${issueData.issue.issueNumber}`}</span>
+					</span>
+				}
 				description={`Updated ${formatRelative(issueData.issue.updatedAt)}`}
 				actions={
 					canWrite ? (
 						<Button
-							variant="danger"
+							variant="ghost"
+							size="sm"
+							className="h-8 w-8 p-0 text-[var(--danger)] hover:bg-[color-mix(in_oklab,var(--danger)_14%,transparent)] hover:text-[var(--danger)]"
 							disabled={isDeleting}
+							aria-label="Delete issue"
+							title="Delete issue"
 							onClick={() => setShowDeleteConfirm(true)}
 						>
-							<Trash2 className="mr-2 h-4 w-4" />
-							Delete
+							<Trash2 className="h-4 w-4" />
 						</Button>
 					) : null
 				}
@@ -152,8 +198,78 @@ function IssueDetailPage() {
 			<div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
 				<div className="space-y-4">
 					<Card>
-						<CardHeader>
+						<CardHeader className="flex flex-row items-center justify-between space-y-0">
+							<CardTitle>Title</CardTitle>
+							{canWrite && !editingTitle ? (
+								<Button
+									size="sm"
+									variant="ghost"
+									className="h-7 w-7 p-0"
+									aria-label="Edit title"
+									title="Edit title"
+									onClick={() => {
+										setEditingTitle(true);
+										setTitleDraft(issueData.issue.title);
+									}}
+								>
+									<Pencil className="h-3.5 w-3.5" />
+								</Button>
+							) : null}
+						</CardHeader>
+						<CardContent className="space-y-3">
+							{editingTitle ? (
+								<form
+									className="space-y-2"
+									onSubmit={async (event) => {
+										event.preventDefault();
+										await saveTitle();
+									}}
+								>
+									<Input
+										value={titleDraft}
+										onChange={(event) => setTitleDraft(event.target.value)}
+										autoFocus
+									/>
+									<div className="flex items-center gap-2">
+										<Button type="submit" size="sm">
+											Save
+										</Button>
+										<Button
+											size="sm"
+											variant="ghost"
+											type="button"
+											onClick={() => setEditingTitle(false)}
+										>
+											Cancel
+										</Button>
+									</div>
+								</form>
+							) : (
+								<h2 className="m-0 text-xl font-semibold text-[var(--text)]">
+									{issueData.issue.title}
+								</h2>
+							)}
+						</CardContent>
+					</Card>
+
+					<Card>
+						<CardHeader className="flex flex-row items-center justify-between space-y-0">
 							<CardTitle>Description</CardTitle>
+							{canWrite && !editingDescription ? (
+								<Button
+									size="sm"
+									variant="ghost"
+									className="h-7 w-7 p-0"
+									aria-label="Edit description"
+									title="Edit description"
+									onClick={() => {
+										setEditingDescription(true);
+										setDescriptionDraft(issueData.issue.description ?? "");
+									}}
+								>
+									<Pencil className="h-3.5 w-3.5" />
+								</Button>
+							) : null}
 						</CardHeader>
 						<CardContent className="space-y-3">
 							{editingDescription ? (
@@ -187,24 +303,9 @@ function IssueDetailPage() {
 									</div>
 								</div>
 							) : (
-								<>
-									<p className="m-0 whitespace-pre-wrap text-sm text-[var(--text)]">
-										{issueData.issue.description || "No description provided."}
-									</p>
-									{canWrite ? (
-										<Button
-											size="sm"
-											variant="secondary"
-											onClick={() => {
-												setEditingDescription(true);
-												setDescriptionDraft(issueData.issue.description ?? "");
-											}}
-										>
-											<Pencil className="mr-2 h-3.5 w-3.5" />
-											Edit Description
-										</Button>
-									) : null}
-								</>
+								<p className="m-0 whitespace-pre-wrap text-sm text-[var(--text)]">
+									{issueData.issue.description || "No description provided."}
+								</p>
 							)}
 						</CardContent>
 					</Card>
@@ -457,15 +558,6 @@ function IssueDetailPage() {
 
 					<Card>
 						<CardHeader>
-							<CardTitle>Activity</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<ActivityFeed activities={activity ?? []} />
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardHeader>
 							<CardTitle>Labels</CardTitle>
 						</CardHeader>
 						<CardContent className="flex flex-wrap gap-1.5">
@@ -477,6 +569,15 @@ function IssueDetailPage() {
 									No labels
 								</p>
 							) : null}
+						</CardContent>
+					</Card>
+
+					<Card>
+						<CardHeader>
+							<CardTitle>Activity</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<ActivityFeed activities={activity ?? []} />
 						</CardContent>
 					</Card>
 				</div>
