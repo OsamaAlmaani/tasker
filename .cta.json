@@ -1,0 +1,26 @@
+{
+  "projectName": "tasker",
+  "mode": "file-router",
+  "typescript": true,
+  "packageManager": "pnpm",
+  "includeExamples": false,
+  "tailwind": true,
+  "addOnOptions": {},
+  "envVarValues": {
+    "CONVEX_DEPLOYMENT": "content-partridge-523",
+    "VITE_CONVEX_URL": "https://content-partridge-523.convex.cloud",
+    "VITE_CLERK_PUBLISHABLE_KEY": "pk_test_ZGl2ZXJzZS1vc3ByZXktNTAuY2xlcmsuYWNjb3VudHMuZGV2JA"
+  },
+  "git": true,
+  "routerOnly": false,
+  "version": 1,
+  "framework": "react",
+  "chosenAddOns": [
+    "biome",
+    "railway",
+    "convex",
+    "shadcn",
+    "clerk",
+    "t3env"
+  ]
+}
