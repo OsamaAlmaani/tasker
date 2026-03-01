@@ -6,8 +6,10 @@ import {
 	Command,
 	FolderKanban,
 	Home,
+	Menu,
 	Settings,
 	Shield,
+	X,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import ThemeToggle from "#/components/ThemeToggle";
@@ -27,6 +29,7 @@ const navItems = [
 export function AppShell({ children }: { children: React.ReactNode }) {
 	const navigate = useNavigate();
 	const [commandOpen, setCommandOpen] = useState(false);
+	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 	const [commandSearch, setCommandSearch] = useState("");
 	const [listModalProject, setListModalProject] = useState<{
 		id: Id<"projects">;
@@ -118,6 +121,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 			if (event.key === "Escape") {
 				setCommandOpen(false);
+				setMobileSidebarOpen(false);
 			}
 		};
 
@@ -125,9 +129,45 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, []);
 
+	useEffect(() => {
+		const media = window.matchMedia("(min-width: 1101px)");
+		const onChange = (event: MediaQueryListEvent) => {
+			if (event.matches) {
+				setMobileSidebarOpen(false);
+			}
+		};
+
+		media.addEventListener("change", onChange);
+		return () => {
+			media.removeEventListener("change", onChange);
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!mobileSidebarOpen) {
+			return;
+		}
+		const previousOverflow = document.body.style.overflow;
+		document.body.style.overflow = "hidden";
+		return () => {
+			document.body.style.overflow = previousOverflow;
+		};
+	}, [mobileSidebarOpen]);
+
 	return (
 		<div className="app-shell-grid min-h-dvh">
-			<aside className="app-sidebar">
+			{mobileSidebarOpen ? (
+				<button
+					type="button"
+					className="app-sidebar-overlay"
+					aria-label="Close navigation menu"
+					onClick={() => setMobileSidebarOpen(false)}
+				/>
+			) : null}
+
+			<aside
+				className={`app-sidebar ${mobileSidebarOpen ? "app-sidebar-open" : ""}`}
+			>
 				<div className="mb-6 flex items-center gap-2">
 					<div className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--accent)] text-[var(--accent-foreground)]">
 						<CircleDot className="h-4 w-4" />
@@ -138,6 +178,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 							Focused team workspace
 						</p>
 					</div>
+					<button
+						type="button"
+						className="app-sidebar-close ml-auto"
+						aria-label="Close navigation menu"
+						onClick={() => setMobileSidebarOpen(false)}
+					>
+						<X className="h-4 w-4" />
+					</button>
 				</div>
 
 				<nav className="space-y-1">
@@ -149,6 +197,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 								to={item.to}
 								className="nav-item"
 								activeProps={{ className: "nav-item nav-item-active" }}
+								onClick={() => setMobileSidebarOpen(false)}
 							>
 								<Icon className="h-4 w-4" />
 								<span>{item.label}</span>
@@ -160,6 +209,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 							to="/admin/users"
 							className="nav-item"
 							activeProps={{ className: "nav-item nav-item-active" }}
+							onClick={() => setMobileSidebarOpen(false)}
 						>
 							<Shield className="h-4 w-4" />
 							<span>Users</span>
@@ -175,9 +225,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 						<Button
 							variant="ghost"
 							size="sm"
-							onClick={() =>
-								navigate({ to: "/projects", search: { create: "1" } })
-							}
+							onClick={() => {
+								setMobileSidebarOpen(false);
+								navigate({ to: "/projects", search: { create: "1" } });
+							}}
 						>
 							+
 						</Button>
@@ -201,6 +252,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 											className:
 												"project-item project-item-active min-w-0 flex-1",
 										}}
+										onClick={() => setMobileSidebarOpen(false)}
 									>
 										<span
 											className="project-dot"
@@ -244,6 +296,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 														"project-subitem project-subitem-active truncate",
 												}}
 												title={list.name}
+												onClick={() => setMobileSidebarOpen(false)}
 											>
 												• {list.name}
 											</Link>
@@ -277,6 +330,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 			<main className="app-main">
 				<header className="app-topbar">
+					<button
+						type="button"
+						className="app-sidebar-toggle"
+						aria-label="Open navigation menu"
+						onClick={() => setMobileSidebarOpen(true)}
+					>
+						<Menu className="h-4 w-4" />
+					</button>
+
 					<button
 						type="button"
 						className="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 text-sm text-[var(--muted-text)]"

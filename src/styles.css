@@ -153,6 +153,31 @@ button:disabled,
   backdrop-filter: blur(12px);
 }
 
+.app-sidebar-overlay {
+  display: none;
+}
+
+.app-sidebar-toggle,
+.app-sidebar-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  width: 36px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--muted-text);
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.app-sidebar-toggle:hover,
+.app-sidebar-close:hover {
+  background: color-mix(in oklab, var(--surface-muted) 90%, var(--accent) 10%);
+  border-color: color-mix(in oklab, var(--line) 82%, var(--accent) 18%);
+  color: var(--text);
+}
+
 .app-main {
   min-width: 0;
 }
@@ -662,11 +687,37 @@ button:disabled,
     grid-template-columns: 1fr;
   }
 
+  .app-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    border: 0;
+    background: rgba(8, 12, 26, 0.48);
+  }
+
   .app-sidebar {
-    position: relative;
-    height: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+    position: fixed;
+    z-index: 50;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(84vw, 320px);
+    height: 100dvh;
+    border-bottom: 0;
+    transform: translateX(-104%);
+    transition: transform 180ms ease;
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.35);
+    overflow-y: auto;
+  }
+
+  .app-sidebar-open {
+    transform: translateX(0);
+  }
+
+  .app-sidebar-toggle,
+  .app-sidebar-close {
+    display: inline-flex;
   }
 
   .stitch-landing-main {
