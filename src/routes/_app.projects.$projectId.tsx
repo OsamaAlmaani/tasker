@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import {
 	Archive,
 	Plus,
@@ -74,6 +74,10 @@ function ProjectDetailPage() {
 	const archiveProject = useMutation(api.projects.archive);
 	const addMember = useMutation(api.projects.addMember);
 	const removeMember = useMutation(api.projects.removeMember);
+	const sendProjectInvite = useAction(api.invitationsActions.sendProjectInvite);
+	const revokeProjectInvite = useAction(
+		api.invitationsActions.revokeProjectInvite,
+	);
 
 	const [createOpen, setCreateOpen] = useState(false);
 	const [createError, setCreateError] = useState<string | null>(null);
@@ -99,10 +103,24 @@ function ProjectDetailPage() {
 	});
 
 	const [inviteSearch, setInviteSearch] = useState("");
-	const inviteCandidates = useQuery(api.projects.searchInviteCandidates, {
-		projectId,
-		search: inviteSearch || undefined,
-	});
+	const [inviteEmail, setInviteEmail] = useState("");
+	const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+	const [inviteError, setInviteError] = useState<string | null>(null);
+	const [isSendingInvite, setIsSendingInvite] = useState(false);
+	const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
+	const inviteCandidates = useQuery(
+		api.projects.searchInviteCandidates,
+		projectData?.canManageMembers
+			? {
+					projectId,
+					search: inviteSearch || undefined,
+				}
+			: "skip",
+	);
+	const projectInvites = useQuery(
+		api.invitations.listByProject,
+		projectData?.canManageMembers ? { projectId } : "skip",
+	);
 
 	const canWrite = me?.globalRole === "admin" || me?.globalRole === "member";
 
@@ -180,6 +198,46 @@ function ProjectDetailPage() {
 		});
 
 		setEditingProject(false);
+	}
+
+	async function submitEmailInvite(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		setInviteError(null);
+		setInviteMessage(null);
+
+		const email = inviteEmail.trim().toLowerCase();
+		if (!email) {
+			setInviteError("Please enter an email.");
+			return;
+		}
+
+		setIsSendingInvite(true);
+		try {
+			const result = await sendProjectInvite({ projectId, email });
+			switch (result.resultType) {
+				case "added_existing_user":
+					setInviteMessage("User already exists and was added to the project.");
+					break;
+				case "already_member":
+					setInviteMessage("This user is already a project member.");
+					break;
+				case "already_invited":
+					setInviteMessage("A pending invite already exists for this email.");
+					break;
+				case "sent":
+					setInviteMessage("Invitation sent.");
+					break;
+				default:
+					setInviteMessage("Invite processed.");
+			}
+			setInviteEmail("");
+		} catch (error) {
+			setInviteError(
+				error instanceof Error ? error.message : "Failed to send invite.",
+			);
+		} finally {
+			setIsSendingInvite(false);
+		}
 	}
 
 	return (
@@ -612,7 +670,90 @@ function ProjectDetailPage() {
 									Invite Users
 								</CardTitle>
 							</CardHeader>
-							<CardContent className="space-y-2">
+							<CardContent className="space-y-3">
+								<form onSubmit={submitEmailInvite} className="space-y-2">
+									<Label>Invite by email</Label>
+									<div className="flex gap-2">
+										<Input
+											type="email"
+											value={inviteEmail}
+											onChange={(event) => setInviteEmail(event.target.value)}
+											placeholder="teammate@company.com"
+										/>
+										<Button
+											type="submit"
+											size="sm"
+											variant="secondary"
+											disabled={isSendingInvite}
+										>
+											{isSendingInvite ? "Sending..." : "Send invite"}
+										</Button>
+									</div>
+									{inviteError ? (
+										<p className="m-0 text-sm text-[var(--danger)]">
+											{inviteError}
+										</p>
+									) : null}
+									{inviteMessage ? (
+										<p className="m-0 text-sm text-[var(--muted-text)]">
+											{inviteMessage}
+										</p>
+									) : null}
+								</form>
+
+								<div className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-3">
+									<p className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
+										Pending invites
+									</p>
+									<div className="space-y-2">
+										{(projectInvites ?? [])
+											.filter((row) => row.invite.status === "pending")
+											.map((row) => (
+												<div
+													key={row.invite._id}
+													className="flex items-center justify-between rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
+												>
+													<div>
+														<p className="m-0 text-sm font-medium text-[var(--text)]">
+															{row.invite.email}
+														</p>
+														<p className="m-0 text-xs text-[var(--muted-text)]">
+															Sent {formatRelative(row.invite.createdAt)}
+														</p>
+													</div>
+													<Button
+														type="button"
+														size="sm"
+														variant="ghost"
+														disabled={revokingInviteId === row.invite._id}
+														onClick={async () => {
+															setRevokingInviteId(row.invite._id);
+															try {
+																await revokeProjectInvite({
+																	projectInviteId: row.invite._id,
+																});
+															} finally {
+																setRevokingInviteId(null);
+															}
+														}}
+													>
+														{revokingInviteId === row.invite._id
+															? "Revoking..."
+															: "Revoke"}
+													</Button>
+												</div>
+											))}
+										{!projectInvites?.some(
+											(row) => row.invite.status === "pending",
+										) ? (
+											<p className="m-0 text-sm text-[var(--muted-text)]">
+												No pending invites.
+											</p>
+										) : null}
+									</div>
+								</div>
+
+								<Label>Add existing users</Label>
 								<Input
 									value={inviteSearch}
 									onChange={(event) => setInviteSearch(event.target.value)}

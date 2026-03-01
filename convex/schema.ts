@@ -4,6 +4,7 @@ import {
   activityActionValidator,
   activityEntityTypeValidator,
   globalRoleValidator,
+  inviteStatusValidator,
   issuePriorityValidator,
   issueStatusValidator,
 } from './constants'
@@ -101,6 +102,25 @@ export default defineSchema({
     .index('by_issueId', ['issueId'])
     .index('by_projectId', ['projectId'])
     .index('by_authorId', ['authorId']),
+
+  projectInvites: defineTable({
+    projectId: v.id('projects'),
+    email: v.string(),
+    invitedBy: v.id('users'),
+    status: inviteStatusValidator,
+    clerkInvitationId: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    acceptedAt: v.optional(v.number()),
+    acceptedBy: v.optional(v.id('users')),
+    revokedAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+  })
+    .index('by_projectId', ['projectId'])
+    .index('by_email', ['email'])
+    .index('by_projectId_status', ['projectId', 'status'])
+    .index('by_email_status', ['email', 'status'])
+    .index('by_projectId_email_status', ['projectId', 'email', 'status']),
 
   activities: defineTable({
     projectId: v.id('projects'),

@@ -21,6 +21,7 @@ export const ACTIVITY_ENTITY_TYPES = [
   'issue',
   'comment',
   'member',
+  'invite',
   'user',
 ] as const
 
@@ -30,6 +31,9 @@ export const ACTIVITY_ACTIONS = [
   'project.archived',
   'project.member_added',
   'project.member_removed',
+  'project.invite_sent',
+  'project.invite_revoked',
+  'project.invite_accepted',
   'issue.created',
   'issue.updated',
   'issue.deleted',
@@ -43,11 +47,19 @@ export const ACTIVITY_ACTIONS = [
   'user.deactivated',
 ] as const
 
+export const INVITE_STATUSES = [
+  'pending',
+  'accepted',
+  'revoked',
+  'expired',
+] as const
+
 export type GlobalRole = (typeof GLOBAL_ROLES)[number]
 export type IssueStatus = (typeof ISSUE_STATUSES)[number]
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number]
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number]
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number]
+export type InviteStatus = (typeof INVITE_STATUSES)[number]
 
 export const globalRoleValidator = v.union(
   v.literal('admin'),
@@ -76,6 +88,7 @@ export const activityEntityTypeValidator = v.union(
   v.literal('issue'),
   v.literal('comment'),
   v.literal('member'),
+  v.literal('invite'),
   v.literal('user'),
 )
 
@@ -85,6 +98,9 @@ export const activityActionValidator = v.union(
   v.literal('project.archived'),
   v.literal('project.member_added'),
   v.literal('project.member_removed'),
+  v.literal('project.invite_sent'),
+  v.literal('project.invite_revoked'),
+  v.literal('project.invite_accepted'),
   v.literal('issue.created'),
   v.literal('issue.updated'),
   v.literal('issue.deleted'),
@@ -96,4 +112,11 @@ export const activityActionValidator = v.union(
   v.literal('user.role_changed'),
   v.literal('user.activated'),
   v.literal('user.deactivated'),
+)
+
+export const inviteStatusValidator = v.union(
+  v.literal('pending'),
+  v.literal('accepted'),
+  v.literal('revoked'),
+  v.literal('expired'),
 )

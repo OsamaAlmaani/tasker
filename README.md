@@ -24,7 +24,8 @@ Production-ready task management system inspired by Linear, built on:
   - archive/unarchive project
   - list accessible projects
   - project detail page with filters, issues, members, and activity
-  - member invite/remove workflow
+  - member add/remove workflow
+  - email invite workflow via Clerk (send/revoke/pending list)
 - Issues:
   - create/update issue
   - soft delete issue
@@ -86,6 +87,7 @@ Defined in [`convex/schema.ts`](./convex/schema.ts):
 - `projects`
 - `projectMembers`
 - `projectCounters`
+- `projectInvites`
 - `issues`
 - `comments`
 - `activities`
@@ -126,18 +128,26 @@ CONVEX_DEPLOYMENT=...
 VITE_CONVEX_URL=...
 VITE_CLERK_PUBLISHABLE_KEY=...
 VITE_CONVEX_SITE_URL=...
+VITE_CLERK_JWT_TEMPLATE=convex
 ```
 
-3. Ensure Convex + Clerk auth integration is configured for your deployment (JWT template for Convex in Clerk).
+3. Set required Convex server env vars:
 
-4. Run Convex and app:
+```bash
+pnpm dlx convex env set CLERK_SECRET_KEY sk_test_...
+pnpm dlx convex env set APP_BASE_URL http://localhost:3000
+```
+
+4. Ensure Convex + Clerk auth integration is configured for your deployment (JWT template for Convex in Clerk).
+
+5. Run Convex and app:
 
 ```bash
 pnpm dlx convex dev
 pnpm dev
 ```
 
-5. Optional (seed sample data after signing in):
+6. Optional (seed sample data after signing in):
 - Open `/settings`
 - Click **Seed demo data**
 
@@ -153,6 +163,7 @@ pnpm test
 ## Notes
 
 - Internal user records are created/synced via `users.ensureCurrentUser` during sign-in bootstrap.
+- Pending email invites are auto-claimed on login when invite email matches user email.
 - First signed-in user becomes `admin`; subsequent users default to `member`.
 - Issues are soft-deleted via `deletedAt`/`archived`.
 - Viewer role is strictly read-only by server checks.

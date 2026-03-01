@@ -1,10 +1,75 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
+import type { Id } from './_generated/dataModel'
+import type { MutationCtx } from './_generated/server'
 import { GLOBAL_ROLES, globalRoleValidator } from './constants'
 import { requireAdmin, requireAuth, requireCurrentUser } from './lib/auth'
+import { createActivity } from './lib/activity'
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase()
+}
+
+async function claimPendingInvites(
+  ctx: MutationCtx,
+  args: { userId: Id<'users'>; email: string },
+) {
+  const now = Date.now()
+
+  const pendingInvites = await ctx.db
+    .query('projectInvites')
+    .withIndex('by_email_status', (q) =>
+      q.eq('email', args.email).eq('status', 'pending'),
+    )
+    .collect()
+
+  for (const invite of pendingInvites) {
+    if (invite.expiresAt && invite.expiresAt <= now) {
+      await ctx.db.patch(invite._id, {
+        status: 'expired',
+        updatedAt: now,
+      })
+      continue
+    }
+
+    const existingMembership = await ctx.db
+      .query('projectMembers')
+      .withIndex('by_projectId_userId', (q) =>
+        q.eq('projectId', invite.projectId).eq('userId', args.userId),
+      )
+      .unique()
+
+    if (!existingMembership) {
+      await ctx.db.insert('projectMembers', {
+        projectId: invite.projectId,
+        userId: args.userId,
+        addedBy: invite.invitedBy,
+        joinedAt: now,
+      })
+    }
+
+    await ctx.db.patch(invite.projectId, {
+      updatedAt: now,
+    })
+
+    await ctx.db.patch(invite._id, {
+      status: 'accepted',
+      acceptedBy: args.userId,
+      acceptedAt: now,
+      updatedAt: now,
+    })
+
+    await createActivity(ctx, {
+      actorId: args.userId,
+      projectId: invite.projectId,
+      entityType: 'invite',
+      entityId: invite._id,
+      action: 'project.invite_accepted',
+      metadata: {
+        email: invite.email,
+      },
+    })
+  }
 }
 
 export const ensureCurrentUser = mutation({
@@ -36,6 +101,10 @@ export const ensureCurrentUser = mutation({
         imageUrl: args.imageUrl,
         updatedAt: now,
       })
+      await claimPendingInvites(ctx, {
+        userId: existing._id,
+        email,
+      })
       return await ctx.db.get(existing._id)
     }
 
@@ -50,6 +119,11 @@ export const ensureCurrentUser = mutation({
       isActive: true,
       createdAt: now,
       updatedAt: now,
+    })
+
+    await claimPendingInvites(ctx, {
+      userId,
+      email,
     })
 
     return await ctx.db.get(userId)
