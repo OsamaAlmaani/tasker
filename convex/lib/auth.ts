@@ -153,12 +153,8 @@ export async function requireProjectIssueDeleteAccess(
 ) {
   const { user, project, membership } = await requireProjectWriteAccess(ctx, projectId)
 
-  if (isAdmin(user.globalRole)) {
-    return { user, project, membership }
-  }
-
   if (!project.allowIssueDelete) {
-    throw forbidden('Issue deletion is restricted for this project.')
+    throw forbidden('Issue deletion is disabled for this project.')
   }
 
   return { user, project, membership }

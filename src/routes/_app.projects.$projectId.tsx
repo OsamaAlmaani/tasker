@@ -580,6 +580,17 @@ function ProjectDetailPage() {
 		}
 	}
 
+	function syncProjectFormWithCurrentProject() {
+		setProjectForm({
+			name: projectData.project.name ?? "",
+			description: projectData.project.description ?? "",
+			color: projectData.project.color ?? "#4f46e5",
+			icon: projectData.project.icon ?? "FolderKanban",
+			allowMemberInvites: projectData.project.allowMemberInvites ?? true,
+			allowIssueDelete: projectData.project.allowIssueDelete ?? true,
+		});
+	}
+
 	return (
 		<div>
 			<PageHeader
@@ -587,20 +598,27 @@ function ProjectDetailPage() {
 				description={projectData.project.description}
 				actions={
 					<>
-						<Button
-							variant="secondary"
+						<button
+							type="button"
 							onClick={() => setIsMembersModalOpen(true)}
-							className="gap-2"
+							className="inline-flex items-center gap-2 rounded-md bg-transparent px-1 py-0.5 text-[var(--muted-text)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]"
+							aria-label="View members"
+							title="View members"
 						>
 							<MemberAvatarStack members={membersForStack} maxVisible={5} />
 							<span className="text-xs text-[var(--muted-text)]">
 								{memberRows.length}
 							</span>
-						</Button>
+						</button>
 						{canWrite ? (
 							<Button
 								variant="secondary"
-								onClick={() => setEditingProject((value) => !value)}
+								onClick={() => {
+									if (!editingProject) {
+										syncProjectFormWithCurrentProject();
+									}
+									setEditingProject((value) => !value);
+								}}
 							>
 								<Settings2 className="mr-2 h-4 w-4" />
 								Settings

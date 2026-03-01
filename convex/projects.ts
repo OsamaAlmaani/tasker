@@ -145,9 +145,7 @@ export const getById = query({
       canManageMembers:
         user.globalRole === 'admin' ||
         (user.globalRole === 'member' && project.allowMemberInvites),
-      canDeleteIssues:
-        user.globalRole === 'admin' ||
-        (user.globalRole === 'member' && project.allowIssueDelete),
+      canDeleteIssues: canWrite(user.globalRole) && project.allowIssueDelete,
     }
   },
 })
