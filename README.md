@@ -1,152 +1,62 @@
 # Tasker
 
-Production-ready task management workspace focused on clear ownership,
-fast planning, and reliable execution.
+Tasker is a production-minded project and issue management system for focused execution.
 
-## What is implemented
+## Product Overview
 
-### Core product
+- Project-based workspaces with scoped membership and permissions.
+- Dual issue views: structured list view and drag-and-drop Kanban by status.
+- Fast issue operations: status, priority, assignee, due date, labels, and search/filtering.
+- Unified issue timeline combining comments and system activity in chronological order.
+- Admin controls for user role management and account activation state.
 
-- Authenticated app shell with sidebar/top bar, command bar (`Ctrl/Cmd + K`), user menu, theme toggle.
-- Dashboard with:
-  - quick stats
-  - recent projects
-  - assigned issues
-  - created-by-me issues
-  - overdue issues
-  - recent activity
-- Projects:
-  - create project
-  - edit project settings
-  - archive/unarchive project
-  - list accessible projects
-  - project detail page with filters, issues, members, and activity
-  - member add/remove workflow
-  - email invite workflow via Clerk (send/revoke/pending list)
-- Issues:
-  - create/update issue
-  - soft delete issue
-  - project-scoped issue numbers
-  - status/priority/assignee updates
-  - filters and search
-- Comments:
-  - add comments
-  - edit own comments (admins can edit any)
-- Activity timeline:
-  - project and issue activity feeds
-- Admin area:
-  - user listing
-  - search/filter users
-  - update global role
-  - activate/deactivate user
-  - inspect project memberships
-- Settings page:
-  - current profile summary
-  - local dev seed utility
+## Key Capabilities
 
-## Role model
+- Real-time synced data layer for projects, issues, comments, members, and activity.
+- Role-based access with strict server-side authorization checks.
+- Project-specific issue numbering and soft-delete behavior.
+- Member management with invite, revoke, and add-existing-user flows.
+- Persistent project view preferences and filters in URL state.
 
-Global roles (stored on `users.globalRole`):
+## Roles and Access Model
 
 - `admin`
-  - full access to all projects and data
-  - can manage users/roles/account state
-  - can manage any project/member/issue/comment
+- Full system access across all projects and users.
+
 - `member`
-  - write access only to projects they created or are members of
-  - can create/update issues and comments in accessible projects
-  - can manage members if project allows `allowMemberInvites`
+- Write access to projects they created or were added to.
+
 - `viewer`
-  - read-only access to projects they created or are members of
-  - cannot create/edit/delete issues/projects/comments
+- Read-only access to projects they were added to.
 
-## Access control design
+All read/write enforcement happens on the server in Convex permission helpers.
 
-All authorization is enforced server-side in Convex helpers:
+## Data Model
 
-- `requireAuth`
-- `requireCurrentUser`
-- `requireAdmin`
-- `requireProjectViewAccess`
-- `requireProjectWriteAccess`
-- `requireProjectMemberManagementAccess`
-- `requireProjectIssueDeleteAccess`
-- `requireIssueViewAccess`
-- `requireIssueWriteAccess`
-
-These are used in queries/mutations across users/projects/issues/comments/dashboard.
-
-## Convex data model
-
-Defined in [`convex/schema.ts`](./convex/schema.ts):
+Core tables in `/convex/schema.ts`:
 
 - `users`
 - `projects`
 - `projectMembers`
-- `projectCounters`
 - `projectInvites`
+- `projectCounters`
 - `issues`
 - `comments`
 - `activities`
 
-Indexes and search index are included for role checks, project scoping, assignee/reporter lookups, and issue text search.
+## Architecture Notes
 
-## Frontend structure
+- Auth is Clerk-based, with Convex identity mapped to internal `users` records.
+- User bootstrap/sync is handled through `users.ensureCurrentUser`.
+- Invite acceptance is auto-processed when a signed-in user email matches pending invites.
+- Project activity and issue activity are recorded for audit-friendly history.
 
-- `src/features/tasker/auth` - auth guard + Clerk→Convex user bootstrap
-- `src/features/tasker/layout` - app shell and command bar
-- `src/features/tasker/components` - reusable task UI components
-- `src/features/tasker/model.ts` - shared role/status/priority enums and labels
-- `src/features/tasker/validation.ts` - zod schemas for forms
-- `src/routes` - route pages:
-  - `/`
-  - `/sign-in`, `/sign-up`
-  - `/_app` layout with protected pages:
-    - `/dashboard`
-    - `/projects`
-    - `/projects/$projectId`
-    - `/issues/$issueId`
-    - `/admin/users`
-    - `/settings`
-  - `/unauthorized`
+## Repository Structure
 
-## Local setup
-
-1. Install deps:
-
-```bash
-pnpm install
-```
-
-2. Configure environment (`.env.local`):
-
-```bash
-CONVEX_DEPLOYMENT=...
-VITE_CONVEX_URL=...
-VITE_CLERK_PUBLISHABLE_KEY=...
-VITE_CONVEX_SITE_URL=...
-VITE_CLERK_JWT_TEMPLATE=convex
-```
-
-3. Set required Convex server env vars:
-
-```bash
-pnpm dlx convex env set CLERK_SECRET_KEY sk_test_...
-pnpm dlx convex env set APP_BASE_URL http://localhost:3000
-```
-
-4. Ensure Convex + Clerk auth integration is configured for your deployment (JWT template for Convex in Clerk).
-
-5. Run Convex and app:
-
-```bash
-pnpm dlx convex dev
-pnpm dev
-```
-
-6. Optional (seed sample data after signing in):
-- Open `/settings`
-- Click **Seed demo data**
+- `/src/routes` - all route screens and page-level logic.
+- `/src/features/tasker` - domain UI, auth guards, and shared feature modules.
+- `/src/components/ui` - shared design system primitives and dialogs.
+- `/convex` - schema, queries, mutations, actions, and auth/permission helpers.
 
 ## Scripts
 
@@ -157,10 +67,56 @@ pnpm check
 pnpm test
 ```
 
-## Notes
+## License
 
-- Internal user records are created/synced via `users.ensureCurrentUser` during sign-in bootstrap.
-- Pending email invites are auto-claimed on login when invite email matches user email.
-- First signed-in user becomes `admin`; subsequent users default to `member`.
-- Issues are soft-deleted via `deletedAt`/`archived`.
-- Viewer role is strictly read-only by server checks.
+This project is licensed under the Unlicense. See `/LICENSE`.
+
+## Local Setup (Required)
+
+1. Install dependencies.
+
+```bash
+pnpm install
+```
+
+2. Configure client env vars in `.env.local`.
+
+```bash
+CONVEX_DEPLOYMENT=...
+VITE_CONVEX_URL=...
+VITE_CLERK_PUBLISHABLE_KEY=...
+VITE_CONVEX_SITE_URL=...
+VITE_CLERK_JWT_TEMPLATE=convex
+```
+
+3. Configure Clerk authentication prerequisites.
+
+- Create a Clerk JWT template named `convex` (used by Convex auth).
+- Enable email sign-in in Clerk, because project invite delivery and acceptance rely on email identity.
+
+4. Configure Convex server env vars (required for invite actions).
+
+```bash
+pnpm dlx convex env set CLERK_SECRET_KEY sk_...
+pnpm dlx convex env set APP_BASE_URL http://localhost:3000
+```
+
+Optional:
+
+```bash
+pnpm dlx convex env set CLERK_API_URL https://api.clerk.com/v1
+```
+
+5. Verify Convex auth provider values for your Clerk instance in `/convex/auth.config.ts`.
+
+- `domain` and `issuer` must match your Clerk account domain.
+- `applicationID` should match the JWT template/application id (`convex` in this setup).
+
+6. Start development services.
+
+```bash
+pnpm dlx convex dev
+pnpm dev
+```
+
+7. Open `http://localhost:3000`, sign in, and optionally seed demo data from `/settings`.
