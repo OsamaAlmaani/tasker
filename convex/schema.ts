@@ -58,8 +58,20 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index('by_projectId', ['projectId']),
 
+  issueLists: defineTable({
+    projectId: v.id('projects'),
+    name: v.string(),
+    position: v.number(),
+    createdBy: v.id('users'),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_projectId', ['projectId'])
+    .index('by_projectId_position', ['projectId', 'position']),
+
   issues: defineTable({
     projectId: v.id('projects'),
+    listId: v.optional(v.id('issueLists')),
     issueNumber: v.number(),
     title: v.string(),
     description: v.optional(v.string()),
@@ -82,7 +94,9 @@ export default defineSchema({
     .index('by_projectId_status', ['projectId', 'status'])
     .index('by_projectId_priority', ['projectId', 'priority'])
     .index('by_projectId_assignee', ['projectId', 'assigneeId'])
+    .index('by_projectId_listId', ['projectId', 'listId'])
     .index('by_assignee', ['assigneeId'])
+    .index('by_listId', ['listId'])
     .index('by_reporter', ['reporterId'])
     .index('by_createdBy', ['createdBy'])
     .searchIndex('search_text', {

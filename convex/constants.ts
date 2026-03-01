@@ -18,6 +18,7 @@ export const ISSUE_PRIORITIES = [
 
 export const ACTIVITY_ENTITY_TYPES = [
   'project',
+  'issue_list',
   'issue',
   'comment',
   'member',
@@ -34,9 +35,13 @@ export const ACTIVITY_ACTIONS = [
   'project.invite_sent',
   'project.invite_revoked',
   'project.invite_accepted',
+  'issue_list.created',
+  'issue_list.updated',
+  'issue_list.deleted',
   'issue.created',
   'issue.updated',
   'issue.deleted',
+  'issue.list_changed',
   'issue.status_changed',
   'issue.priority_changed',
   'issue.assignee_changed',
@@ -85,6 +90,7 @@ export const issuePriorityValidator = v.union(
 
 export const activityEntityTypeValidator = v.union(
   v.literal('project'),
+  v.literal('issue_list'),
   v.literal('issue'),
   v.literal('comment'),
   v.literal('member'),
@@ -101,9 +107,13 @@ export const activityActionValidator = v.union(
   v.literal('project.invite_sent'),
   v.literal('project.invite_revoked'),
   v.literal('project.invite_accepted'),
+  v.literal('issue_list.created'),
+  v.literal('issue_list.updated'),
+  v.literal('issue_list.deleted'),
   v.literal('issue.created'),
   v.literal('issue.updated'),
   v.literal('issue.deleted'),
+  v.literal('issue.list_changed'),
   v.literal('issue.status_changed'),
   v.literal('issue.priority_changed'),
   v.literal('issue.assignee_changed'),

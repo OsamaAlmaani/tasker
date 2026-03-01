@@ -50,6 +50,22 @@ async function ensureAssigneeAllowed(
   return assignee
 }
 
+async function ensureIssueListBelongsToProject(
+  ctx: MutationCtx,
+  projectId: Id<'projects'>,
+  listId: Id<'issueLists'>,
+) {
+  const issueList = await ctx.db.get(listId)
+  if (!issueList || issueList.projectId !== projectId) {
+    throw new ConvexError({
+      code: 'VALIDATION_ERROR',
+      message: 'Issue list not found in this project.',
+    })
+  }
+
+  return issueList
+}
+
 export const listByProject = query({
   args: {
     projectId: v.id('projects'),
@@ -58,6 +74,7 @@ export const listByProject = query({
     priority: v.optional(issuePriorityValidator),
     assigneeId: v.optional(v.id('users')),
     creatorId: v.optional(v.id('users')),
+    listId: v.optional(v.union(v.id('issueLists'), v.null())),
     includeArchived: v.optional(v.boolean()),
     onlyMine: v.optional(v.boolean()),
     sortBy: v.optional(
@@ -108,6 +125,14 @@ export const listByProject = query({
       }
       if (args.creatorId && issue.createdBy !== args.creatorId) {
         return false
+      }
+      if (args.listId !== undefined) {
+        if (args.listId === null && issue.listId !== undefined) {
+          return false
+        }
+        if (args.listId !== null && issue.listId !== args.listId) {
+          return false
+        }
       }
       if (args.search?.trim() && args.includeArchived) {
         const search = args.search.trim().toLowerCase()
@@ -194,6 +219,7 @@ export const create = mutation({
     status: v.optional(issueStatusValidator),
     priority: v.optional(issuePriorityValidator),
     assigneeId: v.optional(v.id('users')),
+    listId: v.optional(v.id('issueLists')),
     labels: v.optional(v.array(v.string())),
     dueDate: v.optional(v.number()),
   },
@@ -202,6 +228,9 @@ export const create = mutation({
 
     if (args.assigneeId) {
       await ensureAssigneeAllowed(ctx, args.projectId, args.assigneeId)
+    }
+    if (args.listId) {
+      await ensureIssueListBelongsToProject(ctx, args.projectId, args.listId)
     }
 
     const now = Date.now()
@@ -238,6 +267,7 @@ export const create = mutation({
       title: args.title.trim(),
       description: args.description?.trim(),
       searchText: buildSearchText(args.title, args.description),
+      listId: args.listId,
       status: args.status ?? 'todo',
       priority: args.priority ?? 'none',
       assigneeId: args.assigneeId,
@@ -280,6 +310,7 @@ export const update = mutation({
     status: v.optional(issueStatusValidator),
     priority: v.optional(issuePriorityValidator),
     assigneeId: v.optional(v.union(v.id('users'), v.null())),
+    listId: v.optional(v.union(v.id('issueLists'), v.null())),
     labels: v.optional(v.array(v.string())),
     dueDate: v.optional(v.union(v.number(), v.null())),
     archived: v.optional(v.boolean()),
@@ -310,6 +341,12 @@ export const update = mutation({
         await ensureAssigneeAllowed(ctx, issue.projectId, args.assigneeId)
       }
       patch.assigneeId = args.assigneeId ?? undefined
+    }
+    if (args.listId !== undefined) {
+      if (args.listId) {
+        await ensureIssueListBelongsToProject(ctx, issue.projectId, args.listId)
+      }
+      patch.listId = args.listId ?? undefined
     }
     if (args.labels !== undefined) {
       patch.labels = args.labels.map((label) => label.trim()).filter(Boolean)
@@ -384,6 +421,21 @@ export const update = mutation({
         metadata: {
           from: issue.assigneeId,
           to: args.assigneeId,
+        },
+      })
+    }
+
+    if (args.listId !== undefined && args.listId !== issue.listId) {
+      await createActivity(ctx, {
+        actorId: user._id,
+        projectId: issue.projectId,
+        issueId: issue._id,
+        entityType: 'issue',
+        entityId: issue._id,
+        action: 'issue.list_changed',
+        metadata: {
+          from: issue.listId,
+          to: args.listId,
         },
       })
     }

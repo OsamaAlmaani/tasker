@@ -51,6 +51,10 @@ function IssueDetailPage() {
 		api.users.listAssignableUsers,
 		issueProjectId ? { projectId: issueProjectId } : "skip",
 	);
+	const issueLists = useQuery(
+		api.issueLists.listByProject,
+		issueProjectId ? { projectId: issueProjectId } : "skip",
+	);
 
 	const updateIssue = useMutation(api.issues.update);
 	const deleteIssue = useMutation(api.issues.remove);
@@ -297,6 +301,35 @@ function IssueDetailPage() {
 							<CardTitle>Details</CardTitle>
 						</CardHeader>
 						<CardContent className="space-y-3">
+							<div>
+								<Label>List</Label>
+								{canWrite ? (
+									<Select
+										value={issueData.issue.listId ?? ""}
+										onChange={(event) =>
+											updateIssue({
+												issueId,
+												listId: (event.target.value ||
+													null) as Id<"issueLists"> | null,
+											})
+										}
+									>
+										<option value="">No list</option>
+										{(issueLists ?? []).map((list) => (
+											<option key={list._id} value={list._id}>
+												{list.name}
+											</option>
+										))}
+									</Select>
+								) : (
+									<p className="m-0 text-sm text-[var(--text)]">
+										{issueLists?.find(
+											(list) => list._id === issueData.issue.listId,
+										)?.name ?? "No list"}
+									</p>
+								)}
+							</div>
+
 							<div>
 								<Label>Status</Label>
 								{canWrite ? (

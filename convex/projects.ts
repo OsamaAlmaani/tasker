@@ -179,6 +179,15 @@ export const create = mutation({
       updatedAt: now,
     })
 
+    await ctx.db.insert('issueLists', {
+      projectId,
+      name: 'General',
+      position: 0,
+      createdBy: user._id,
+      createdAt: now,
+      updatedAt: now,
+    })
+
     await ctx.db.insert('projectMembers', {
       projectId,
       userId: user._id,
