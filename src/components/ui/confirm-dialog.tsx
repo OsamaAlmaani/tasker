@@ -47,7 +47,7 @@ export function ConfirmDialog({
 	}
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,12,26,0.45)] px-4">
+		<div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
 			<div
 				role="dialog"
 				aria-modal="true"

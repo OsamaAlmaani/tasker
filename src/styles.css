@@ -385,6 +385,12 @@ button:disabled,
   border-style: dashed;
 }
 
+.modal-overlay {
+  background: rgba(8, 12, 26, 0.45);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
 .kanban-board {
   display: grid;
   grid-template-columns: repeat(5, minmax(220px, 1fr));

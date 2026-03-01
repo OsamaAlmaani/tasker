@@ -730,7 +730,10 @@ function ProjectDetailPage() {
 						{canWrite ? (
 							<Button
 								variant="secondary"
-								onClick={() => setCreateOpen((value) => !value)}
+								onClick={() => {
+									setCreateError(null);
+									setCreateOpen(true);
+								}}
 							>
 								<Plus className="mr-2 h-4 w-4" />
 								New Issue
@@ -856,149 +859,6 @@ function ProjectDetailPage() {
 											: "Archive project"}
 									</Button>
 								</div>
-							</div>
-						</form>
-					</CardContent>
-				</Card>
-			) : null}
-
-			{createOpen ? (
-				<Card className="mb-4">
-					<CardHeader>
-						<CardTitle>Create Issue</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<form onSubmit={submitIssue} className="grid gap-3 md:grid-cols-2">
-							<div className="md:col-span-2">
-								<Label>Title</Label>
-								<Input
-									value={issueForm.title}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											title: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div className="md:col-span-2">
-								<Label>Description</Label>
-								<Textarea
-									value={issueForm.description}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											description: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div>
-								<Label>Status</Label>
-								<Select
-									value={issueForm.status}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											status: event.target.value,
-										}))
-									}
-								>
-									{ISSUE_STATUSES.map((value) => (
-										<option key={value} value={value}>
-											{issueStatusLabel[value]}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>Priority</Label>
-								<Select
-									value={issueForm.priority}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											priority: event.target.value,
-										}))
-									}
-								>
-									{ISSUE_PRIORITIES.map((value) => (
-										<option key={value} value={value}>
-											{value}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>List</Label>
-								<Select
-									value={issueForm.listId}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											listId: event.target.value,
-										}))
-									}
-								>
-									<option value="">No list</option>
-									{(issueLists ?? []).map((list) => (
-										<option key={list._id} value={list._id}>
-											{list.name}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>Assignee</Label>
-								<Select
-									value={issueForm.assigneeId}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											assigneeId: event.target.value,
-										}))
-									}
-								>
-									<option value="">Unassigned</option>
-									{(assignableUsers ?? []).map((user) => (
-										<option key={user._id} value={user._id}>
-											{user.name}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>Due Date</Label>
-								<Input
-									type="date"
-									value={issueForm.dueDate}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											dueDate: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div className="md:col-span-2">
-								<Label>Labels (comma-separated)</Label>
-								<Input
-									value={issueForm.labels}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											labels: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							{createError ? (
-								<p className="m-0 text-sm text-[var(--danger)]">
-									{createError}
-								</p>
-							) : null}
-							<div className="md:col-span-2">
-								<Button type="submit">Create issue</Button>
 							</div>
 						</form>
 					</CardContent>
@@ -1472,7 +1332,7 @@ function ProjectDetailPage() {
 			</div>
 
 			{isMembersModalOpen ? (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,12,26,0.45)] px-4">
+				<div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
 					<div
 						role="dialog"
 						aria-modal="true"
@@ -1558,7 +1418,7 @@ function ProjectDetailPage() {
 			) : null}
 
 			{projectData.canManageMembers && isInviteModalOpen ? (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,12,26,0.45)] px-4">
+				<div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
 					<div
 						role="dialog"
 						aria-modal="true"
@@ -1696,6 +1556,181 @@ function ProjectDetailPage() {
 								</p>
 							) : null}
 						</div>
+					</div>
+				</div>
+			) : null}
+
+			{createOpen ? (
+				<div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
+					<div
+						role="dialog"
+						aria-modal="true"
+						aria-label="Create issue"
+						className="w-full max-w-3xl rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
+					>
+						<div className="mb-4 flex items-center justify-between gap-3">
+							<h2 className="m-0 text-base font-semibold text-[var(--text)]">
+								Create Issue
+							</h2>
+							<Button
+								type="button"
+								size="sm"
+								variant="ghost"
+								onClick={() => {
+									setCreateError(null);
+									setCreateOpen(false);
+								}}
+							>
+								Close
+							</Button>
+						</div>
+
+						<form
+							onSubmit={submitIssue}
+							className="max-h-[70vh] overflow-y-auto pr-1 grid gap-3 md:grid-cols-2"
+						>
+							<div className="md:col-span-2">
+								<Label>Title</Label>
+								<Input
+									value={issueForm.title}
+									onChange={(event) =>
+										setIssueForm((prev) => ({
+											...prev,
+											title: event.target.value,
+										}))
+									}
+								/>
+							</div>
+							<div className="md:col-span-2">
+								<Label>Description</Label>
+								<Textarea
+									value={issueForm.description}
+									onChange={(event) =>
+										setIssueForm((prev) => ({
+											...prev,
+											description: event.target.value,
+										}))
+									}
+								/>
+							</div>
+							<div>
+								<Label>Status</Label>
+								<Select
+									value={issueForm.status}
+									onChange={(event) =>
+										setIssueForm((prev) => ({
+											...prev,
+											status: event.target.value,
+										}))
+									}
+								>
+									{ISSUE_STATUSES.map((value) => (
+										<option key={value} value={value}>
+											{issueStatusLabel[value]}
+										</option>
+									))}
+								</Select>
+							</div>
+							<div>
+								<Label>Priority</Label>
+								<Select
+									value={issueForm.priority}
+									onChange={(event) =>
+										setIssueForm((prev) => ({
+											...prev,
+											priority: event.target.value,
+										}))
+									}
+								>
+									{ISSUE_PRIORITIES.map((value) => (
+										<option key={value} value={value}>
+											{value}
+										</option>
+									))}
+								</Select>
+							</div>
+							<div>
+								<Label>List</Label>
+								<Select
+									value={issueForm.listId}
+									onChange={(event) =>
+										setIssueForm((prev) => ({
+											...prev,
+											listId: event.target.value,
+										}))
+									}
+								>
+									<option value="">No list</option>
+									{(issueLists ?? []).map((list) => (
+										<option key={list._id} value={list._id}>
+											{list.name}
+										</option>
+									))}
+								</Select>
+							</div>
+							<div>
+								<Label>Assignee</Label>
+								<Select
+									value={issueForm.assigneeId}
+									onChange={(event) =>
+										setIssueForm((prev) => ({
+											...prev,
+											assigneeId: event.target.value,
+										}))
+									}
+								>
+									<option value="">Unassigned</option>
+									{(assignableUsers ?? []).map((user) => (
+										<option key={user._id} value={user._id}>
+											{user.name}
+										</option>
+									))}
+								</Select>
+							</div>
+							<div>
+								<Label>Due Date</Label>
+								<Input
+									type="date"
+									value={issueForm.dueDate}
+									onChange={(event) =>
+										setIssueForm((prev) => ({
+											...prev,
+											dueDate: event.target.value,
+										}))
+									}
+								/>
+							</div>
+							<div className="md:col-span-2">
+								<Label>Labels (comma-separated)</Label>
+								<Input
+									value={issueForm.labels}
+									onChange={(event) =>
+										setIssueForm((prev) => ({
+											...prev,
+											labels: event.target.value,
+										}))
+									}
+								/>
+							</div>
+							{createError ? (
+								<p className="m-0 text-sm text-[var(--danger)]">
+									{createError}
+								</p>
+							) : null}
+							<div className="md:col-span-2 flex items-center justify-end gap-2 pt-1">
+								<Button
+									type="button"
+									variant="ghost"
+									onClick={() => {
+										setCreateError(null);
+										setCreateOpen(false);
+									}}
+								>
+									Cancel
+								</Button>
+								<Button type="submit">Create issue</Button>
+							</div>
+						</form>
 					</div>
 				</div>
 			) : null}
