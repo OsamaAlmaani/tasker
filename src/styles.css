@@ -385,6 +385,117 @@ button:disabled,
   border-style: dashed;
 }
 
+.issue-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 22px;
+  align-items: start;
+}
+
+.issue-detail-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.issue-detail-settings {
+  min-width: 0;
+}
+
+.issue-overview-block {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+
+.issue-overview-block-description {
+  padding-bottom: 14px;
+}
+
+.issue-overview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.issue-overview-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-text);
+}
+
+.issue-meta-panel {
+  border-left: 1px solid var(--line);
+  padding-left: 16px;
+}
+
+.issue-meta-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  border-bottom: 1px solid var(--line);
+}
+
+.issue-meta-row-last {
+  border-bottom: 0;
+}
+
+.issue-meta-label {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+}
+
+.issue-meta-value {
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.issue-meta-control {
+  width: 100%;
+  max-width: 190px;
+  height: 28px;
+  border: 1px solid transparent;
+  background: transparent;
+  padding-inline: 8px;
+  text-align: right;
+  color: var(--text);
+}
+
+.issue-meta-control:focus {
+  border-color: color-mix(in oklab, var(--accent) 48%, var(--line) 52%);
+  background: color-mix(in oklab, var(--surface-muted) 90%, var(--surface) 10%);
+}
+
+.issue-meta-static {
+  font-size: 0.96rem;
+  color: var(--text);
+}
+
+.issue-meta-tag {
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.issue-detail-discussion {
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+
+.issue-discussion-card {
+  border-radius: 14px;
+}
+
+.issue-comment-input {
+  min-height: 90px;
+}
+
 .modal-overlay {
   background: rgba(8, 12, 26, 0.45);
   -webkit-backdrop-filter: blur(6px);
@@ -872,6 +983,21 @@ button:disabled,
     grid-template-columns: 1fr;
   }
 
+  .issue-detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .issue-meta-panel {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding-left: 0;
+    padding-top: 8px;
+  }
+
+  .issue-detail-discussion {
+    grid-column: auto;
+  }
+
   .app-sidebar-overlay {
     display: block;
     position: fixed;
@@ -953,6 +1079,10 @@ button:disabled,
 }
 
 @media (max-width: 800px) {
+  .issue-detail-main h1 {
+    font-size: 2rem;
+  }
+
   .stitch-landing-header {
     padding: 18px 16px;
   }

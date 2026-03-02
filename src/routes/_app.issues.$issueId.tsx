@@ -15,13 +15,8 @@ import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { Input } from "#/components/ui/input";
-import { Label } from "#/components/ui/label";
 import { Select } from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
-import {
-	IssuePriorityBadge,
-	IssueStatusBadge,
-} from "#/features/tasker/components/IssueBadges";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatDate, formatRelative } from "#/features/tasker/format";
 import {
@@ -284,27 +279,27 @@ function IssueDetailPage() {
 				<p className="mb-3 mt-0 text-sm text-[var(--danger)]">{deleteError}</p>
 			) : null}
 
-			<div className="space-y-4">
-				<Card>
-					<CardHeader className="flex flex-row items-center justify-between space-y-0">
-						<CardTitle>Title</CardTitle>
-						{canWrite && !editingTitle ? (
-							<Button
-								size="sm"
-								variant="ghost"
-								className="h-7 w-7 p-0"
-								aria-label="Edit title"
-								title="Edit title"
-								onClick={() => {
-									setEditingTitle(true);
-									setTitleDraft(issueData.issue.title);
-								}}
-							>
-								<Pencil className="h-3.5 w-3.5" />
-							</Button>
-						) : null}
-					</CardHeader>
-					<CardContent className="space-y-3">
+			<div className="issue-detail-layout">
+				<div className="issue-detail-main">
+					<section className="issue-overview-block">
+						<div className="issue-overview-toolbar">
+							<span className="issue-overview-kicker">Title</span>
+							{canWrite && !editingTitle ? (
+								<Button
+									size="sm"
+									variant="ghost"
+									className="h-7 w-7 p-0"
+									aria-label="Edit title"
+									title="Edit title"
+									onClick={() => {
+										setEditingTitle(true);
+										setTitleDraft(issueData.issue.title);
+									}}
+								>
+									<Pencil className="h-3.5 w-3.5" />
+								</Button>
+							) : null}
+						</div>
 						{editingTitle ? (
 							<form
 								className="space-y-2"
@@ -333,33 +328,31 @@ function IssueDetailPage() {
 								</div>
 							</form>
 						) : (
-							<h2 className="m-0 text-xl font-semibold text-[var(--text)]">
+							<h1 className="m-0 text-4xl font-bold leading-tight tracking-[-0.02em] text-[var(--text)]">
 								{issueData.issue.title}
-							</h2>
+							</h1>
 						)}
-					</CardContent>
-				</Card>
+					</section>
 
-				<Card>
-					<CardHeader className="flex flex-row items-center justify-between space-y-0">
-						<CardTitle>Description</CardTitle>
-						{canWrite && !editingDescription ? (
-							<Button
-								size="sm"
-								variant="ghost"
-								className="h-7 w-7 p-0"
-								aria-label="Edit description"
-								title="Edit description"
-								onClick={() => {
-									setEditingDescription(true);
-									setDescriptionDraft(issueData.issue.description ?? "");
-								}}
-							>
-								<Pencil className="h-3.5 w-3.5" />
-							</Button>
-						) : null}
-					</CardHeader>
-					<CardContent className="space-y-3">
+					<section className="issue-overview-block issue-overview-block-description">
+						<div className="issue-overview-toolbar">
+							<span className="issue-overview-kicker">Description</span>
+							{canWrite && !editingDescription ? (
+								<Button
+									size="sm"
+									variant="ghost"
+									className="h-7 w-7 p-0"
+									aria-label="Edit description"
+									title="Edit description"
+									onClick={() => {
+										setEditingDescription(true);
+										setDescriptionDraft(issueData.issue.description ?? "");
+									}}
+								>
+									<Pencil className="h-3.5 w-3.5" />
+								</Button>
+							) : null}
+						</div>
 						{editingDescription ? (
 							<div className="space-y-2">
 								<Textarea
@@ -389,22 +382,20 @@ function IssueDetailPage() {
 								</div>
 							</div>
 						) : (
-							<p className="m-0 whitespace-pre-wrap text-sm text-[var(--text)]">
+							<p className="m-0 whitespace-pre-wrap text-[1.05rem] leading-relaxed text-[var(--text)]">
 								{issueData.issue.description || "No description provided."}
 							</p>
 						)}
-					</CardContent>
-				</Card>
+					</section>
+				</div>
 
-				<Card>
-					<CardHeader>
-						<CardTitle>Details</CardTitle>
-					</CardHeader>
-					<CardContent className="space-y-3">
-						<div>
-							<Label>List</Label>
+				<aside className="issue-detail-settings issue-meta-panel">
+					<div className="issue-meta-row">
+						<span className="issue-meta-label">List</span>
+						<div className="issue-meta-value">
 							{canWrite ? (
 								<Select
+									className="issue-meta-control"
 									value={issueData.issue.listId ?? ""}
 									onChange={(event) =>
 										updateIssue({
@@ -422,18 +413,21 @@ function IssueDetailPage() {
 									))}
 								</Select>
 							) : (
-								<p className="m-0 text-sm text-[var(--text)]">
+								<span className="issue-meta-static">
 									{issueLists?.find(
 										(list) => list._id === issueData.issue.listId,
 									)?.name ?? "No list"}
-								</p>
+								</span>
 							)}
 						</div>
+					</div>
 
-						<div>
-							<Label>Status</Label>
+					<div className="issue-meta-row">
+						<span className="issue-meta-label">Status</span>
+						<div className="issue-meta-value">
 							{canWrite ? (
 								<Select
+									className="issue-meta-control"
 									value={issueData.issue.status}
 									onChange={(event) =>
 										updateIssue({
@@ -450,16 +444,19 @@ function IssueDetailPage() {
 									))}
 								</Select>
 							) : (
-								<div className="pt-1">
-									<IssueStatusBadge status={issueData.issue.status} />
-								</div>
+								<span className="issue-meta-static">
+									{issueStatusLabel[issueData.issue.status]}
+								</span>
 							)}
 						</div>
+					</div>
 
-						<div>
-							<Label>Priority</Label>
+					<div className="issue-meta-row">
+						<span className="issue-meta-label">Priority</span>
+						<div className="issue-meta-value">
 							{canWrite ? (
 								<Select
+									className="issue-meta-control"
 									value={issueData.issue.priority}
 									onChange={(event) =>
 										updateIssue({
@@ -476,16 +473,19 @@ function IssueDetailPage() {
 									))}
 								</Select>
 							) : (
-								<div className="pt-1">
-									<IssuePriorityBadge priority={issueData.issue.priority} />
-								</div>
+								<span className="issue-meta-static">
+									{issuePriorityLabel[issueData.issue.priority]}
+								</span>
 							)}
 						</div>
+					</div>
 
-						<div>
-							<Label>Assignee</Label>
+					<div className="issue-meta-row">
+						<span className="issue-meta-label">Assignee</span>
+						<div className="issue-meta-value">
 							{canWrite ? (
 								<Select
+									className="issue-meta-control"
 									value={issueData.issue.assigneeId ?? ""}
 									onChange={(event) =>
 										updateIssue({
@@ -503,16 +503,19 @@ function IssueDetailPage() {
 									))}
 								</Select>
 							) : (
-								<p className="m-0 text-sm text-[var(--text)]">
+								<span className="issue-meta-static">
 									{issueData.assignee?.name ?? "Unassigned"}
-								</p>
+								</span>
 							)}
 						</div>
+					</div>
 
-						<div>
-							<Label>Due Date</Label>
+					<div className="issue-meta-row">
+						<span className="issue-meta-label">Due Date</span>
+						<div className="issue-meta-value">
 							{canWrite ? (
 								<Input
+									className="issue-meta-control"
 									type="date"
 									value={
 										issueData.issue.dueDate
@@ -531,188 +534,179 @@ function IssueDetailPage() {
 									}
 								/>
 							) : (
-								<p className="m-0 text-sm text-[var(--text)]">
+								<span className="issue-meta-static">
 									{issueData.issue.dueDate
 										? formatDate(issueData.issue.dueDate)
 										: "No due date"}
-								</p>
+								</span>
 							)}
 						</div>
+					</div>
 
-						<div>
-							<Label>Labels</Label>
-							<div className="pt-1">
-								{issueData.issue.labels.length ? (
-									<div className="flex flex-wrap gap-1.5">
-										{issueData.issue.labels.map((label) => (
-											<Badge key={label}>{label}</Badge>
-										))}
-									</div>
-								) : (
-									<p className="m-0 text-sm text-[var(--muted-text)]">
-										No labels
-									</p>
-								)}
-							</div>
+					<div className="issue-meta-row issue-meta-row-last">
+						<span className="issue-meta-label">Labels</span>
+						<div className="issue-meta-value">
+							{issueData.issue.labels.length ? (
+								<div className="flex flex-wrap justify-end gap-1.5">
+									{issueData.issue.labels.map((label) => (
+										<Badge key={label} className="issue-meta-tag">
+											{label}
+										</Badge>
+									))}
+								</div>
+							) : (
+								<span className="issue-meta-static">None</span>
+							)}
 						</div>
+					</div>
+				</aside>
 
-						<div className="rounded-md border border-[var(--line)] p-3 text-xs text-[var(--muted-text)]">
-							<p className="m-0">
-								Created {formatRelative(issueData.issue.createdAt)}
-							</p>
-							<p className="m-0 mt-1">
-								Reporter: {issueData.reporter?.name ?? "Unknown"}
-							</p>
-							{issueData.issue.completedAt ? (
-								<p className="m-0 mt-1">
-									Completed {formatDate(issueData.issue.completedAt)}
-								</p>
-							) : null}
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader>
-						<CardTitle>Discussion & Activity</CardTitle>
-					</CardHeader>
-					<CardContent className="space-y-4">
-						{timelineItems.length ? (
-							<ul className="m-0 divide-y divide-[var(--line)] p-0 pb-2">
-								{timelineItems.map((item) => (
-									<li
-										key={item.key}
-										className="flex items-start gap-3 py-3 first:pt-0"
-									>
-										<span
-											className={
-												item.type === "comment"
-													? "inline-flex h-7 w-7 flex-none items-center justify-center rounded-full border border-blue-300/60 bg-blue-50/70 text-blue-700 dark:border-blue-800/70 dark:bg-blue-950/25 dark:text-blue-300"
-													: "inline-flex h-7 w-7 flex-none items-center justify-center rounded-full border border-amber-300/60 bg-amber-50/70 text-amber-700 dark:border-amber-800/70 dark:bg-amber-950/25 dark:text-amber-300"
-											}
+				<div className="issue-detail-discussion">
+					<Card className="issue-discussion-card">
+						<CardHeader className="pb-2">
+							<CardTitle className="text-base">Discussion & Activity</CardTitle>
+						</CardHeader>
+						<CardContent className="space-y-4">
+							{timelineItems.length ? (
+								<ul className="m-0 divide-y divide-[var(--line)] p-0 pb-2">
+									{timelineItems.map((item) => (
+										<li
+											key={item.key}
+											className="flex items-start gap-3 py-3 first:pt-0"
 										>
-											{item.type === "comment" ? (
-												<MessageSquare className="h-3.5 w-3.5" />
-											) : (
-												<History className="h-3.5 w-3.5" />
-											)}
-										</span>
-
-										<div className="min-w-0 flex-1">
-											{item.type === "comment" ? (
-												editingCommentId === item.comment._id ? (
-													<div className="space-y-2">
-														<Textarea
-															value={commentDraft}
-															onChange={(event) =>
-																setCommentDraft(event.target.value)
-															}
-														/>
-														<div className="flex items-center gap-1">
-															<Button
-																type="button"
-																size="sm"
-																variant="ghost"
-																className="h-7 w-7 p-0"
-																aria-label="Save comment"
-																title="Save"
-																onClick={async () => {
-																	await updateComment({
-																		commentId: item.comment._id,
-																		body: commentDraft,
-																	});
-																	setEditingCommentId(null);
-																}}
-															>
-																<Check className="h-3.5 w-3.5" />
-															</Button>
-															<Button
-																type="button"
-																size="sm"
-																variant="ghost"
-																className="h-7 w-7 p-0"
-																aria-label="Cancel editing comment"
-																title="Cancel"
-																onClick={() => setEditingCommentId(null)}
-															>
-																<X className="h-3.5 w-3.5" />
-															</Button>
-														</div>
-													</div>
+											<span
+												className={
+													item.type === "comment"
+														? "inline-flex h-7 w-7 flex-none items-center justify-center rounded-full border border-blue-300/60 bg-blue-50/70 text-blue-700 dark:border-blue-800/70 dark:bg-blue-950/25 dark:text-blue-300"
+														: "inline-flex h-7 w-7 flex-none items-center justify-center rounded-full border border-amber-300/60 bg-amber-50/70 text-amber-700 dark:border-amber-800/70 dark:bg-amber-950/25 dark:text-amber-300"
+												}
+											>
+												{item.type === "comment" ? (
+													<MessageSquare className="h-3.5 w-3.5" />
 												) : (
-													<>
-														<div className="flex items-center justify-between gap-2">
-															<p className="m-0 text-xs text-[var(--muted-text)]">
-																<span className="font-medium text-[var(--text)]">
-																	{item.author?.name ?? "Unknown User"}
-																</span>{" "}
-																commented ·{" "}
-																{formatRelative(item.comment.updatedAt)}
-															</p>
-															{canWrite &&
-															me &&
-															item.comment.authorId === me._id ? (
+													<History className="h-3.5 w-3.5" />
+												)}
+											</span>
+
+											<div className="min-w-0 flex-1">
+												{item.type === "comment" ? (
+													editingCommentId === item.comment._id ? (
+														<div className="space-y-2">
+															<Textarea
+																value={commentDraft}
+																onChange={(event) =>
+																	setCommentDraft(event.target.value)
+																}
+															/>
+															<div className="flex items-center gap-1">
 																<Button
 																	type="button"
 																	size="sm"
 																	variant="ghost"
 																	className="h-7 w-7 p-0"
-																	aria-label="Edit comment"
-																	title="Edit comment"
-																	onClick={() => {
-																		setEditingCommentId(item.comment._id);
-																		setCommentDraft(item.comment.body);
+																	aria-label="Save comment"
+																	title="Save"
+																	onClick={async () => {
+																		await updateComment({
+																			commentId: item.comment._id,
+																			body: commentDraft,
+																		});
+																		setEditingCommentId(null);
 																	}}
 																>
-																	<Pencil className="h-3.5 w-3.5" />
+																	<Check className="h-3.5 w-3.5" />
 																</Button>
-															) : null}
+																<Button
+																	type="button"
+																	size="sm"
+																	variant="ghost"
+																	className="h-7 w-7 p-0"
+																	aria-label="Cancel editing comment"
+																	title="Cancel"
+																	onClick={() => setEditingCommentId(null)}
+																>
+																	<X className="h-3.5 w-3.5" />
+																</Button>
+															</div>
 														</div>
-														<p className="m-0 mt-1 whitespace-pre-wrap text-sm text-[var(--text)]">
-															{item.comment.body}
+													) : (
+														<>
+															<div className="flex items-center justify-between gap-2">
+																<p className="m-0 text-xs text-[var(--muted-text)]">
+																	<span className="font-medium text-[var(--text)]">
+																		{item.author?.name ?? "Unknown User"}
+																	</span>{" "}
+																	commented ·{" "}
+																	{formatRelative(item.comment.updatedAt)}
+																</p>
+																{canWrite &&
+																me &&
+																item.comment.authorId === me._id ? (
+																	<Button
+																		type="button"
+																		size="sm"
+																		variant="ghost"
+																		className="h-7 w-7 p-0"
+																		aria-label="Edit comment"
+																		title="Edit comment"
+																		onClick={() => {
+																			setEditingCommentId(item.comment._id);
+																			setCommentDraft(item.comment.body);
+																		}}
+																	>
+																		<Pencil className="h-3.5 w-3.5" />
+																	</Button>
+																) : null}
+															</div>
+															<p className="m-0 mt-1 whitespace-pre-wrap text-sm text-[var(--text)]">
+																{item.comment.body}
+															</p>
+														</>
+													)
+												) : (
+													<div>
+														<p className="m-0 text-sm text-[var(--text)]">
+															{activityLabel[item.activity.action] ??
+																item.activity.action}
 														</p>
-													</>
-												)
-											) : (
-												<div>
-													<p className="m-0 text-sm text-[var(--text)]">
-														{activityLabel[item.activity.action] ??
-															item.activity.action}
-													</p>
-													<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
-														{formatRelative(item.activity.createdAt)}
-													</p>
-												</div>
-											)}
-										</div>
-									</li>
-								))}
-							</ul>
-						) : (
-							<p className="m-0 text-sm text-[var(--muted-text)]">
-								No discussion or activity yet.
-							</p>
-						)}
+														<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
+															{formatRelative(item.activity.createdAt)}
+														</p>
+													</div>
+												)}
+											</div>
+										</li>
+									))}
+								</ul>
+							) : (
+								<p className="m-0 text-sm text-[var(--muted-text)]">
+									No discussion or activity yet.
+								</p>
+							)}
 
-						{canWrite ? (
-							<form
-								onSubmit={submitComment}
-								className="space-y-2 border-t border-[var(--line)] pt-3"
-							>
-								<Textarea
-									value={comment}
-									onChange={(event) => setComment(event.target.value)}
-									placeholder="Add a comment"
-								/>
-								<Button type="submit">Add comment</Button>
-							</form>
-						) : (
-							<p className="m-0 text-sm text-[var(--muted-text)]">
-								Viewers cannot add comments.
-							</p>
-						)}
-					</CardContent>
-				</Card>
+							{canWrite ? (
+								<form
+									onSubmit={submitComment}
+									className="issue-comment-form space-y-2 border-t border-[var(--line)] pt-3"
+								>
+									<Textarea
+										className="issue-comment-input"
+										value={comment}
+										onChange={(event) => setComment(event.target.value)}
+										placeholder="Add a comment"
+									/>
+									<Button type="submit" size="sm">
+										Add comment
+									</Button>
+								</form>
+							) : (
+								<p className="m-0 text-sm text-[var(--muted-text)]">
+									Viewers cannot add comments.
+								</p>
+							)}
+						</CardContent>
+					</Card>
+				</div>
 			</div>
 
 			<ConfirmDialog
