@@ -286,6 +286,11 @@ export const listByProject = query({
     ),
   },
   handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId)
+    if (!project) {
+      return []
+    }
+
     const { user } = await requireProjectViewAccess(ctx, args.projectId)
 
     const issues = await ctx.db
@@ -394,6 +399,11 @@ export const getById = query({
   handler: async (ctx, args) => {
     const issue = await ctx.db.get(args.issueId)
     if (!issue || issue.deletedAt) {
+      return null
+    }
+
+    const projectExists = await ctx.db.get(issue.projectId)
+    if (!projectExists) {
       return null
     }
 
@@ -805,6 +815,11 @@ export const activity = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const issue = await ctx.db.get(args.issueId)
+    if (!issue || issue.deletedAt) {
+      return []
+    }
+
     await requireIssueViewAccess(ctx, args.issueId)
 
     return await ctx.db

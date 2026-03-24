@@ -8,6 +8,14 @@ export const listByIssue = query({
     issueId: v.id('issues'),
   },
   handler: async (ctx, args) => {
+    const existingIssue = await ctx.db.get(args.issueId)
+    if (!existingIssue || existingIssue.deletedAt) {
+      return {
+        issue: null,
+        comments: [],
+      }
+    }
+
     const { issue } = await requireIssueViewAccess(ctx, args.issueId)
 
     const comments = await ctx.db

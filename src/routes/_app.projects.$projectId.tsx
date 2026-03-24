@@ -396,22 +396,27 @@ function ProjectDetailPage() {
 		});
 	}
 
-	const issues = useQuery(api.issues.listByProject, {
-		projectId,
-		search: search || undefined,
-		statuses: selectedStatuses.length ? selectedStatuses : undefined,
-		priority: (priority || undefined) as
-			| (typeof ISSUE_PRIORITIES)[number]
-			| undefined,
-		assigneeId: (assigneeId || undefined) as Id<"users"> | undefined,
-		listId:
-			listFilter === "all"
-				? undefined
-				: listFilter === "none"
-					? null
-					: (listFilter as Id<"issueLists">),
-		sortBy,
-	});
+	const issues = useQuery(
+		api.issues.listByProject,
+		projectData
+			? {
+					projectId,
+					search: search || undefined,
+					statuses: selectedStatuses.length ? selectedStatuses : undefined,
+					priority: (priority || undefined) as
+						| (typeof ISSUE_PRIORITIES)[number]
+						| undefined,
+					assigneeId: (assigneeId || undefined) as Id<"users"> | undefined,
+					listId:
+						listFilter === "all"
+							? undefined
+							: listFilter === "none"
+								? null
+								: (listFilter as Id<"issueLists">),
+					sortBy,
+				}
+			: "skip",
+	);
 
 	function addStatusFilter(nextStatus: string) {
 		if (
@@ -432,9 +437,10 @@ function ProjectDetailPage() {
 		setStatusPicker("");
 	}
 
-	const assignableUsers = useQuery(api.users.listAssignableUsers, {
-		projectId,
-	});
+	const assignableUsers = useQuery(
+		api.users.listAssignableUsers,
+		projectData ? { projectId } : "skip",
+	);
 
 	const createIssue = useMutation(api.issues.create);
 	const updateIssue = useMutation(api.issues.update);
@@ -504,14 +510,24 @@ function ProjectDetailPage() {
 	const [dragOverStatus, setDragOverStatus] = useState<
 		(typeof ISSUE_STATUSES)[number] | null
 	>(null);
-	const issueLists = useQuery(api.issueLists.listByProject, { projectId });
-	const allProjectIssues = useQuery(api.issues.listByProject, {
-		projectId,
-		sortBy: "created_desc",
-	});
+	const issueLists = useQuery(
+		api.issueLists.listByProject,
+		projectData ? { projectId } : "skip",
+	);
+	const allProjectIssues = useQuery(
+		api.issues.listByProject,
+		projectData
+			? {
+					projectId,
+					sortBy: "created_desc",
+				}
+			: "skip",
+	);
 	const projectActivity = useQuery(
 		api.projects.activity,
-		projectView === "activity" ? { projectId, limit: 80 } : "skip",
+		projectData && projectView === "activity"
+			? { projectId, limit: 80 }
+			: "skip",
 	);
 	const inviteCandidates = useQuery(
 		api.projects.searchInviteCandidates,
@@ -668,8 +684,28 @@ function ProjectDetailPage() {
 		};
 	}, [isImportExportMenuOpen]);
 
-	if (!projectData) {
+	if (projectData === undefined) {
 		return <div className="page-loading">Loading project…</div>;
+	}
+
+	if (projectData === null) {
+		return (
+			<div className="mx-auto max-w-xl">
+				<Card>
+					<CardHeader>
+						<CardTitle>Project not found</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-3">
+						<p className="m-0 text-sm text-[var(--muted-text)]">
+							This project may have been deleted or you no longer have access.
+						</p>
+						<Link to="/projects" className="no-underline">
+							<Button>Back to projects</Button>
+						</Link>
+					</CardContent>
+				</Card>
+			</div>
+		);
 	}
 
 	async function submitIssue(event: FormEvent<HTMLFormElement>) {

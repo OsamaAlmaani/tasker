@@ -96,6 +96,11 @@ export const listByProject = query({
     projectId: v.id('projects'),
   },
   handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId)
+    if (!project) {
+      return []
+    }
+
     await requireProjectViewAccess(ctx, args.projectId)
 
     return await ctx.db

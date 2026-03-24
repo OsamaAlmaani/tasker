@@ -98,6 +98,11 @@ export const getById = query({
     projectId: v.id('projects'),
   },
   handler: async (ctx, args) => {
+    const existingProject = await ctx.db.get(args.projectId)
+    if (!existingProject) {
+      return null
+    }
+
     const { project, user } = await requireProjectViewAccess(ctx, args.projectId)
 
     const memberships = await ctx.db
@@ -479,6 +484,11 @@ export const activity = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId)
+    if (!project) {
+      return []
+    }
+
     await requireProjectViewAccess(ctx, args.projectId)
 
     const rows = await ctx.db
