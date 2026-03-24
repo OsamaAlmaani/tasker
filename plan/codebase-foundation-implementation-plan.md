@@ -1,6 +1,6 @@
 # Codebase Foundation Implementation Plan
 
-_Last updated: 2026-03-24_
+_Last updated: 2026-03-25_
 
 ## Objective
 Refactor oversized route files into maintainable feature modules while preserving behavior.
@@ -16,6 +16,7 @@ Refactor oversized route files into maintainable feature modules while preservin
 ## Phase 2: Route decomposition
 - [ ] Introduce route-local composition shells for project and issue pages.
 - [ ] Move route state/mutation orchestration into focused hooks.
+  - [x] Extract shared issue status update and cascade-completion orchestration from large routes.
 - [ ] Split inline UI regions into dedicated feature components.
 - [ ] Consolidate repeated project/task presentation patterns.
 
@@ -28,3 +29,4 @@ Refactor oversized route files into maintainable feature modules while preservin
 - Keep refactors incremental and behavior-preserving.
 - Keep this plan updated as tasks start and finish.
 - Initial extraction complete: `buildDescendantStats` and `findDoneAncestorIssue` now live in `src/features/tasker/issues/hierarchy.ts`.
+- Latest extraction complete: shared issue status update flow now lives in `src/features/tasker/issues/useIssueStatusFlow.ts`.

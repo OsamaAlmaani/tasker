@@ -26,6 +26,7 @@ Use this file to track feature progress. Check items off as they ship.
 
 - 2026-03-24: Created `plan/codebase-foundation-implementation-plan.md` with trackable refactor phases and tasks.
 - 2026-03-24: Extracted shared issue hierarchy helpers (`buildDescendantStats`, `findDoneAncestorIssue`) to `src/features/tasker/issues/hierarchy.ts` and wired both project and issue detail routes to use the shared module.
+- 2026-03-25: Extracted shared issue status orchestration to `src/features/tasker/issues/useIssueStatusFlow.ts`, removing duplicated done-ancestor validation and cascade-completion flow from both large route files.
 
 ## Product Direction
 

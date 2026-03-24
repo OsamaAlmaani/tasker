@@ -21,10 +21,7 @@ import { Select } from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatDate, formatRelative } from "#/features/tasker/format";
-import {
-	buildDescendantStats,
-	findDoneAncestorIssue,
-} from "#/features/tasker/issues/hierarchy";
+import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import {
 	ISSUE_PRIORITIES,
 	ISSUE_STATUSES,
@@ -170,18 +167,9 @@ function IssueDetailPage() {
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
-	const [statusUpdateError, setStatusUpdateError] = useState<string | null>(
-		null,
-	);
 	const [subIssueFormOpen, setSubIssueFormOpen] = useState(false);
 	const [subIssueError, setSubIssueError] = useState<string | null>(null);
 	const [subIssueForm, setSubIssueForm] = useState(createSubIssueDraft());
-	const [completionConfirm, setCompletionConfirm] = useState<{
-		issueId: Id<"issues">;
-		title: string;
-		unfinishedDescendantCount: number;
-	} | null>(null);
-	const [isCompletingIssueTree, setIsCompletingIssueTree] = useState(false);
 
 	const canWrite = me?.globalRole === "admin" || me?.globalRole === "member";
 
@@ -189,14 +177,17 @@ function IssueDetailPage() {
 		() => (commentsData?.comments ?? []) as CommentRow[],
 		[commentsData?.comments],
 	);
-	const descendantStatsByIssueId = useMemo(
-		() => buildDescendantStats((projectIssues ?? []) as IssueDetailRow[]),
-		[projectIssues],
-	);
-	const projectIssueById = useMemo(
-		() => new Map((projectIssues ?? []).map((issue) => [issue._id, issue])),
-		[projectIssues],
-	);
+	const {
+		completionConfirm,
+		confirmCascadeCompletion,
+		handleIssueStatusChange,
+		isCompletingIssueTree,
+		setCompletionConfirm,
+		statusUpdateError,
+	} = useIssueStatusFlow<IssueDetailRow>({
+		issues: (projectIssues ?? []) as IssueDetailRow[],
+		updateIssue,
+	});
 	const timelineItems = useMemo<TimelineItem[]>(() => {
 		const commentItems: TimelineItem[] = commentRows.map((row) => ({
 			type: "comment",
@@ -357,74 +348,6 @@ function IssueDetailPage() {
 			setSubIssueError(
 				getClientErrorMessage(error, "Failed to create sub-task."),
 			);
-		}
-	}
-
-	async function handleIssueStatusChange(
-		issue: IssueDetailRow,
-		nextStatus: (typeof ISSUE_STATUSES)[number],
-	) {
-		setStatusUpdateError(null);
-
-		try {
-			if (nextStatus !== "done") {
-				const doneAncestor = findDoneAncestorIssue(issue, projectIssueById);
-				if (doneAncestor) {
-					setStatusUpdateError(
-						`Cannot move this sub-task out of done while parent task #${doneAncestor.issueNumber} is still done. Reopen the parent first.`,
-					);
-					return;
-				}
-
-				await updateIssue({
-					issueId: issue._id,
-					status: nextStatus,
-				});
-				return;
-			}
-
-			const unfinishedDescendantCount =
-				descendantStatsByIssueId.get(issue._id)?.unfinishedDescendantCount ?? 0;
-			if (unfinishedDescendantCount > 0) {
-				setCompletionConfirm({
-					issueId: issue._id,
-					title: issue.title,
-					unfinishedDescendantCount,
-				});
-				return;
-			}
-
-			await updateIssue({
-				issueId: issue._id,
-				status: nextStatus,
-			});
-		} catch (error) {
-			setStatusUpdateError(
-				getClientErrorMessage(error, "Failed to update task status."),
-			);
-		}
-	}
-
-	async function confirmCascadeCompletion() {
-		if (!completionConfirm) {
-			return;
-		}
-
-		setIsCompletingIssueTree(true);
-		try {
-			setStatusUpdateError(null);
-			await updateIssue({
-				issueId: completionConfirm.issueId,
-				status: "done",
-				cascadeDescendantsToDone: true,
-			});
-			setCompletionConfirm(null);
-		} catch (error) {
-			setStatusUpdateError(
-				getClientErrorMessage(error, "Failed to update task status."),
-			);
-		} finally {
-			setIsCompletingIssueTree(false);
 		}
 	}
 

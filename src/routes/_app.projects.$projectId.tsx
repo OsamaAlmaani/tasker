@@ -42,10 +42,7 @@ import {
 import { MemberAvatarStack } from "#/features/tasker/components/MemberAvatarStack";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatDate, formatRelative } from "#/features/tasker/format";
-import {
-	buildDescendantStats,
-	findDoneAncestorIssue,
-} from "#/features/tasker/issues/hierarchy";
+import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import {
 	ISSUE_PRIORITIES,
 	ISSUE_STATUSES,
@@ -422,15 +419,6 @@ function ProjectDetailPage() {
 	const [isRevokingInvite, setIsRevokingInvite] = useState(false);
 	const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
 	const [isTogglingArchive, setIsTogglingArchive] = useState(false);
-	const [statusUpdateError, setStatusUpdateError] = useState<string | null>(
-		null,
-	);
-	const [completionConfirm, setCompletionConfirm] = useState<{
-		issueId: Id<"issues">;
-		title: string;
-		unfinishedDescendantCount: number;
-	} | null>(null);
-	const [isCompletingIssueTree, setIsCompletingIssueTree] = useState(false);
 	const [isImportExportMenuOpen, setIsImportExportMenuOpen] = useState(false);
 	const [isImportingTasks, setIsImportingTasks] = useState(false);
 	const [importExportMessage, setImportExportMessage] = useState<string | null>(
@@ -516,10 +504,17 @@ function ProjectDetailPage() {
 				})),
 		[allProjectIssues],
 	);
-	const descendantStatsByIssueId = useMemo(
-		() => buildDescendantStats((allProjectIssues ?? []) as ProjectIssueRow[]),
-		[allProjectIssues],
-	);
+	const {
+		completionConfirm,
+		confirmCascadeCompletion,
+		handleIssueStatusChange,
+		isCompletingIssueTree,
+		setCompletionConfirm,
+		statusUpdateError,
+	} = useIssueStatusFlow<ProjectIssueRow>({
+		issues: (allProjectIssues ?? []) as ProjectIssueRow[],
+		updateIssue,
+	});
 	const groupedIssues = useMemo(() => {
 		const rows = (issues ?? []) as ProjectIssueRow[];
 		const groups = new Map<
@@ -881,74 +876,6 @@ function ProjectDetailPage() {
 			// Ignore malformed drag payloads.
 		} finally {
 			handleKanbanDragEnd();
-		}
-	}
-
-	async function handleIssueStatusChange(
-		issue: ProjectIssueRow,
-		nextStatus: (typeof ISSUE_STATUSES)[number],
-	) {
-		setStatusUpdateError(null);
-
-		try {
-			if (nextStatus !== "done") {
-				const doneAncestor = findDoneAncestorIssue(issue, projectIssueById);
-				if (doneAncestor) {
-					setStatusUpdateError(
-						`Cannot move this sub-task out of done while parent task #${doneAncestor.issueNumber} is still done. Reopen the parent first.`,
-					);
-					return;
-				}
-
-				await updateIssue({
-					issueId: issue._id,
-					status: nextStatus,
-				});
-				return;
-			}
-
-			const unfinishedDescendantCount =
-				descendantStatsByIssueId.get(issue._id)?.unfinishedDescendantCount ?? 0;
-			if (unfinishedDescendantCount > 0) {
-				setCompletionConfirm({
-					issueId: issue._id,
-					title: issue.title,
-					unfinishedDescendantCount,
-				});
-				return;
-			}
-
-			await updateIssue({
-				issueId: issue._id,
-				status: nextStatus,
-			});
-		} catch (error) {
-			setStatusUpdateError(
-				getClientErrorMessage(error, "Failed to update task status."),
-			);
-		}
-	}
-
-	async function confirmCascadeCompletion() {
-		if (!completionConfirm) {
-			return;
-		}
-
-		setIsCompletingIssueTree(true);
-		try {
-			setStatusUpdateError(null);
-			await updateIssue({
-				issueId: completionConfirm.issueId,
-				status: "done",
-				cascadeDescendantsToDone: true,
-			});
-			setCompletionConfirm(null);
-		} catch (error) {
-			setStatusUpdateError(
-				getClientErrorMessage(error, "Failed to update task status."),
-			);
-		} finally {
-			setIsCompletingIssueTree(false);
 		}
 	}
 
