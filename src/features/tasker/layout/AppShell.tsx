@@ -7,12 +7,14 @@ import {
 	FolderKanban,
 	Home,
 	Menu,
+	MoreHorizontal,
+	Pencil,
 	Settings,
 	Shield,
 	Trash2,
 	X,
 } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import ThemeToggle from "#/components/ThemeToggle";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -41,6 +43,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	const [newListName, setNewListName] = useState("");
 	const [listError, setListError] = useState<string | null>(null);
 	const [isCreatingList, setIsCreatingList] = useState(false);
+	const [listActionMenu, setListActionMenu] = useState<{
+		projectId: Id<"projects">;
+		issueListId: Id<"issueLists">;
+	} | null>(null);
+	const [listToRename, setListToRename] = useState<{
+		projectName: string;
+		issueListId: Id<"issueLists">;
+		issueListName: string;
+	} | null>(null);
+	const [renameListName, setRenameListName] = useState("");
+	const [renameListError, setRenameListError] = useState<string | null>(null);
+	const [isRenamingList, setIsRenamingList] = useState(false);
 	const [listToDelete, setListToDelete] = useState<{
 		projectId: Id<"projects">;
 		projectName: string;
@@ -54,12 +68,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 		useState("__none__");
 	const [deleteListError, setDeleteListError] = useState<string | null>(null);
 	const [isDeletingList, setIsDeletingList] = useState(false);
+	const listActionMenuRef = useRef<HTMLDivElement | null>(null);
 
 	const me = useQuery(api.users.me);
 	const sidebarProjects = useQuery(api.projects.sidebar, {
 		includeArchived: false,
 	});
 	const createIssueList = useMutation(api.issueLists.create);
+	const updateIssueList = useMutation(api.issueLists.update);
 	const deleteIssueList = useMutation(api.issueLists.remove);
 	const canManageIssueLists =
 		me?.globalRole === "admin" || me?.globalRole === "member";
@@ -129,6 +145,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 		}
 	}
 
+	function closeRenameListModal() {
+		setListToRename(null);
+		setRenameListName("");
+		setRenameListError(null);
+	}
+
+	async function submitRenameList(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		if (!listToRename) {
+			return;
+		}
+
+		const name = renameListName.trim();
+		setRenameListError(null);
+		if (!name) {
+			setRenameListError("List name is required.");
+			return;
+		}
+
+		setIsRenamingList(true);
+		try {
+			await updateIssueList({
+				issueListId: listToRename.issueListId,
+				name,
+			});
+			closeRenameListModal();
+		} catch (error) {
+			setRenameListError(
+				getClientErrorMessage(error, "Failed to rename task list."),
+			);
+		} finally {
+			setIsRenamingList(false);
+		}
+	}
+
 	const deleteListDestinationOptions = useMemo(() => {
 		if (!listToDelete || !sidebarProjects) {
 			return [];
@@ -176,6 +227,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			setIsDeletingList(false);
 		}
 	}
+
+	useEffect(() => {
+		if (!listActionMenu) {
+			return;
+		}
+
+		const onDocumentClick = (event: MouseEvent) => {
+			if (
+				listActionMenuRef.current &&
+				!listActionMenuRef.current.contains(event.target as Node)
+			) {
+				setListActionMenu(null);
+			}
+		};
+
+		const onDocumentKeydown = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				setListActionMenu(null);
+			}
+		};
+
+		document.addEventListener("mousedown", onDocumentClick);
+		document.addEventListener("keydown", onDocumentKeydown);
+		return () => {
+			document.removeEventListener("mousedown", onDocumentClick);
+			document.removeEventListener("keydown", onDocumentKeydown);
+		};
+	}, [listActionMenu]);
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -282,7 +361,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 					) : null}
 				</nav>
 
-				<div className="mt-8">
+				<div className="mt-8 flex min-h-0 flex-1 flex-col">
 					<div className="mb-2 flex items-center justify-between">
 						<p className="m-0 text-xs font-semibold tracking-wide text-[var(--muted-text)] uppercase">
 							Projects
@@ -299,7 +378,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 						</Button>
 					</div>
 
-					<div className="max-h-[34vh] space-y-2 overflow-auto pr-1">
+					<div className="min-h-0 flex-1 space-y-2 overflow-auto pr-4 pb-4">
 						{(sidebarProjects ?? []).map((row) => (
 							<div key={row.project._id} className="space-y-1">
 								<div className="flex items-center gap-1">
@@ -372,27 +451,80 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 													• {list.name}
 												</Link>
 												{canManageIssueLists ? (
-													<Button
-														type="button"
-														size="sm"
-														variant="ghost"
-														className="h-7 w-7 shrink-0 px-0"
-														aria-label={`Delete ${list.name} list`}
-														title={`Delete ${list.name} list`}
-														onClick={() => {
-															setDeleteListMode("move_tasks");
-															setDeleteListDestinationId("__none__");
-															setDeleteListError(null);
-															setListToDelete({
-																projectId: row.project._id,
-																projectName: row.project.name,
-																issueListId: list._id,
-																issueListName: list.name,
-															});
-														}}
+													<div
+														className="relative"
+														ref={
+															listActionMenu?.issueListId === list._id
+																? listActionMenuRef
+																: undefined
+														}
 													>
-														<Trash2 className="h-3.5 w-3.5" />
-													</Button>
+														<Button
+															type="button"
+															size="sm"
+															variant="ghost"
+															className="h-7 w-7 shrink-0 px-0"
+															aria-label={`Open actions for ${list.name} list`}
+															title={`Open actions for ${list.name} list`}
+															onClick={() =>
+																setListActionMenu((current) =>
+																	current?.issueListId === list._id
+																		? null
+																		: {
+																				projectId: row.project._id,
+																				issueListId: list._id,
+																			},
+																)
+															}
+														>
+															<MoreHorizontal className="h-3.5 w-3.5" />
+														</Button>
+														{listActionMenu?.issueListId === list._id ? (
+															<div
+																role="menu"
+																className="absolute right-0 z-20 mt-2 min-w-[150px] rounded-md border border-[var(--line)] bg-[var(--surface)] p-1 shadow-[0_20px_50px_rgba(8,12,26,0.2)]"
+															>
+																<button
+																	type="button"
+																	role="menuitem"
+																	className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-muted)]"
+																	onClick={() => {
+																		setRenameListName(list.name);
+																		setRenameListError(null);
+																		setListToRename({
+																			projectName: row.project.name,
+																			issueListId: list._id,
+																			issueListName: list.name,
+																		});
+																		setListActionMenu(null);
+																	}}
+																>
+																	<Pencil className="h-4 w-4" />
+																	Rename list
+																</button>
+																<button
+																	type="button"
+																	role="menuitem"
+																	className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-muted)]"
+																	onClick={() => {
+																		setDeleteListMode("move_tasks");
+																		setDeleteListDestinationId("__none__");
+																		setDeleteListError(null);
+																		setListToDelete({
+																			projectId: row.project._id,
+																			projectName: row.project.name,
+																			issueListId: list._id,
+																			issueListName: list.name,
+																		});
+																		setListActionMenu(null);
+																	}}
+																>
+																	<Trash2 className="h-4 w-4" />
+																	Delete list
+																</button>
+															</div>
+														) : null}
+													</div>
 												) : null}
 											</div>
 										))}
@@ -408,7 +540,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 					</div>
 				</div>
 
-				<div className="mt-auto pt-6">
+				<div className="pt-6">
 					<div className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-3">
 						<p className="m-0 text-sm font-medium">
 							{me?.name ?? "Loading..."}
@@ -558,6 +690,57 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 									disabled={isCreatingList}
 								>
 									{isCreatingList ? "Creating..." : "Create list"}
+								</Button>
+							</div>
+						</form>
+					</div>
+				</div>
+			) : null}
+
+			{listToRename ? (
+				<div
+					className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,12,26,0.42)] px-4"
+					role="dialog"
+					aria-modal="true"
+					aria-label="Rename task list"
+				>
+					<div className="w-full max-w-md rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_24px_64px_rgba(0,0,0,0.25)]">
+						<div className="mb-3">
+							<h2 className="m-0 text-base font-semibold text-[var(--text)]">
+								Rename Task List
+							</h2>
+							<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
+								{listToRename.projectName}
+							</p>
+						</div>
+
+						<form onSubmit={submitRenameList} className="space-y-3">
+							<Input
+								autoFocus
+								value={renameListName}
+								onChange={(event) => setRenameListName(event.target.value)}
+								placeholder="List name"
+							/>
+							{renameListError ? (
+								<p className="m-0 text-sm text-[var(--danger)]">
+									{renameListError}
+								</p>
+							) : null}
+							<div className="flex items-center justify-end gap-2">
+								<Button
+									type="button"
+									variant="ghost"
+									onClick={closeRenameListModal}
+									disabled={isRenamingList}
+								>
+									Cancel
+								</Button>
+								<Button
+									type="submit"
+									variant="secondary"
+									disabled={isRenamingList}
+								>
+									{isRenamingList ? "Saving..." : "Save name"}
 								</Button>
 							</div>
 						</form>

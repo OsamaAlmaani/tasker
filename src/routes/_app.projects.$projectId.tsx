@@ -2197,7 +2197,7 @@ function ProjectDetailPage() {
 
 						<form
 							onSubmit={submitIssue}
-							className="max-h-[70vh] overflow-y-auto pr-1 grid gap-3 md:grid-cols-2"
+							className="grid max-h-[70vh] gap-3 overflow-y-auto pr-4 pb-4 md:grid-cols-2"
 						>
 							<div className="md:col-span-2">
 								<Label>Title</Label>
