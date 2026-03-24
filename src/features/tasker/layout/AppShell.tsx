@@ -105,7 +105,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			setNewListName("");
 		} catch (error) {
 			setListError(
-				error instanceof Error ? error.message : "Failed to create issue list.",
+				error instanceof Error ? error.message : "Failed to create task list.",
 			);
 		} finally {
 			setIsCreatingList(false);
@@ -431,12 +431,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 					className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,12,26,0.42)] px-4"
 					role="dialog"
 					aria-modal="true"
-					aria-label="Create issue list"
+					aria-label="Create task list"
 				>
 					<div className="w-full max-w-md rounded-xl border border-[var(--line)] bg-card p-4 shadow-[0_24px_64px_rgba(0,0,0,0.25)]">
 						<div className="mb-3">
 							<h2 className="m-0 text-base font-semibold text-[var(--text)]">
-								New Issue List
+								New Task List
 							</h2>
 							<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
 								{listModalProject.name}

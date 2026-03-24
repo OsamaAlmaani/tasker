@@ -64,7 +64,7 @@ function SettingsPage() {
 				</CardHeader>
 				<CardContent>
 					<p className="mt-0 mb-3 text-sm text-[var(--muted-text)]">
-						Seed a sample project/issues dataset for local testing.
+						Seed a sample project/tasks dataset for local testing.
 					</p>
 					<Button
 						variant="secondary"

@@ -16,7 +16,7 @@ export const projectFormSchema = z.object({
 });
 
 export const issueFormSchema = z.object({
-	title: z.string().trim().min(2, "Issue title is required."),
+	title: z.string().trim().min(2, "Task title is required."),
 	description: z.string().trim().optional(),
 	status: z.enum(ISSUE_STATUSES).default("todo"),
 	priority: z.enum(ISSUE_PRIORITIES).default("none"),

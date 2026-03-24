@@ -56,7 +56,7 @@ function HomePage() {
 						Work at the <span>speed</span> of thought.
 					</h1>
 					<p className="stitch-landing-subtitle">
-						A unified workspace for projects, lists, and issues. Experience the
+						A unified workspace for projects, lists, and tasks. Experience the
 						ultimate flow for modern teams.
 					</p>
 				</div>
@@ -86,7 +86,7 @@ function HomePage() {
 							<div className="stitch-stage-node-icon">
 								<Bug className="h-6 w-6" />
 							</div>
-							<span>Issue tracking</span>
+							<span>Task tracking</span>
 						</div>
 					</div>
 

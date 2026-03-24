@@ -48,16 +48,16 @@ const activityLabel: Record<string, string> = {
 	"project.invite_sent": "Sent invitation",
 	"project.invite_revoked": "Revoked invitation",
 	"project.invite_accepted": "Accepted invitation",
-	"issue_list.created": "Created issue list",
-	"issue_list.updated": "Updated issue list",
-	"issue_list.deleted": "Deleted issue list",
-	"issue.created": "Created issue",
-	"issue.updated": "Updated issue",
-	"issue.deleted": "Deleted issue",
-	"issue.list_changed": "Moved issue to a different list",
-	"issue.status_changed": "Changed issue status",
-	"issue.priority_changed": "Changed issue priority",
-	"issue.assignee_changed": "Changed issue assignee",
+	"issue_list.created": "Created task list",
+	"issue_list.updated": "Updated task list",
+	"issue_list.deleted": "Deleted task list",
+	"issue.created": "Created task",
+	"issue.updated": "Updated task",
+	"issue.deleted": "Deleted task",
+	"issue.list_changed": "Moved task to a different list",
+	"issue.status_changed": "Changed task status",
+	"issue.priority_changed": "Changed task priority",
+	"issue.assignee_changed": "Changed task assignee",
 	"comment.created": "Added comment",
 	"comment.edited": "Edited comment",
 };
@@ -285,7 +285,7 @@ function IssueDetailPage() {
 	}, [activity, commentRows]);
 
 	if (issueData === undefined) {
-		return <div className="page-loading">Loading issue…</div>;
+		return <div className="page-loading">Loading task…</div>;
 	}
 
 	if (issueData === null) {
@@ -293,11 +293,11 @@ function IssueDetailPage() {
 			<div className="mx-auto max-w-xl">
 				<Card>
 					<CardHeader>
-						<CardTitle>Issue not found</CardTitle>
+						<CardTitle>Task not found</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-3">
 						<p className="m-0 text-sm text-[var(--muted-text)]">
-							This issue may have been deleted or you no longer have access.
+							This task may have been deleted or you no longer have access.
 						</p>
 						<Link to="/projects" className="no-underline">
 							<Button>Back to projects</Button>
@@ -357,7 +357,7 @@ function IssueDetailPage() {
 			setDeleteError(
 				getClientErrorMessage(
 					error,
-					"Issue deletion is not allowed for this project.",
+					"Task deletion is not allowed for this project.",
 				),
 			);
 		} finally {
@@ -387,7 +387,7 @@ function IssueDetailPage() {
 		const parsed = issueFormSchema.safeParse(subIssueForm);
 		if (!parsed.success) {
 			setSubIssueError(
-				parsed.error.issues[0]?.message ?? "Sub-issue form is invalid.",
+				parsed.error.issues[0]?.message ?? "Sub-task form is invalid.",
 			);
 			return;
 		}
@@ -420,7 +420,7 @@ function IssueDetailPage() {
 			setSubIssueFormOpen(false);
 		} catch (error) {
 			setSubIssueError(
-				getClientErrorMessage(error, "Failed to create sub-issue."),
+				getClientErrorMessage(error, "Failed to create sub-task."),
 			);
 		}
 	}
@@ -436,7 +436,7 @@ function IssueDetailPage() {
 				const doneAncestor = findDoneAncestorIssue(issue, projectIssueById);
 				if (doneAncestor) {
 					setStatusUpdateError(
-						`Cannot move this sub-issue out of done while parent issue #${doneAncestor.issueNumber} is still done. Reopen the parent first.`,
+						`Cannot move this sub-task out of done while parent task #${doneAncestor.issueNumber} is still done. Reopen the parent first.`,
 					);
 					return;
 				}
@@ -465,7 +465,7 @@ function IssueDetailPage() {
 			});
 		} catch (error) {
 			setStatusUpdateError(
-				getClientErrorMessage(error, "Failed to update issue status."),
+				getClientErrorMessage(error, "Failed to update task status."),
 			);
 		}
 	}
@@ -486,7 +486,7 @@ function IssueDetailPage() {
 			setCompletionConfirm(null);
 		} catch (error) {
 			setStatusUpdateError(
-				getClientErrorMessage(error, "Failed to update issue status."),
+				getClientErrorMessage(error, "Failed to update task status."),
 			);
 		} finally {
 			setIsCompletingIssueTree(false);
@@ -520,8 +520,8 @@ function IssueDetailPage() {
 							size="sm"
 							className="h-8 w-8 p-0 text-[var(--danger)] hover:bg-[color-mix(in_oklab,var(--danger)_14%,transparent)] hover:text-[var(--danger)]"
 							disabled={isDeleting}
-							aria-label="Delete issue"
-							title="Delete issue"
+							aria-label="Delete task"
+							title="Delete task"
 							onClick={() => setShowDeleteConfirm(true)}
 						>
 							<Trash2 className="h-4 w-4" />
@@ -543,7 +543,7 @@ function IssueDetailPage() {
 					{issueData.parentIssue ? (
 						<section className="issue-overview-block">
 							<div className="issue-overview-toolbar">
-								<span className="issue-overview-kicker">Parent Issue</span>
+								<span className="issue-overview-kicker">Parent Task</span>
 							</div>
 							<Link
 								to="/issues/$issueId"
@@ -621,14 +621,14 @@ function IssueDetailPage() {
 								</h1>
 								{issueData.issue.parentIssueId ? (
 									<div>
-										<Badge className="issue-hierarchy-badge">Sub-issue</Badge>
+										<Badge className="issue-hierarchy-badge">Sub-task</Badge>
 									</div>
 								) : null}
 								{issueData.issue.hasChildren ? (
 									<div className="issue-progress-panel">
 										<div className="flex items-center justify-between gap-3">
 											<span className="issue-progress-text">
-												Sub-issue progress
+												Sub-task progress
 											</span>
 											<span className="issue-progress-text">
 												{formatChildProgress(issueData.issue as IssueDetailRow)}{" "}
@@ -710,21 +710,21 @@ function IssueDetailPage() {
 							<CardHeader className="pb-2">
 								<div className="flex items-center justify-between gap-3">
 									<CardTitle className="text-base">
-										Sub-issues ({childIssueRows.length})
+										Sub-tasks ({childIssueRows.length})
 									</CardTitle>
 									{canWrite ? (
 										<Button
 											type="button"
 											size="sm"
-											variant={subIssueFormOpen ? "ghost" : "secondary"}
+											variant="secondary"
 											onClick={() => {
 												setSubIssueError(null);
 												setSubIssueForm(createSubIssueDraft(issueData.issue));
-												setSubIssueFormOpen((current) => !current);
+												setSubIssueFormOpen(true);
 											}}
 										>
 											<Plus className="mr-1.5 h-3.5 w-3.5" />
-											{subIssueFormOpen ? "Close" : "Add sub-issue"}
+											Add sub-task
 										</Button>
 									) : null}
 								</div>
@@ -750,7 +750,7 @@ function IssueDetailPage() {
 															{row.issue.title}
 														</p>
 														<Badge className="issue-hierarchy-badge">
-															Sub-issue
+															Sub-task
 														</Badge>
 													</div>
 													<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
@@ -777,161 +777,9 @@ function IssueDetailPage() {
 									</div>
 								) : (
 									<p className="m-0 text-sm text-[var(--muted-text)]">
-										No sub-issues yet.
+										No sub-tasks yet.
 									</p>
 								)}
-
-								{subIssueFormOpen ? (
-									<form
-										onSubmit={submitSubIssue}
-										className="grid gap-3 border-t border-[var(--line)] pt-4 md:grid-cols-2"
-									>
-										<div className="md:col-span-2">
-											<Label>Title</Label>
-											<Input
-												value={subIssueForm.title}
-												onChange={(event) =>
-													setSubIssueForm((prev) => ({
-														...prev,
-														title: event.target.value,
-													}))
-												}
-											/>
-										</div>
-										<div className="md:col-span-2">
-											<Label>Description</Label>
-											<Textarea
-												value={subIssueForm.description}
-												onChange={(event) =>
-													setSubIssueForm((prev) => ({
-														...prev,
-														description: event.target.value,
-													}))
-												}
-											/>
-										</div>
-										<div>
-											<Label>Status</Label>
-											<Select
-												value={subIssueForm.status}
-												onChange={(event) =>
-													setSubIssueForm((prev) => ({
-														...prev,
-														status: event.target
-															.value as (typeof ISSUE_STATUSES)[number],
-													}))
-												}
-											>
-												{ISSUE_STATUSES.map((value) => (
-													<option key={value} value={value}>
-														{issueStatusLabel[value]}
-													</option>
-												))}
-											</Select>
-										</div>
-										<div>
-											<Label>Priority</Label>
-											<Select
-												value={subIssueForm.priority}
-												onChange={(event) =>
-													setSubIssueForm((prev) => ({
-														...prev,
-														priority: event.target
-															.value as (typeof ISSUE_PRIORITIES)[number],
-													}))
-												}
-											>
-												{ISSUE_PRIORITIES.map((value) => (
-													<option key={value} value={value}>
-														{issuePriorityLabel[value]}
-													</option>
-												))}
-											</Select>
-										</div>
-										<div>
-											<Label>List</Label>
-											<Select
-												value={subIssueForm.listId}
-												onChange={(event) =>
-													setSubIssueForm((prev) => ({
-														...prev,
-														listId: event.target.value,
-													}))
-												}
-											>
-												<option value="">No list</option>
-												{(issueLists ?? []).map((list) => (
-													<option key={list._id} value={list._id}>
-														{list.name}
-													</option>
-												))}
-											</Select>
-										</div>
-										<div>
-											<Label>Assignee</Label>
-											<Select
-												value={subIssueForm.assigneeId}
-												onChange={(event) =>
-													setSubIssueForm((prev) => ({
-														...prev,
-														assigneeId: event.target.value,
-													}))
-												}
-											>
-												<option value="">Unassigned</option>
-												{(assignableUsers ?? []).map((user) => (
-													<option key={user._id} value={user._id}>
-														{user.name}
-													</option>
-												))}
-											</Select>
-										</div>
-										<div>
-											<Label>Due Date</Label>
-											<Input
-												type="date"
-												value={subIssueForm.dueDate}
-												onChange={(event) =>
-													setSubIssueForm((prev) => ({
-														...prev,
-														dueDate: event.target.value,
-													}))
-												}
-											/>
-										</div>
-										<div className="md:col-span-2">
-											<Label>Labels (comma-separated)</Label>
-											<Input
-												value={subIssueForm.labels}
-												onChange={(event) =>
-													setSubIssueForm((prev) => ({
-														...prev,
-														labels: event.target.value,
-													}))
-												}
-											/>
-										</div>
-										{subIssueError ? (
-											<p className="m-0 text-sm text-[var(--danger)]">
-												{subIssueError}
-											</p>
-										) : null}
-										<div className="md:col-span-2 flex items-center justify-end gap-2">
-											<Button
-												type="button"
-												variant="ghost"
-												onClick={() => {
-													setSubIssueError(null);
-													setSubIssueForm(createSubIssueDraft(issueData.issue));
-													setSubIssueFormOpen(false);
-												}}
-											>
-												Cancel
-											</Button>
-											<Button type="submit">Create sub-issue</Button>
-										</div>
-									</form>
-								) : null}
 							</CardContent>
 						</Card>
 					) : null}
@@ -1256,11 +1104,190 @@ function IssueDetailPage() {
 				</div>
 			</div>
 
+			{subIssueFormOpen ? (
+				<div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
+					<div
+						role="dialog"
+						aria-modal="true"
+						aria-label="Create sub-task"
+						className="w-full max-w-3xl rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
+					>
+						<div className="mb-4 flex items-center justify-between gap-3">
+							<h2 className="m-0 text-base font-semibold text-[var(--text)]">
+								Create sub-task
+							</h2>
+							<Button
+								type="button"
+								size="sm"
+								variant="ghost"
+								onClick={() => {
+									setSubIssueError(null);
+									setSubIssueForm(createSubIssueDraft(currentIssue));
+									setSubIssueFormOpen(false);
+								}}
+							>
+								Close
+							</Button>
+						</div>
+
+						<form
+							onSubmit={submitSubIssue}
+							className="grid max-h-[70vh] gap-3 overflow-y-auto pr-1 md:grid-cols-2"
+						>
+							<div className="md:col-span-2">
+								<Label>Title</Label>
+								<Input
+									value={subIssueForm.title}
+									onChange={(event) =>
+										setSubIssueForm((prev) => ({
+											...prev,
+											title: event.target.value,
+										}))
+									}
+								/>
+							</div>
+							<div className="md:col-span-2">
+								<Label>Description</Label>
+								<Textarea
+									value={subIssueForm.description}
+									onChange={(event) =>
+										setSubIssueForm((prev) => ({
+											...prev,
+											description: event.target.value,
+										}))
+									}
+								/>
+							</div>
+							<div>
+								<Label>Status</Label>
+								<Select
+									value={subIssueForm.status}
+									onChange={(event) =>
+										setSubIssueForm((prev) => ({
+											...prev,
+											status: event.target
+												.value as (typeof ISSUE_STATUSES)[number],
+										}))
+									}
+								>
+									{ISSUE_STATUSES.map((value) => (
+										<option key={value} value={value}>
+											{issueStatusLabel[value]}
+										</option>
+									))}
+								</Select>
+							</div>
+							<div>
+								<Label>Priority</Label>
+								<Select
+									value={subIssueForm.priority}
+									onChange={(event) =>
+										setSubIssueForm((prev) => ({
+											...prev,
+											priority: event.target
+												.value as (typeof ISSUE_PRIORITIES)[number],
+										}))
+									}
+								>
+									{ISSUE_PRIORITIES.map((value) => (
+										<option key={value} value={value}>
+											{issuePriorityLabel[value]}
+										</option>
+									))}
+								</Select>
+							</div>
+							<div>
+								<Label>List</Label>
+								<Select
+									value={subIssueForm.listId}
+									onChange={(event) =>
+										setSubIssueForm((prev) => ({
+											...prev,
+											listId: event.target.value,
+										}))
+									}
+								>
+									<option value="">No list</option>
+									{(issueLists ?? []).map((list) => (
+										<option key={list._id} value={list._id}>
+											{list.name}
+										</option>
+									))}
+								</Select>
+							</div>
+							<div>
+								<Label>Assignee</Label>
+								<Select
+									value={subIssueForm.assigneeId}
+									onChange={(event) =>
+										setSubIssueForm((prev) => ({
+											...prev,
+											assigneeId: event.target.value,
+										}))
+									}
+								>
+									<option value="">Unassigned</option>
+									{(assignableUsers ?? []).map((user) => (
+										<option key={user._id} value={user._id}>
+											{user.name}
+										</option>
+									))}
+								</Select>
+							</div>
+							<div>
+								<Label>Due Date</Label>
+								<Input
+									type="date"
+									value={subIssueForm.dueDate}
+									onChange={(event) =>
+										setSubIssueForm((prev) => ({
+											...prev,
+											dueDate: event.target.value,
+										}))
+									}
+								/>
+							</div>
+							<div className="md:col-span-2">
+								<Label>Labels (comma-separated)</Label>
+								<Input
+									value={subIssueForm.labels}
+									onChange={(event) =>
+										setSubIssueForm((prev) => ({
+											...prev,
+											labels: event.target.value,
+										}))
+									}
+								/>
+							</div>
+							{subIssueError ? (
+								<p className="m-0 text-sm text-[var(--danger)]">
+									{subIssueError}
+								</p>
+							) : null}
+							<div className="md:col-span-2 flex items-center justify-end gap-2 pt-1">
+								<Button
+									type="button"
+									variant="ghost"
+									onClick={() => {
+										setSubIssueError(null);
+										setSubIssueForm(createSubIssueDraft(currentIssue));
+										setSubIssueFormOpen(false);
+									}}
+								>
+									Cancel
+								</Button>
+								<Button type="submit">Create sub-task</Button>
+							</div>
+						</form>
+					</div>
+				</div>
+			) : null}
+
 			<ConfirmDialog
 				open={showDeleteConfirm}
-				title="Delete issue"
-				description="This action will permanently remove this issue from active views. You cannot undo this."
-				confirmLabel="Delete issue"
+				title="Delete task"
+				description="This action will permanently remove this task from active views. You cannot undo this."
+				confirmLabel="Delete task"
 				isConfirming={isDeleting}
 				onCancel={() => setShowDeleteConfirm(false)}
 				onConfirm={confirmDeleteIssue}
@@ -1268,10 +1295,10 @@ function IssueDetailPage() {
 
 			<ConfirmDialog
 				open={Boolean(completionConfirm)}
-				title="Complete parent issue and sub-issues"
+				title="Complete parent task and sub-tasks"
 				description={
 					completionConfirm
-						? `"${completionConfirm.title}" still has ${completionConfirm.unfinishedDescendantCount} unfinished sub-issue${completionConfirm.unfinishedDescendantCount === 1 ? "" : "s"}. Mark all descendants as done too?`
+						? `"${completionConfirm.title}" still has ${completionConfirm.unfinishedDescendantCount} unfinished sub-task${completionConfirm.unfinishedDescendantCount === 1 ? "" : "s"}. Mark all descendants as done too?`
 						: ""
 				}
 				confirmLabel="Mark all done"

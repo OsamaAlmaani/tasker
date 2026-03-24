@@ -29,7 +29,7 @@ function PrivacyPage() {
 						</h2>
 						<p className="mb-0 mt-2">
 							We collect account and profile data (such as name, email, and
-							avatar), workspace content (projects, lists, issues, comments,
+							avatar), workspace content (projects, lists, tasks, comments,
 							activity), and operational metadata (for example access logs, role
 							assignments, and timestamps).
 						</p>

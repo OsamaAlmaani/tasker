@@ -127,7 +127,7 @@ function ProjectsPage() {
 		<div>
 			<PageHeader
 				title="Projects"
-				description="Browse your accessible projects, create new ones, and jump into issue planning."
+				description="Browse your accessible projects, create new ones, and jump into task planning."
 				actions={
 					canCreate ? (
 						<Button
@@ -233,7 +233,7 @@ function ProjectsPage() {
 									}
 								/>
 								<span className="text-sm text-[var(--muted-text)]">
-									Allow issue deletion
+									Allow task deletion
 								</span>
 							</div>
 

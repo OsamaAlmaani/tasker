@@ -58,7 +58,7 @@ function TermsPage() {
 						<h2 className="m-0 text-lg font-semibold">4. Workspace Content</h2>
 						<p className="mb-0 mt-2">
 							You retain ownership of content you submit, including projects,
-							issues, comments, and related metadata. You grant LMI the limited
+							tasks, comments, and related metadata. You grant LMI the limited
 							rights needed to host, process, secure, and display that content
 							to provide the service.
 						</p>

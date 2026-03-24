@@ -679,7 +679,7 @@ function ProjectDetailPage() {
 		const parsed = issueFormSchema.safeParse(issueForm);
 		if (!parsed.success) {
 			setCreateError(
-				parsed.error.issues[0]?.message ?? "Issue form is invalid.",
+				parsed.error.issues[0]?.message ?? "Task form is invalid.",
 			);
 			return;
 		}
@@ -714,7 +714,7 @@ function ProjectDetailPage() {
 			setCreateOpen(false);
 		} catch (mutationError) {
 			setCreateError(
-				getClientErrorMessage(mutationError, "Failed to create issue."),
+				getClientErrorMessage(mutationError, "Failed to create task."),
 			);
 		}
 	}
@@ -924,7 +924,7 @@ function ProjectDetailPage() {
 				const doneAncestor = findDoneAncestorIssue(issue, projectIssueById);
 				if (doneAncestor) {
 					setStatusUpdateError(
-						`Cannot move this sub-issue out of done while parent issue #${doneAncestor.issueNumber} is still done. Reopen the parent first.`,
+						`Cannot move this sub-task out of done while parent task #${doneAncestor.issueNumber} is still done. Reopen the parent first.`,
 					);
 					return;
 				}
@@ -953,7 +953,7 @@ function ProjectDetailPage() {
 			});
 		} catch (error) {
 			setStatusUpdateError(
-				getClientErrorMessage(error, "Failed to update issue status."),
+				getClientErrorMessage(error, "Failed to update task status."),
 			);
 		}
 	}
@@ -974,7 +974,7 @@ function ProjectDetailPage() {
 			setCompletionConfirm(null);
 		} catch (error) {
 			setStatusUpdateError(
-				getClientErrorMessage(error, "Failed to update issue status."),
+				getClientErrorMessage(error, "Failed to update task status."),
 			);
 		} finally {
 			setIsCompletingIssueTree(false);
@@ -1216,7 +1216,7 @@ function ProjectDetailPage() {
 									{issue.title}
 								</p>
 								{issue.parentIssueId ? (
-									<Badge className="issue-hierarchy-badge">Sub-issue</Badge>
+									<Badge className="issue-hierarchy-badge">Sub-task</Badge>
 								) : null}
 							</div>
 							<p className="m-0 truncate whitespace-nowrap text-xs text-[var(--muted-text)]">
@@ -1241,7 +1241,7 @@ function ProjectDetailPage() {
 					<div className="issue-row-col issue-row-col-assignee">
 						{canWrite ? (
 							<InlineSelectTrigger
-								ariaLabel="Assign issue"
+								ariaLabel="Assign task"
 								value={issue.assigneeId ?? ""}
 								onChange={(nextAssigneeId) => {
 									void updateIssue({
@@ -1362,7 +1362,7 @@ function ProjectDetailPage() {
 				)}
 			>
 				<article
-					aria-label={`Issue ${issue.issueNumber}`}
+					aria-label={`Task ${issue.issueNumber}`}
 					className={cn(
 						"kanban-card",
 						issue.parentIssueId ? "kanban-card-subissue" : "",
@@ -1388,7 +1388,7 @@ function ProjectDetailPage() {
 						</p>
 						<div className="mt-2 flex flex-wrap items-center gap-1.5">
 							{issue.parentIssueId ? (
-								<Badge className="issue-hierarchy-badge">Sub-issue</Badge>
+								<Badge className="issue-hierarchy-badge">Sub-task</Badge>
 							) : null}
 							{progressLabel ? (
 								<Badge className="issue-progress-badge">
@@ -1477,7 +1477,7 @@ function ProjectDetailPage() {
 								}}
 							>
 								<Plus className="mr-2 h-4 w-4" />
-								New Issue
+								New Task
 							</Button>
 						) : null}
 						<Button
@@ -1499,7 +1499,7 @@ function ProjectDetailPage() {
 							) : (
 								<>
 									<ListTodo className="mr-2 h-4 w-4" />
-									Issues
+									Tasks
 								</>
 							)}
 						</Button>
@@ -1644,7 +1644,7 @@ function ProjectDetailPage() {
 									}
 								/>
 								<span className="text-sm text-[var(--muted-text)]">
-									Allow issue deletion
+									Allow task deletion
 								</span>
 							</div>
 							<div className="md:col-span-2">
@@ -1675,7 +1675,7 @@ function ProjectDetailPage() {
 				{projectView === "issues" ? (
 					<Card>
 						<CardHeader>
-							<CardTitle>Issues</CardTitle>
+							<CardTitle>Tasks</CardTitle>
 						</CardHeader>
 						<CardContent>
 							<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -1734,7 +1734,7 @@ function ProjectDetailPage() {
 											{ replace: true },
 										)
 									}
-									placeholder="Search issues"
+									placeholder="Search tasks"
 								/>
 								<Select
 									value={statusPicker}
@@ -1873,7 +1873,7 @@ function ProjectDetailPage() {
 									))}
 									{issues && issues.length === 0 ? (
 										<p className="m-0 text-sm text-[var(--muted-text)]">
-											No issues found.
+											No tasks found.
 										</p>
 									) : null}
 								</div>
@@ -1912,7 +1912,7 @@ function ProjectDetailPage() {
 													column.tree.map((node) => renderKanbanIssueNode(node))
 												) : (
 													<p className="kanban-empty">
-														No issues in this status.
+														No tasks in this status.
 													</p>
 												)}
 											</div>
@@ -2174,12 +2174,12 @@ function ProjectDetailPage() {
 					<div
 						role="dialog"
 						aria-modal="true"
-						aria-label="Create issue"
+						aria-label="Create task"
 						className="w-full max-w-3xl rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
 					>
 						<div className="mb-4 flex items-center justify-between gap-3">
 							<h2 className="m-0 text-base font-semibold text-[var(--text)]">
-								Create Issue
+								Create Task
 							</h2>
 							<Button
 								type="button"
@@ -2281,7 +2281,7 @@ function ProjectDetailPage() {
 								</Select>
 							</div>
 							<div>
-								<Label>Parent Issue</Label>
+								<Label>Parent Task</Label>
 								<Select
 									value={issueForm.parentIssueId}
 									onChange={(event) => {
@@ -2385,7 +2385,7 @@ function ProjectDetailPage() {
 								>
 									Cancel
 								</Button>
-								<Button type="submit">Create issue</Button>
+								<Button type="submit">Create task</Button>
 							</div>
 						</form>
 					</div>
@@ -2433,10 +2433,10 @@ function ProjectDetailPage() {
 
 			<ConfirmDialog
 				open={Boolean(completionConfirm)}
-				title="Complete parent issue and sub-issues"
+				title="Complete parent task and sub-tasks"
 				description={
 					completionConfirm
-						? `"${completionConfirm.title}" still has ${completionConfirm.unfinishedDescendantCount} unfinished sub-issue${completionConfirm.unfinishedDescendantCount === 1 ? "" : "s"}. Mark all descendants as done too?`
+						? `"${completionConfirm.title}" still has ${completionConfirm.unfinishedDescendantCount} unfinished sub-task${completionConfirm.unfinishedDescendantCount === 1 ? "" : "s"}. Mark all descendants as done too?`
 						: ""
 				}
 				confirmLabel="Mark all done"

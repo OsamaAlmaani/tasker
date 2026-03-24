@@ -34,7 +34,7 @@ function DashboardPage() {
 			icon: FolderKanban,
 		},
 		{
-			label: "Open Issues",
+			label: "Open Tasks",
 			value: overview.quickStats.openIssues,
 			icon: ListChecks,
 		},
@@ -81,7 +81,7 @@ function DashboardPage() {
 			<section className="mt-5 grid gap-4 lg:grid-cols-2">
 				<Card>
 					<CardHeader>
-						<CardTitle>My Assigned Issues</CardTitle>
+						<CardTitle>My Assigned Tasks</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-2">
 						{overview.myAssignedIssues.map((issue) => (
@@ -107,7 +107,7 @@ function DashboardPage() {
 						))}
 						{!overview.myAssignedIssues.length ? (
 							<p className="m-0 text-sm text-[var(--muted-text)]">
-								No assigned issues.
+								No assigned tasks.
 							</p>
 						) : null}
 					</CardContent>
@@ -138,7 +138,7 @@ function DashboardPage() {
 						))}
 						{!overview.overdueIssues.length ? (
 							<p className="m-0 text-sm text-[var(--muted-text)]">
-								No overdue issues.
+								No overdue tasks.
 							</p>
 						) : null}
 					</CardContent>
@@ -237,7 +237,7 @@ function DashboardPage() {
 						))}
 						{!overview.createdByMe.length ? (
 							<p className="m-0 text-sm text-[var(--muted-text)]">
-								No created issues yet.
+								No created tasks yet.
 							</p>
 						) : null}
 					</CardContent>

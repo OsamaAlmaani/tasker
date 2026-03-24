@@ -1,6 +1,6 @@
 # Tasker
 
-Tasker is a production-minded project and issue management system for focused execution.
+Tasker is a production-minded project and task management system for focused execution.
 
 ## Built With Codex 🤫
 
@@ -9,16 +9,17 @@ This project was built end-to-end by **GPT-5.3-Codex**, covering architecture, b
 ## Product Overview
 
 - Project-based workspaces with scoped membership and permissions.
-- Dual issue views: structured list view and drag-and-drop Kanban by status.
-- Fast issue operations: status, priority, assignee, due date, labels, and search/filtering.
-- Unified issue timeline combining comments and system activity in chronological order.
+- Dual task views: structured list view and drag-and-drop Kanban by status.
+- Fast task operations: status, priority, assignee, due date, labels, and search/filtering.
+- Parent tasks with one-level sub-task support, progress rollups, and nested list/Kanban presentation.
+- Unified task timeline combining comments and system activity in chronological order.
 - Admin controls for user role management and account activation state.
 
 ## Key Capabilities
 
-- Real-time synced data layer for projects, issues, comments, members, and activity.
+- Real-time synced data layer for projects, tasks, comments, members, and activity.
 - Role-based access with strict server-side authorization checks.
-- Project-specific issue numbering and soft-delete behavior.
+- Project-specific task numbering and soft-delete behavior.
 - Member management with invite, revoke, and add-existing-user flows.
 - Persistent project view preferences and filters in URL state.
 
@@ -53,7 +54,7 @@ Core tables in `/convex/schema.ts`:
 - Auth is Clerk-based, with Convex identity mapped to internal `users` records.
 - User bootstrap/sync is handled through `users.ensureCurrentUser`.
 - Invite acceptance is auto-processed when a signed-in user email matches pending invites.
-- Project activity and issue activity are recorded for audit-friendly history.
+- Project activity and task activity are recorded for audit-friendly history.
 
 ## Repository Structure
 
