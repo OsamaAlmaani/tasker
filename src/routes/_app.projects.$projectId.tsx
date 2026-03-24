@@ -14,13 +14,10 @@ import {
 	Users,
 } from "lucide-react";
 import {
-	type ChangeEvent,
 	type DragEvent,
 	type FormEvent,
 	type ReactNode,
-	useEffect,
 	useMemo,
-	useRef,
 	useState,
 } from "react";
 import { z } from "zod";
@@ -42,6 +39,10 @@ import {
 import { MemberAvatarStack } from "#/features/tasker/components/MemberAvatarStack";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatDate, formatRelative } from "#/features/tasker/format";
+import {
+	type IssueDraft,
+	IssueDraftDialog,
+} from "#/features/tasker/issues/components/IssueDraftDialog";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import {
 	ISSUE_PRIORITIES,
@@ -49,6 +50,7 @@ import {
 	issuePriorityLabel,
 	issueStatusLabel,
 } from "#/features/tasker/model";
+import { useProjectTaskImportExport } from "#/features/tasker/projects/useProjectTaskImportExport";
 import { issueFormSchema } from "#/features/tasker/validation";
 import { cn, getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
@@ -77,15 +79,6 @@ const projectSearchSchema = z.object({
 });
 
 type ProjectSearch = z.infer<typeof projectSearchSchema>;
-type ImportedTask = {
-	title: string;
-	description?: string;
-	status?: (typeof ISSUE_STATUSES)[number];
-	priority?: (typeof ISSUE_PRIORITIES)[number];
-	labels?: string[] | string;
-	dueDate?: number | string;
-	listName?: string;
-};
 
 type ProjectIssueRow = Doc<"issues"> & {
 	childIssueCount: number;
@@ -99,7 +92,7 @@ type IssueTreeNode = {
 	children: IssueTreeNode[];
 };
 
-function createIssueDraft() {
+function createIssueDraft(): IssueDraft {
 	return {
 		title: "",
 		description: "",
@@ -419,14 +412,6 @@ function ProjectDetailPage() {
 	const [isRevokingInvite, setIsRevokingInvite] = useState(false);
 	const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
 	const [isTogglingArchive, setIsTogglingArchive] = useState(false);
-	const [isImportExportMenuOpen, setIsImportExportMenuOpen] = useState(false);
-	const [isImportingTasks, setIsImportingTasks] = useState(false);
-	const [importExportMessage, setImportExportMessage] = useState<string | null>(
-		null,
-	);
-	const [importExportError, setImportExportError] = useState<string | null>(
-		null,
-	);
 	const [draggingIssueId, setDraggingIssueId] = useState<Id<"issues"> | null>(
 		null,
 	);
@@ -515,6 +500,37 @@ function ProjectDetailPage() {
 		issues: (allProjectIssues ?? []) as ProjectIssueRow[],
 		updateIssue,
 	});
+	const {
+		exportTasks,
+		handleImportTasksFile,
+		importExportError,
+		importExportMenuRef,
+		importExportMessage,
+		importFileInputRef,
+		isImportExportMenuOpen,
+		isImportingTasks,
+		openImportPicker,
+		toggleImportExportMenu,
+	} = useProjectTaskImportExport({
+		canWrite,
+		createIssue,
+		filters: {
+			assigneeId,
+			groupBy,
+			layout: issueLayout,
+			list: listFilter,
+			priority,
+			search,
+			sort: sortBy,
+			statuses: selectedStatuses,
+			view: projectView,
+		},
+		issueListById,
+		issueLists,
+		issues: issues as ProjectIssueRow[] | undefined,
+		project: projectData?.project,
+		projectId,
+	});
 	const groupedIssues = useMemo(() => {
 		const rows = (issues ?? []) as ProjectIssueRow[];
 		const groups = new Map<
@@ -583,36 +599,6 @@ function ProjectDetailPage() {
 			})),
 		[issues],
 	);
-	const importFileInputRef = useRef<HTMLInputElement | null>(null);
-	const importExportMenuRef = useRef<HTMLDivElement | null>(null);
-
-	useEffect(() => {
-		if (!isImportExportMenuOpen) {
-			return;
-		}
-
-		const onDocumentClick = (event: MouseEvent) => {
-			if (
-				importExportMenuRef.current &&
-				!importExportMenuRef.current.contains(event.target as Node)
-			) {
-				setIsImportExportMenuOpen(false);
-			}
-		};
-
-		const onDocumentKeydown = (event: KeyboardEvent) => {
-			if (event.key === "Escape") {
-				setIsImportExportMenuOpen(false);
-			}
-		};
-
-		document.addEventListener("mousedown", onDocumentClick);
-		document.addEventListener("keydown", onDocumentKeydown);
-		return () => {
-			document.removeEventListener("mousedown", onDocumentClick);
-			document.removeEventListener("keydown", onDocumentKeydown);
-		};
-	}, [isImportExportMenuOpen]);
 
 	if (projectData === undefined) {
 		return <div className="page-loading">Loading project…</div>;
@@ -876,205 +862,6 @@ function ProjectDetailPage() {
 			// Ignore malformed drag payloads.
 		} finally {
 			handleKanbanDragEnd();
-		}
-	}
-
-	function extractImportTasks(payload: unknown): ImportedTask[] {
-		if (Array.isArray(payload)) {
-			return payload as ImportedTask[];
-		}
-		if (payload && typeof payload === "object") {
-			const objectPayload = payload as Record<string, unknown>;
-			if (Array.isArray(objectPayload.tasks)) {
-				return objectPayload.tasks as ImportedTask[];
-			}
-			if (Array.isArray(objectPayload.issues)) {
-				return objectPayload.issues as ImportedTask[];
-			}
-		}
-
-		return [];
-	}
-
-	function normalizeTaskLabels(
-		labels?: string[] | string,
-	): string[] | undefined {
-		if (!labels) {
-			return undefined;
-		}
-
-		if (typeof labels === "string") {
-			const parsed = labels
-				.split(",")
-				.map((item) => item.trim())
-				.filter(Boolean);
-			return parsed.length ? parsed : undefined;
-		}
-
-		const parsed = labels.map((item) => item.trim()).filter(Boolean);
-		return parsed.length ? parsed : undefined;
-	}
-
-	function normalizeTaskDueDate(dueDate?: string | number): number | undefined {
-		if (dueDate === undefined || dueDate === null) {
-			return undefined;
-		}
-		if (typeof dueDate === "number" && Number.isFinite(dueDate)) {
-			return dueDate;
-		}
-		if (typeof dueDate === "string" && dueDate.trim()) {
-			const timestamp = Date.parse(dueDate);
-			if (Number.isFinite(timestamp)) {
-				return timestamp;
-			}
-		}
-
-		return undefined;
-	}
-
-	function exportTasks() {
-		if (!projectData) {
-			return;
-		}
-
-		const taskRows = issues ?? [];
-		const payload = {
-			version: 1,
-			exportedAt: new Date().toISOString(),
-			project: {
-				id: projectData.project._id,
-				key: projectData.project.key,
-				name: projectData.project.name,
-			},
-			filters: {
-				search: search || undefined,
-				statuses: selectedStatuses.length ? selectedStatuses : undefined,
-				priority: priority || undefined,
-				assigneeId: assigneeId || undefined,
-				list:
-					listFilter === "all"
-						? undefined
-						: listFilter === "none"
-							? "none"
-							: listFilter,
-				sort: sortBy,
-				groupBy: groupBy,
-				layout: issueLayout,
-				view: projectView,
-			},
-			tasks: taskRows.map((issue) => ({
-				title: issue.title,
-				description: issue.description,
-				status: issue.status,
-				priority: issue.priority,
-				labels: issue.labels,
-				dueDate: issue.dueDate,
-				listName: issue.listId
-					? issueListById.get(issue.listId)?.name
-					: undefined,
-			})),
-		};
-
-		const fileContent = JSON.stringify(payload, null, 2);
-		const fileBlob = new Blob([fileContent], { type: "application/json" });
-		const downloadUrl = URL.createObjectURL(fileBlob);
-		const anchor = document.createElement("a");
-		anchor.href = downloadUrl;
-		anchor.download = `${projectData.project.key.toLowerCase()}-tasks-${new Date().toISOString().slice(0, 10)}.json`;
-		anchor.click();
-		URL.revokeObjectURL(downloadUrl);
-		setImportExportError(null);
-		setImportExportMessage(
-			`Exported ${payload.tasks.length} task${payload.tasks.length === 1 ? "" : "s"}.`,
-		);
-	}
-
-	async function handleImportTasksFile(event: ChangeEvent<HTMLInputElement>) {
-		const file = event.target.files?.[0];
-		event.target.value = "";
-		if (!file) {
-			return;
-		}
-
-		setImportExportError(null);
-		setImportExportMessage(null);
-		setIsImportingTasks(true);
-		setIsImportExportMenuOpen(false);
-
-		try {
-			const fileText = await file.text();
-			const jsonPayload = JSON.parse(fileText) as unknown;
-			const importedTasks = extractImportTasks(jsonPayload);
-			if (!importedTasks.length) {
-				throw new Error("No tasks found in the import file.");
-			}
-
-			const listIdByName = new Map(
-				(issueLists ?? []).map((list) => [
-					list.name.trim().toLowerCase(),
-					list._id,
-				]),
-			);
-			const allowedStatuses = new Set<string>(ISSUE_STATUSES);
-			const allowedPriorities = new Set<string>(ISSUE_PRIORITIES);
-
-			let importedCount = 0;
-			let skippedCount = 0;
-
-			for (const task of importedTasks) {
-				const title = task.title?.trim();
-				if (!title) {
-					skippedCount += 1;
-					continue;
-				}
-
-				const status =
-					task.status && allowedStatuses.has(task.status)
-						? task.status
-						: undefined;
-				const priority =
-					task.priority && allowedPriorities.has(task.priority)
-						? task.priority
-						: undefined;
-				const normalizedListName = task.listName?.trim().toLowerCase();
-				const listId = normalizedListName
-					? listIdByName.get(normalizedListName)
-					: undefined;
-
-				try {
-					await createIssue({
-						projectId,
-						title,
-						description: task.description?.trim() || undefined,
-						status,
-						priority,
-						dueDate: normalizeTaskDueDate(task.dueDate),
-						labels: normalizeTaskLabels(task.labels),
-						listId,
-					});
-					importedCount += 1;
-				} catch {
-					skippedCount += 1;
-				}
-			}
-
-			if (!importedCount) {
-				throw new Error(
-					"No tasks were imported. Check the file format and permissions.",
-				);
-			}
-
-			setImportExportMessage(
-				skippedCount
-					? `Imported ${importedCount} task${importedCount === 1 ? "" : "s"} (${skippedCount} skipped).`
-					: `Imported ${importedCount} task${importedCount === 1 ? "" : "s"}.`,
-			);
-		} catch (error) {
-			setImportExportError(
-				getClientErrorMessage(error, "Failed to import tasks."),
-			);
-		} finally {
-			setIsImportingTasks(false);
 		}
 	}
 
@@ -1397,7 +1184,7 @@ function ProjectDetailPage() {
 								aria-label="More actions"
 								aria-haspopup="menu"
 								aria-expanded={isImportExportMenuOpen}
-								onClick={() => setIsImportExportMenuOpen((current) => !current)}
+								onClick={toggleImportExportMenu}
 							>
 								<MoreHorizontal className="h-4 w-4" />
 							</Button>
@@ -1411,10 +1198,7 @@ function ProjectDetailPage() {
 										role="menuitem"
 										className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
 										disabled={!canWrite || isImportingTasks}
-										onClick={() => {
-											setIsImportExportMenuOpen(false);
-											importFileInputRef.current?.click();
-										}}
+										onClick={openImportPicker}
 									>
 										<Upload className="h-4 w-4" />
 										Import tasks
@@ -2067,228 +1851,54 @@ function ProjectDetailPage() {
 				</div>
 			) : null}
 
-			{createOpen ? (
-				<div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
-					<div
-						role="dialog"
-						aria-modal="true"
-						aria-label="Create task"
-						className="w-full max-w-3xl rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
-					>
-						<div className="mb-4 flex items-center justify-between gap-3">
-							<h2 className="m-0 text-base font-semibold text-[var(--text)]">
-								Create Task
-							</h2>
-							<Button
-								type="button"
-								size="sm"
-								variant="ghost"
-								onClick={() => {
-									setCreateError(null);
-									setIssueForm(createIssueDraft());
-									setCreateOpen(false);
-								}}
-							>
-								Close
-							</Button>
-						</div>
+			<IssueDraftDialog
+				assignableUsers={assignableUsers}
+				dialogLabel="Create task"
+				draft={issueForm}
+				error={createError}
+				issueLists={issueLists}
+				onClose={() => {
+					setCreateError(null);
+					setIssueForm(createIssueDraft());
+					setCreateOpen(false);
+				}}
+				onParentIssueChange={(nextParentIssueId) => {
+					const parentIssue = nextParentIssueId
+						? projectIssueById.get(nextParentIssueId as Id<"issues">)
+						: null;
 
-						<form
-							onSubmit={submitIssue}
-							className="grid max-h-[70vh] gap-3 overflow-y-auto pr-4 pb-4 md:grid-cols-2"
-						>
-							<div className="md:col-span-2">
-								<Label>Title</Label>
-								<Input
-									value={issueForm.title}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											title: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div className="md:col-span-2">
-								<Label>Description</Label>
-								<Textarea
-									value={issueForm.description}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											description: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div>
-								<Label>Status</Label>
-								<Select
-									value={issueForm.status}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											status: event.target
-												.value as (typeof ISSUE_STATUSES)[number],
-										}))
-									}
-								>
-									{ISSUE_STATUSES.map((value) => (
-										<option key={value} value={value}>
-											{issueStatusLabel[value]}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>Priority</Label>
-								<Select
-									value={issueForm.priority}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											priority: event.target
-												.value as (typeof ISSUE_PRIORITIES)[number],
-										}))
-									}
-								>
-									{ISSUE_PRIORITIES.map((value) => (
-										<option key={value} value={value}>
-											{value}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>List</Label>
-								<Select
-									value={issueForm.listId}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											listId: event.target.value,
-										}))
-									}
-								>
-									<option value="">No list</option>
-									{(issueLists ?? []).map((list) => (
-										<option key={list._id} value={list._id}>
-											{list.name}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>Parent Task</Label>
-								<Select
-									value={issueForm.parentIssueId}
-									onChange={(event) => {
-										const nextParentIssueId = event.target.value;
-										const parentIssue = nextParentIssueId
-											? projectIssueById.get(nextParentIssueId as Id<"issues">)
-											: null;
-
-										setIssueForm((prev) => ({
-											...prev,
-											parentIssueId: nextParentIssueId,
-											listId:
-												prev.listId || !parentIssue?.listId
-													? prev.listId
-													: parentIssue.listId,
-											status:
-												prev.status === "todo" && parentIssue
-													? parentIssue.status
-													: prev.status,
-											priority:
-												prev.priority === "none" && parentIssue
-													? parentIssue.priority
-													: prev.priority,
-											assigneeId:
-												prev.assigneeId || !parentIssue?.assigneeId
-													? prev.assigneeId
-													: parentIssue.assigneeId,
-											dueDate:
-												prev.dueDate || !parentIssue?.dueDate
-													? prev.dueDate
-													: formatIssueInputDate(parentIssue.dueDate),
-										}));
-									}}
-								>
-									<option value="">No parent</option>
-									{parentIssueOptions.map((issue) => (
-										<option key={issue.value} value={issue.value}>
-											{issue.label}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>Assignee</Label>
-								<Select
-									value={issueForm.assigneeId}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											assigneeId: event.target.value,
-										}))
-									}
-								>
-									<option value="">Unassigned</option>
-									{(assignableUsers ?? []).map((user) => (
-										<option key={user._id} value={user._id}>
-											{user.name}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>Due Date</Label>
-								<Input
-									type="date"
-									value={issueForm.dueDate}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											dueDate: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div className="md:col-span-2">
-								<Label>Labels (comma-separated)</Label>
-								<Input
-									value={issueForm.labels}
-									onChange={(event) =>
-										setIssueForm((prev) => ({
-											...prev,
-											labels: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							{createError ? (
-								<p className="m-0 text-sm text-[var(--danger)]">
-									{createError}
-								</p>
-							) : null}
-							<div className="md:col-span-2 flex items-center justify-end gap-2 pt-1">
-								<Button
-									type="button"
-									variant="ghost"
-									onClick={() => {
-										setCreateError(null);
-										setIssueForm(createIssueDraft());
-										setCreateOpen(false);
-									}}
-								>
-									Cancel
-								</Button>
-								<Button type="submit">Create task</Button>
-							</div>
-						</form>
-					</div>
-				</div>
-			) : null}
+					setIssueForm((prev) => ({
+						...prev,
+						parentIssueId: nextParentIssueId,
+						listId:
+							prev.listId || !parentIssue?.listId
+								? prev.listId
+								: parentIssue.listId,
+						status:
+							prev.status === "todo" && parentIssue
+								? parentIssue.status
+								: prev.status,
+						priority:
+							prev.priority === "none" && parentIssue
+								? parentIssue.priority
+								: prev.priority,
+						assigneeId:
+							prev.assigneeId || !parentIssue?.assigneeId
+								? prev.assigneeId
+								: parentIssue.assigneeId,
+						dueDate:
+							prev.dueDate || !parentIssue?.dueDate
+								? prev.dueDate
+								: formatIssueInputDate(parentIssue.dueDate),
+					}));
+				}}
+				onSubmit={submitIssue}
+				open={createOpen}
+				parentIssueOptions={parentIssueOptions}
+				setDraft={setIssueForm}
+				submitLabel="Create task"
+				title="Create Task"
+			/>
 
 			<ConfirmDialog
 				open={Boolean(memberToRemove)}

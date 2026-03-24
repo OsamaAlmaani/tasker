@@ -214,6 +214,8 @@ Invite flow is split intentionally:
 - Keep route files as entry/composition shells; move reusable pure logic to feature modules.
 - Place issue hierarchy logic in `src/features/tasker/issues/` and import it from routes/components instead of duplicating helper functions.
 - Place shared issue status transition/cascade-confirmation orchestration in `src/features/tasker/issues/useIssueStatusFlow.ts` and reuse it instead of reimplementing route-local mutation guards.
+- Place shared task draft modal/form UI in `src/features/tasker/issues/components/IssueDraftDialog.tsx` and reuse it across project and issue flows instead of duplicating form markup.
+- Place project task import/export state, menu behavior, and file parsing in `src/features/tasker/projects/useProjectTaskImportExport.ts` instead of keeping that workflow inline in route files.
 - Prefer incremental extractions that preserve behavior over broad rewrites.
 - When roadmap work starts or completes, update:
   - `plan/codebase-foundation-implementation-plan.md` task status

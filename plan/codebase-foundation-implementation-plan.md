@@ -17,7 +17,9 @@ Refactor oversized route files into maintainable feature modules while preservin
 - [ ] Introduce route-local composition shells for project and issue pages.
 - [ ] Move route state/mutation orchestration into focused hooks.
   - [x] Extract shared issue status update and cascade-completion orchestration from large routes.
+  - [x] Extract project task import/export state and file handling from the project route.
 - [ ] Split inline UI regions into dedicated feature components.
+  - [x] Extract the repeated task draft dialog/form into a shared issue component.
 - [ ] Consolidate repeated project/task presentation patterns.
 
 ## Phase 3: Stabilization
@@ -30,3 +32,5 @@ Refactor oversized route files into maintainable feature modules while preservin
 - Keep this plan updated as tasks start and finish.
 - Initial extraction complete: `buildDescendantStats` and `findDoneAncestorIssue` now live in `src/features/tasker/issues/hierarchy.ts`.
 - Latest extraction complete: shared issue status update flow now lives in `src/features/tasker/issues/useIssueStatusFlow.ts`.
+- Latest extraction complete: project task import/export flow now lives in `src/features/tasker/projects/useProjectTaskImportExport.ts`.
+- Latest extraction complete: shared task draft dialog/form now lives in `src/features/tasker/issues/components/IssueDraftDialog.tsx`.

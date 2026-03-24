@@ -16,11 +16,14 @@ import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { Input } from "#/components/ui/input";
-import { Label } from "#/components/ui/label";
 import { Select } from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatDate, formatRelative } from "#/features/tasker/format";
+import {
+	type IssueDraft,
+	IssueDraftDialog,
+} from "#/features/tasker/issues/components/IssueDraftDialog";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import {
 	ISSUE_PRIORITIES,
@@ -90,7 +93,7 @@ type IssueDetailRow = Doc<"issues"> & {
 	hasChildren: boolean;
 };
 
-function createSubIssueDraft(parentIssue?: IssueDetailRow) {
+function createSubIssueDraft(parentIssue?: IssueDetailRow): IssueDraft {
 	return {
 		title: "",
 		description: "",
@@ -962,184 +965,23 @@ function IssueDetailPage() {
 				</div>
 			</div>
 
-			{subIssueFormOpen ? (
-				<div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
-					<div
-						role="dialog"
-						aria-modal="true"
-						aria-label="Create sub-task"
-						className="w-full max-w-3xl rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
-					>
-						<div className="mb-4 flex items-center justify-between gap-3">
-							<h2 className="m-0 text-base font-semibold text-[var(--text)]">
-								Create sub-task
-							</h2>
-							<Button
-								type="button"
-								size="sm"
-								variant="ghost"
-								onClick={() => {
-									setSubIssueError(null);
-									setSubIssueForm(createSubIssueDraft(currentIssue));
-									setSubIssueFormOpen(false);
-								}}
-							>
-								Close
-							</Button>
-						</div>
-
-						<form
-							onSubmit={submitSubIssue}
-							className="grid max-h-[70vh] gap-3 overflow-y-auto pr-1 md:grid-cols-2"
-						>
-							<div className="md:col-span-2">
-								<Label>Title</Label>
-								<Input
-									value={subIssueForm.title}
-									onChange={(event) =>
-										setSubIssueForm((prev) => ({
-											...prev,
-											title: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div className="md:col-span-2">
-								<Label>Description</Label>
-								<Textarea
-									value={subIssueForm.description}
-									onChange={(event) =>
-										setSubIssueForm((prev) => ({
-											...prev,
-											description: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div>
-								<Label>Status</Label>
-								<Select
-									value={subIssueForm.status}
-									onChange={(event) =>
-										setSubIssueForm((prev) => ({
-											...prev,
-											status: event.target
-												.value as (typeof ISSUE_STATUSES)[number],
-										}))
-									}
-								>
-									{ISSUE_STATUSES.map((value) => (
-										<option key={value} value={value}>
-											{issueStatusLabel[value]}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>Priority</Label>
-								<Select
-									value={subIssueForm.priority}
-									onChange={(event) =>
-										setSubIssueForm((prev) => ({
-											...prev,
-											priority: event.target
-												.value as (typeof ISSUE_PRIORITIES)[number],
-										}))
-									}
-								>
-									{ISSUE_PRIORITIES.map((value) => (
-										<option key={value} value={value}>
-											{issuePriorityLabel[value]}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>List</Label>
-								<Select
-									value={subIssueForm.listId}
-									onChange={(event) =>
-										setSubIssueForm((prev) => ({
-											...prev,
-											listId: event.target.value,
-										}))
-									}
-								>
-									<option value="">No list</option>
-									{(issueLists ?? []).map((list) => (
-										<option key={list._id} value={list._id}>
-											{list.name}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>Assignee</Label>
-								<Select
-									value={subIssueForm.assigneeId}
-									onChange={(event) =>
-										setSubIssueForm((prev) => ({
-											...prev,
-											assigneeId: event.target.value,
-										}))
-									}
-								>
-									<option value="">Unassigned</option>
-									{(assignableUsers ?? []).map((user) => (
-										<option key={user._id} value={user._id}>
-											{user.name}
-										</option>
-									))}
-								</Select>
-							</div>
-							<div>
-								<Label>Due Date</Label>
-								<Input
-									type="date"
-									value={subIssueForm.dueDate}
-									onChange={(event) =>
-										setSubIssueForm((prev) => ({
-											...prev,
-											dueDate: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div className="md:col-span-2">
-								<Label>Labels (comma-separated)</Label>
-								<Input
-									value={subIssueForm.labels}
-									onChange={(event) =>
-										setSubIssueForm((prev) => ({
-											...prev,
-											labels: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							{subIssueError ? (
-								<p className="m-0 text-sm text-[var(--danger)]">
-									{subIssueError}
-								</p>
-							) : null}
-							<div className="md:col-span-2 flex items-center justify-end gap-2 pt-1">
-								<Button
-									type="button"
-									variant="ghost"
-									onClick={() => {
-										setSubIssueError(null);
-										setSubIssueForm(createSubIssueDraft(currentIssue));
-										setSubIssueFormOpen(false);
-									}}
-								>
-									Cancel
-								</Button>
-								<Button type="submit">Create sub-task</Button>
-							</div>
-						</form>
-					</div>
-				</div>
-			) : null}
+			<IssueDraftDialog
+				assignableUsers={assignableUsers}
+				dialogLabel="Create sub-task"
+				draft={subIssueForm}
+				error={subIssueError}
+				issueLists={issueLists}
+				onClose={() => {
+					setSubIssueError(null);
+					setSubIssueForm(createSubIssueDraft(currentIssue));
+					setSubIssueFormOpen(false);
+				}}
+				onSubmit={submitSubIssue}
+				open={subIssueFormOpen}
+				setDraft={setSubIssueForm}
+				submitLabel="Create sub-task"
+				title="Create sub-task"
+			/>
 
 			<ConfirmDialog
 				open={showDeleteConfirm}
