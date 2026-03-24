@@ -1464,20 +1464,7 @@ function ProjectDetailPage() {
 								}}
 							>
 								<Settings2 className="mr-2 h-4 w-4" />
-								Settings
-							</Button>
-						) : null}
-						{canWrite ? (
-							<Button
-								variant="secondary"
-								onClick={() => {
-									setCreateError(null);
-									setIssueForm(createIssueDraft());
-									setCreateOpen(true);
-								}}
-							>
-								<Plus className="mr-2 h-4 w-4" />
-								New Task
+								Project Settings
 							</Button>
 						) : null}
 						<Button
@@ -1674,8 +1661,21 @@ function ProjectDetailPage() {
 			<div className="space-y-4">
 				{projectView === "issues" ? (
 					<Card>
-						<CardHeader>
+						<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
 							<CardTitle>Tasks</CardTitle>
+							{canWrite ? (
+								<Button
+									variant="secondary"
+									onClick={() => {
+										setCreateError(null);
+										setIssueForm(createIssueDraft());
+										setCreateOpen(true);
+									}}
+								>
+									<Plus className="mr-2 h-4 w-4" />
+									New Task
+								</Button>
+							) : null}
 						</CardHeader>
 						<CardContent>
 							<div className="mb-3 flex flex-wrap items-center justify-between gap-2">

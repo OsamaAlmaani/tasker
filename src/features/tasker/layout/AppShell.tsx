@@ -9,6 +9,7 @@ import {
 	Menu,
 	Settings,
 	Shield,
+	Trash2,
 	X,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
@@ -16,6 +17,8 @@ import ThemeToggle from "#/components/ThemeToggle";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
+import { Select } from "#/components/ui/select";
+import { getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
 import { globalRoleLabel } from "../model";
@@ -38,12 +41,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	const [newListName, setNewListName] = useState("");
 	const [listError, setListError] = useState<string | null>(null);
 	const [isCreatingList, setIsCreatingList] = useState(false);
+	const [listToDelete, setListToDelete] = useState<{
+		projectId: Id<"projects">;
+		projectName: string;
+		issueListId: Id<"issueLists">;
+		issueListName: string;
+	} | null>(null);
+	const [deleteListMode, setDeleteListMode] = useState<
+		"delete_tasks" | "move_tasks"
+	>("move_tasks");
+	const [deleteListDestinationId, setDeleteListDestinationId] =
+		useState("__none__");
+	const [deleteListError, setDeleteListError] = useState<string | null>(null);
+	const [isDeletingList, setIsDeletingList] = useState(false);
 
 	const me = useQuery(api.users.me);
 	const sidebarProjects = useQuery(api.projects.sidebar, {
 		includeArchived: false,
 	});
 	const createIssueList = useMutation(api.issueLists.create);
+	const deleteIssueList = useMutation(api.issueLists.remove);
 	const canManageIssueLists =
 		me?.globalRole === "admin" || me?.globalRole === "member";
 
@@ -109,6 +126,54 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			);
 		} finally {
 			setIsCreatingList(false);
+		}
+	}
+
+	const deleteListDestinationOptions = useMemo(() => {
+		if (!listToDelete || !sidebarProjects) {
+			return [];
+		}
+
+		const projectRow = sidebarProjects.find(
+			(row) => row.project._id === listToDelete.projectId,
+		);
+		return (projectRow?.issueLists ?? []).filter(
+			(list) => list._id !== listToDelete.issueListId,
+		);
+	}, [listToDelete, sidebarProjects]);
+
+	function closeDeleteListModal() {
+		setListToDelete(null);
+		setDeleteListMode("move_tasks");
+		setDeleteListDestinationId("__none__");
+		setDeleteListError(null);
+	}
+
+	async function confirmDeleteList() {
+		if (!listToDelete) {
+			return;
+		}
+
+		setDeleteListError(null);
+		setIsDeletingList(true);
+		try {
+			await deleteIssueList({
+				issueListId: listToDelete.issueListId,
+				mode: deleteListMode,
+				destinationListId:
+					deleteListMode === "move_tasks"
+						? deleteListDestinationId === "__none__"
+							? null
+							: (deleteListDestinationId as Id<"issueLists">)
+						: undefined,
+			});
+			closeDeleteListModal();
+		} catch (error) {
+			setDeleteListError(
+				getClientErrorMessage(error, "Failed to delete task list."),
+			);
+		} finally {
+			setIsDeletingList(false);
 		}
 	}
 
@@ -287,25 +352,49 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 								{row.issueLists.length ? (
 									<div className="ml-6 space-y-0.5">
 										{row.issueLists.map((list) => (
-											<Link
-												key={list._id}
-												to="/projects/$projectId"
-												params={{ projectId: row.project._id }}
-												search={(previous) => ({
-													...previous,
-													list: list._id,
-												})}
-												className="project-subitem truncate"
-												activeOptions={{ exact: true, includeSearch: true }}
-												activeProps={{
-													className:
-														"project-subitem project-subitem-active truncate",
-												}}
-												title={list.name}
-												onClick={() => setMobileSidebarOpen(false)}
-											>
-												• {list.name}
-											</Link>
+											<div key={list._id} className="flex items-center gap-1">
+												<Link
+													to="/projects/$projectId"
+													params={{ projectId: row.project._id }}
+													search={(previous) => ({
+														...previous,
+														list: list._id,
+													})}
+													className="project-subitem min-w-0 flex-1 truncate"
+													activeOptions={{ exact: true, includeSearch: true }}
+													activeProps={{
+														className:
+															"project-subitem project-subitem-active min-w-0 flex-1 truncate",
+													}}
+													title={list.name}
+													onClick={() => setMobileSidebarOpen(false)}
+												>
+													• {list.name}
+												</Link>
+												{canManageIssueLists ? (
+													<Button
+														type="button"
+														size="sm"
+														variant="ghost"
+														className="h-7 w-7 shrink-0 px-0"
+														aria-label={`Delete ${list.name} list`}
+														title={`Delete ${list.name} list`}
+														onClick={() => {
+															setDeleteListMode("move_tasks");
+															setDeleteListDestinationId("__none__");
+															setDeleteListError(null);
+															setListToDelete({
+																projectId: row.project._id,
+																projectName: row.project.name,
+																issueListId: list._id,
+																issueListName: list.name,
+															});
+														}}
+													>
+														<Trash2 className="h-3.5 w-3.5" />
+													</Button>
+												) : null}
+											</div>
 										))}
 									</div>
 								) : null}
@@ -472,6 +561,115 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 								</Button>
 							</div>
 						</form>
+					</div>
+				</div>
+			) : null}
+
+			{listToDelete ? (
+				<div
+					className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,12,26,0.42)] px-4"
+					role="dialog"
+					aria-modal="true"
+					aria-label="Delete task list"
+				>
+					<div className="w-full max-w-md rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_24px_64px_rgba(0,0,0,0.25)]">
+						<div className="mb-3">
+							<h2 className="m-0 text-base font-semibold text-[var(--text)]">
+								Delete Task List
+							</h2>
+							<p className="m-0 mt-1 text-sm text-[var(--muted-text)]">
+								Delete <strong>{listToDelete.issueListName}</strong> from{" "}
+								{listToDelete.projectName}.
+							</p>
+						</div>
+
+						<div className="space-y-3">
+							<label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3">
+								<input
+									type="radio"
+									name="delete-list-mode"
+									checked={deleteListMode === "move_tasks"}
+									onChange={() => setDeleteListMode("move_tasks")}
+									disabled={isDeletingList}
+								/>
+								<div>
+									<p className="m-0 text-sm font-medium text-[var(--text)]">
+										Move tasks out of this list
+									</p>
+									<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
+										Keep the tasks and move them to another list or to No list.
+									</p>
+								</div>
+							</label>
+
+							{deleteListMode === "move_tasks" ? (
+								<div>
+									<p className="m-0 mb-1 text-xs font-medium uppercase tracking-wide text-[var(--muted-text)]">
+										Move tasks to
+									</p>
+									<Select
+										value={deleteListDestinationId}
+										onChange={(event) =>
+											setDeleteListDestinationId(event.target.value)
+										}
+										disabled={isDeletingList}
+									>
+										<option value="__none__">No list</option>
+										{deleteListDestinationOptions.map((list) => (
+											<option key={list._id} value={list._id}>
+												{list.name}
+											</option>
+										))}
+									</Select>
+								</div>
+							) : null}
+
+							<label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3">
+								<input
+									type="radio"
+									name="delete-list-mode"
+									checked={deleteListMode === "delete_tasks"}
+									onChange={() => setDeleteListMode("delete_tasks")}
+									disabled={isDeletingList}
+								/>
+								<div>
+									<p className="m-0 text-sm font-medium text-[var(--text)]">
+										Delete all tasks in this list
+									</p>
+									<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
+										Delete every task assigned to this list. Sub-tasks under
+										those tasks will be deleted too.
+									</p>
+								</div>
+							</label>
+
+							{deleteListError ? (
+								<p className="m-0 text-sm text-[var(--danger)]">
+									{deleteListError}
+								</p>
+							) : null}
+
+							<div className="flex items-center justify-end gap-2">
+								<Button
+									type="button"
+									variant="ghost"
+									onClick={closeDeleteListModal}
+									disabled={isDeletingList}
+								>
+									Cancel
+								</Button>
+								<Button
+									type="button"
+									variant="danger"
+									onClick={() => {
+										void confirmDeleteList();
+									}}
+									disabled={isDeletingList}
+								>
+									{isDeletingList ? "Deleting..." : "Delete list"}
+								</Button>
+							</div>
+						</div>
 					</div>
 				</div>
 			) : null}
