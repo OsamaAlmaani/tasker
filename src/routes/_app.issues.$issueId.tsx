@@ -22,6 +22,10 @@ import { Textarea } from "#/components/ui/textarea";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatDate, formatRelative } from "#/features/tasker/format";
 import {
+	buildDescendantStats,
+	findDoneAncestorIssue,
+} from "#/features/tasker/issues/hierarchy";
+import {
 	ISSUE_PRIORITIES,
 	ISSUE_STATUSES,
 	issuePriorityLabel,
@@ -89,10 +93,6 @@ type IssueDetailRow = Doc<"issues"> & {
 	hasChildren: boolean;
 };
 
-type DescendantStats = {
-	unfinishedDescendantCount: number;
-};
-
 function createSubIssueDraft(parentIssue?: IssueDetailRow) {
 	return {
 		title: "",
@@ -120,71 +120,6 @@ function formatChildProgress(issue: IssueDetailRow) {
 
 function roundCompletionRate(issue: IssueDetailRow) {
 	return Math.round(issue.childCompletionRate * 100);
-}
-
-function buildDescendantStats(rows: IssueDetailRow[]) {
-	const childrenByParent = new Map<string, IssueDetailRow[]>();
-
-	for (const issue of rows) {
-		if (!issue.parentIssueId) {
-			continue;
-		}
-
-		const children = childrenByParent.get(issue.parentIssueId) ?? [];
-		children.push(issue);
-		childrenByParent.set(issue.parentIssueId, children);
-	}
-
-	const statsByIssueId = new Map<string, DescendantStats>();
-
-	function visit(issueId: string): DescendantStats {
-		const cached = statsByIssueId.get(issueId);
-		if (cached) {
-			return cached;
-		}
-
-		const children = childrenByParent.get(issueId) ?? [];
-		let unfinishedDescendantCount = 0;
-
-		for (const child of children) {
-			if (child.status !== "done") {
-				unfinishedDescendantCount += 1;
-			}
-
-			unfinishedDescendantCount += visit(child._id).unfinishedDescendantCount;
-		}
-
-		const stats = { unfinishedDescendantCount };
-		statsByIssueId.set(issueId, stats);
-		return stats;
-	}
-
-	for (const issue of rows) {
-		visit(issue._id);
-	}
-
-	return statsByIssueId;
-}
-
-function findDoneAncestorIssue(
-	issue: IssueDetailRow,
-	issueById: Map<string, IssueDetailRow>,
-) {
-	let cursor = issue.parentIssueId;
-
-	while (cursor) {
-		const parentIssue = issueById.get(cursor);
-		if (!parentIssue) {
-			return null;
-		}
-		if (parentIssue.status === "done") {
-			return parentIssue;
-		}
-
-		cursor = parentIssue.parentIssueId;
-	}
-
-	return null;
 }
 
 function IssueDetailPage() {

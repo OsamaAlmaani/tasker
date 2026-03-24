@@ -1,0 +1,30 @@
+# Codebase Foundation Implementation Plan
+
+_Last updated: 2026-03-24_
+
+## Objective
+Refactor oversized route files into maintainable feature modules while preserving behavior.
+
+## Phase 1: Planning and first extraction (current)
+- [x] Create `plan/` workspace and initial trackable implementation plan.
+- [x] Audit `Highest Priority: Codebase Foundation` section and map first concrete extraction task.
+- [x] Extract shared issue hierarchy helpers from route files into feature modules.
+- [x] Update project and issue routes to consume shared helpers.
+- [x] Run static checks and fix any regressions.
+- [x] Update `AGENT.md` and `ROADMAP.md` with progress and structure rules.
+
+## Phase 2: Route decomposition
+- [ ] Introduce route-local composition shells for project and issue pages.
+- [ ] Move route state/mutation orchestration into focused hooks.
+- [ ] Split inline UI regions into dedicated feature components.
+- [ ] Consolidate repeated project/task presentation patterns.
+
+## Phase 3: Stabilization
+- [ ] Add lean tests around extracted pure logic (non-UI heavy).
+- [ ] Document code organization conventions for future feature work.
+- [ ] Mark roadmap foundation items completed once route sizes are materially reduced.
+
+## Notes
+- Keep refactors incremental and behavior-preserving.
+- Keep this plan updated as tasks start and finish.
+- Initial extraction complete: `buildDescendantStats` and `findDoneAncestorIssue` now live in `src/features/tasker/issues/hierarchy.ts`.

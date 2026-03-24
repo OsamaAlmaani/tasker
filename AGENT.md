@@ -209,6 +209,16 @@ Invite flow is split intentionally:
 
 ## Frontend Structure Notes
 
+### Code organization rules (foundation refactor)
+
+- Keep route files as entry/composition shells; move reusable pure logic to feature modules.
+- Place issue hierarchy logic in `src/features/tasker/issues/` and import it from routes/components instead of duplicating helper functions.
+- Prefer incremental extractions that preserve behavior over broad rewrites.
+- When roadmap work starts or completes, update:
+  - `plan/codebase-foundation-implementation-plan.md` task status
+  - `ROADMAP.md` checklist/progress log
+  - `AGENT.md` structure notes when architecture conventions change
+
 ### App shell
 
 [`src/features/tasker/layout/AppShell.tsx`](./src/features/tasker/layout/AppShell.tsx) owns a lot of cross-app UI:

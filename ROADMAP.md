@@ -4,7 +4,7 @@ Use this file to track feature progress. Check items off as they ship.
 
 ## Working Rule
 
-- [ ] Keep [AGENT.md](/Users/osama/sources/private/tasker/AGENT.md) and [ROADMAP.md](/Users/osama/sources/private/tasker/ROADMAP.md) updated whenever implementation changes meaningfully, roadmap items move, or tasks are completed
+- [ ] Keep [AGENT.md](/Users/osama/sources/private/tasker/AGENT.md) and [ROADMAP.md](/Users/osama/sources/private/tasker/ROADMAP.md) updated whenever implementation changes meaningfully, roadmap items move, or tasks are completed (This check list item should always be validated after each task completion and should not be marked as done unless all other tasks are also done)
 
 ## Highest Priority: Codebase Foundation
 
@@ -18,9 +18,14 @@ Use this file to track feature progress. Check items off as they ship.
 - [ ] Split large inline UI sections into dedicated components with clear ownership
 - [ ] Move repeated task/project presentation patterns into reusable components where it genuinely reduces duplication
 - [ ] Separate pure view logic from Convex wiring and mutation orchestration
-- [ ] Consolidate route-specific helper functions into colocated modules or shared utilities where appropriate
+- [x] Consolidate route-specific helper functions into colocated modules or shared utilities where appropriate
 - [ ] Add tests around the refactor so behavior does not drift while files are being split, and keep test files, artifacts and related pieces well organized away from the main codebase to reduce bloat.
 - [ ] Establish code organization rules and update AGENT.md file so new work extends the same structure instead of recreating large route files
+
+### Foundation Progress Log
+
+- 2026-03-24: Created `plan/codebase-foundation-implementation-plan.md` with trackable refactor phases and tasks.
+- 2026-03-24: Extracted shared issue hierarchy helpers (`buildDescendantStats`, `findDoneAncestorIssue`) to `src/features/tasker/issues/hierarchy.ts` and wired both project and issue detail routes to use the shared module.
 
 ## Product Direction
 
