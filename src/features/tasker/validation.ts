@@ -22,6 +22,7 @@ export const issueFormSchema = z.object({
 	priority: z.enum(ISSUE_PRIORITIES).default("none"),
 	assigneeId: z.string().trim().optional(),
 	listId: z.string().trim().optional(),
+	parentIssueId: z.string().trim().optional(),
 	dueDate: z.string().trim().optional(),
 	labels: z.string().trim().optional(),
 });

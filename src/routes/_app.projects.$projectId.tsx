@@ -49,7 +49,7 @@ import {
 	issueStatusLabel,
 } from "#/features/tasker/model";
 import { issueFormSchema } from "#/features/tasker/validation";
-import { cn } from "#/lib/utils";
+import { cn, getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Doc, Id } from "#convex/_generated/dataModel";
 
@@ -85,6 +85,143 @@ type ImportedTask = {
 	dueDate?: number | string;
 	listName?: string;
 };
+
+type ProjectIssueRow = Doc<"issues"> & {
+	childIssueCount: number;
+	completedChildIssueCount: number;
+	childCompletionRate: number;
+	hasChildren: boolean;
+};
+
+type IssueTreeNode = {
+	issue: ProjectIssueRow;
+	children: IssueTreeNode[];
+};
+
+type DescendantStats = {
+	unfinishedDescendantCount: number;
+};
+
+function createIssueDraft() {
+	return {
+		title: "",
+		description: "",
+		listId: "",
+		parentIssueId: "",
+		status: "todo" as (typeof ISSUE_STATUSES)[number],
+		priority: "none" as (typeof ISSUE_PRIORITIES)[number],
+		assigneeId: "",
+		dueDate: "",
+		labels: "",
+	};
+}
+
+function formatIssueInputDate(timestamp?: number) {
+	return timestamp ? new Date(timestamp).toISOString().slice(0, 10) : "";
+}
+
+function buildIssueTree(rows: ProjectIssueRow[]): IssueTreeNode[] {
+	const byId = new Map<string, IssueTreeNode>(
+		rows.map((issue) => [issue._id, { issue, children: [] }]),
+	);
+	const roots: IssueTreeNode[] = [];
+
+	for (const issue of rows) {
+		const node = byId.get(issue._id);
+		if (!node) {
+			continue;
+		}
+
+		if (issue.parentIssueId) {
+			const parentNode = byId.get(issue.parentIssueId);
+			if (parentNode) {
+				parentNode.children.push(node);
+				continue;
+			}
+		}
+
+		roots.push(node);
+	}
+
+	return roots;
+}
+
+function formatChildProgress(issue: ProjectIssueRow) {
+	if (!issue.hasChildren) {
+		return null;
+	}
+
+	return `${issue.completedChildIssueCount}/${issue.childIssueCount} done`;
+}
+
+function roundCompletionRate(issue: ProjectIssueRow) {
+	return Math.round(issue.childCompletionRate * 100);
+}
+
+function findDoneAncestorIssue(
+	issue: ProjectIssueRow,
+	issueById: Map<string, ProjectIssueRow>,
+) {
+	let cursor = issue.parentIssueId;
+
+	while (cursor) {
+		const parentIssue = issueById.get(cursor);
+		if (!parentIssue) {
+			return null;
+		}
+		if (parentIssue.status === "done") {
+			return parentIssue;
+		}
+
+		cursor = parentIssue.parentIssueId;
+	}
+
+	return null;
+}
+
+function buildDescendantStats(rows: ProjectIssueRow[]) {
+	const childrenByParent = new Map<string, ProjectIssueRow[]>();
+
+	for (const issue of rows) {
+		if (!issue.parentIssueId) {
+			continue;
+		}
+
+		const children = childrenByParent.get(issue.parentIssueId) ?? [];
+		children.push(issue);
+		childrenByParent.set(issue.parentIssueId, children);
+	}
+
+	const statsByIssueId = new Map<string, DescendantStats>();
+
+	function visit(issueId: string): DescendantStats {
+		const cached = statsByIssueId.get(issueId);
+		if (cached) {
+			return cached;
+		}
+
+		const children = childrenByParent.get(issueId) ?? [];
+		let unfinishedDescendantCount = 0;
+
+		for (const child of children) {
+			if (child.status !== "done") {
+				unfinishedDescendantCount += 1;
+			}
+
+			unfinishedDescendantCount += visit(child._id).unfinishedDescendantCount;
+		}
+
+		const stats = { unfinishedDescendantCount };
+		statsByIssueId.set(issueId, stats);
+		return stats;
+	}
+
+	for (const issue of rows) {
+		visit(issue._id);
+	}
+
+	return statsByIssueId;
+}
 
 function parseStatusFilters(raw?: string): (typeof ISSUE_STATUSES)[number][] {
 	if (!raw) {
@@ -314,16 +451,7 @@ function ProjectDetailPage() {
 	const [createError, setCreateError] = useState<string | null>(null);
 	const [editingProject, setEditingProject] = useState(false);
 
-	const [issueForm, setIssueForm] = useState({
-		title: "",
-		description: "",
-		listId: "",
-		status: "todo",
-		priority: "none",
-		assigneeId: "",
-		dueDate: "",
-		labels: "",
-	});
+	const [issueForm, setIssueForm] = useState(createIssueDraft);
 
 	const [projectForm, setProjectForm] = useState({
 		name: projectData?.project.name ?? "",
@@ -353,6 +481,15 @@ function ProjectDetailPage() {
 	const [isRevokingInvite, setIsRevokingInvite] = useState(false);
 	const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
 	const [isTogglingArchive, setIsTogglingArchive] = useState(false);
+	const [statusUpdateError, setStatusUpdateError] = useState<string | null>(
+		null,
+	);
+	const [completionConfirm, setCompletionConfirm] = useState<{
+		issueId: Id<"issues">;
+		title: string;
+		unfinishedDescendantCount: number;
+	} | null>(null);
+	const [isCompletingIssueTree, setIsCompletingIssueTree] = useState(false);
 	const [isImportExportMenuOpen, setIsImportExportMenuOpen] = useState(false);
 	const [isImportingTasks, setIsImportingTasks] = useState(false);
 	const [importExportMessage, setImportExportMessage] = useState<string | null>(
@@ -368,6 +505,10 @@ function ProjectDetailPage() {
 		(typeof ISSUE_STATUSES)[number] | null
 	>(null);
 	const issueLists = useQuery(api.issueLists.listByProject, { projectId });
+	const allProjectIssues = useQuery(api.issues.listByProject, {
+		projectId,
+		sortBy: "created_desc",
+	});
 	const projectActivity = useQuery(
 		api.projects.activity,
 		projectView === "activity" ? { projectId, limit: 80 } : "skip",
@@ -409,15 +550,34 @@ function ProjectDetailPage() {
 		() => new Map((assignableUsers ?? []).map((user) => [user._id, user])),
 		[assignableUsers],
 	);
+	const projectIssueById = useMemo(
+		() => new Map((allProjectIssues ?? []).map((issue) => [issue._id, issue])),
+		[allProjectIssues],
+	);
+	const parentIssueOptions = useMemo(
+		() =>
+			[...(allProjectIssues ?? [])]
+				.filter((issue) => !issue.parentIssueId)
+				.sort((left, right) => left.issueNumber - right.issueNumber)
+				.map((issue) => ({
+					value: issue._id,
+					label: `#${issue.issueNumber} ${issue.title}`,
+				})),
+		[allProjectIssues],
+	);
+	const descendantStatsByIssueId = useMemo(
+		() => buildDescendantStats((allProjectIssues ?? []) as ProjectIssueRow[]),
+		[allProjectIssues],
+	);
 	const groupedIssues = useMemo(() => {
-		const rows = issues ?? [];
+		const rows = (issues ?? []) as ProjectIssueRow[];
 		const groups = new Map<
 			string,
 			{
 				key: string;
 				title: string;
 				position: number;
-				items: Doc<"issues">[];
+				items: ProjectIssueRow[];
 			}
 		>();
 
@@ -451,19 +611,29 @@ function ProjectDetailPage() {
 			});
 		}
 
-		return [...groups.values()].sort((a, b) => {
-			if (a.position !== b.position) {
-				return a.position - b.position;
-			}
-			return a.title.localeCompare(b.title);
-		});
+		return [...groups.values()]
+			.sort((a, b) => {
+				if (a.position !== b.position) {
+					return a.position - b.position;
+				}
+				return a.title.localeCompare(b.title);
+			})
+			.map((group) => ({
+				...group,
+				tree: buildIssueTree(group.items),
+			}));
 	}, [issues, issueListById, groupBy]);
 	const kanbanColumns = useMemo(
 		() =>
 			ISSUE_STATUSES.map((status) => ({
 				status,
 				title: issueStatusLabel[status],
-				items: (issues ?? []).filter((issue) => issue.status === status),
+				items: (issues ?? []).filter(
+					(issue): issue is ProjectIssueRow => issue.status === status,
+				),
+			})).map((column) => ({
+				...column,
+				tree: buildIssueTree(column.items),
 			})),
 		[issues],
 	);
@@ -522,6 +692,9 @@ function ProjectDetailPage() {
 				listId: (parsed.data.listId || undefined) as
 					| Id<"issueLists">
 					| undefined,
+				parentIssueId: (parsed.data.parentIssueId || undefined) as
+					| Id<"issues">
+					| undefined,
 				status: parsed.data.status,
 				priority: parsed.data.priority,
 				assigneeId: (parsed.data.assigneeId || undefined) as
@@ -537,22 +710,11 @@ function ProjectDetailPage() {
 							.filter(Boolean)
 					: undefined,
 			});
-			setIssueForm({
-				title: "",
-				description: "",
-				listId: "",
-				status: "todo",
-				priority: "none",
-				assigneeId: "",
-				dueDate: "",
-				labels: "",
-			});
+			setIssueForm(createIssueDraft());
 			setCreateOpen(false);
 		} catch (mutationError) {
 			setCreateError(
-				mutationError instanceof Error
-					? mutationError.message
-					: "Failed to create issue.",
+				getClientErrorMessage(mutationError, "Failed to create issue."),
 			);
 		}
 	}
@@ -605,9 +767,7 @@ function ProjectDetailPage() {
 			}
 			setInviteEmail("");
 		} catch (error) {
-			setInviteError(
-				error instanceof Error ? error.message : "Failed to send invite.",
-			);
+			setInviteError(getClientErrorMessage(error, "Failed to send invite."));
 		} finally {
 			setIsSendingInvite(false);
 		}
@@ -661,6 +821,10 @@ function ProjectDetailPage() {
 	}
 
 	function syncProjectFormWithCurrentProject() {
+		if (!projectData) {
+			return;
+		}
+
 		setProjectForm({
 			name: projectData.project.name ?? "",
 			description: projectData.project.description ?? "",
@@ -735,15 +899,85 @@ function ProjectDetailPage() {
 				return;
 			}
 			if (parsed.status !== nextStatus) {
-				void updateIssue({
-					issueId: parsed.issueId as Id<"issues">,
-					status: nextStatus,
-				});
+				const issue = (issues ?? []).find(
+					(candidate) => candidate._id === parsed.issueId,
+				) as ProjectIssueRow | undefined;
+				if (issue) {
+					void handleIssueStatusChange(issue, nextStatus);
+				}
 			}
 		} catch {
 			// Ignore malformed drag payloads.
 		} finally {
 			handleKanbanDragEnd();
+		}
+	}
+
+	async function handleIssueStatusChange(
+		issue: ProjectIssueRow,
+		nextStatus: (typeof ISSUE_STATUSES)[number],
+	) {
+		setStatusUpdateError(null);
+
+		try {
+			if (nextStatus !== "done") {
+				const doneAncestor = findDoneAncestorIssue(issue, projectIssueById);
+				if (doneAncestor) {
+					setStatusUpdateError(
+						`Cannot move this sub-issue out of done while parent issue #${doneAncestor.issueNumber} is still done. Reopen the parent first.`,
+					);
+					return;
+				}
+
+				await updateIssue({
+					issueId: issue._id,
+					status: nextStatus,
+				});
+				return;
+			}
+
+			const unfinishedDescendantCount =
+				descendantStatsByIssueId.get(issue._id)?.unfinishedDescendantCount ?? 0;
+			if (unfinishedDescendantCount > 0) {
+				setCompletionConfirm({
+					issueId: issue._id,
+					title: issue.title,
+					unfinishedDescendantCount,
+				});
+				return;
+			}
+
+			await updateIssue({
+				issueId: issue._id,
+				status: nextStatus,
+			});
+		} catch (error) {
+			setStatusUpdateError(
+				getClientErrorMessage(error, "Failed to update issue status."),
+			);
+		}
+	}
+
+	async function confirmCascadeCompletion() {
+		if (!completionConfirm) {
+			return;
+		}
+
+		setIsCompletingIssueTree(true);
+		try {
+			setStatusUpdateError(null);
+			await updateIssue({
+				issueId: completionConfirm.issueId,
+				status: "done",
+				cascadeDescendantsToDone: true,
+			});
+			setCompletionConfirm(null);
+		} catch (error) {
+			setStatusUpdateError(
+				getClientErrorMessage(error, "Failed to update issue status."),
+			);
+		} finally {
+			setIsCompletingIssueTree(false);
 		}
 	}
 
@@ -801,6 +1035,10 @@ function ProjectDetailPage() {
 	}
 
 	function exportTasks() {
+		if (!projectData) {
+			return;
+		}
+
 		const taskRows = issues ?? [];
 		const payload = {
 			version: 1,
@@ -935,11 +1173,265 @@ function ProjectDetailPage() {
 			);
 		} catch (error) {
 			setImportExportError(
-				error instanceof Error ? error.message : "Failed to import tasks.",
+				getClientErrorMessage(error, "Failed to import tasks."),
 			);
 		} finally {
 			setIsImportingTasks(false);
 		}
+	}
+
+	function renderListIssueNode(node: IssueTreeNode) {
+		const { issue, children } = node;
+		const assignee = issue.assigneeId
+			? assignableUserById.get(issue.assigneeId)
+			: null;
+		const progressLabel = formatChildProgress(issue);
+		const completionRate = roundCompletionRate(issue);
+
+		return (
+			<div
+				key={issue._id}
+				className={cn(
+					"issue-tree-node",
+					issue.parentIssueId ? "issue-tree-node-child" : "",
+				)}
+			>
+				<div
+					className={cn(
+						"issue-row issue-row-compact",
+						issue.parentIssueId ? "issue-row-subissue" : "",
+					)}
+				>
+					<Link
+						to="/issues/$issueId"
+						params={{ issueId: issue._id }}
+						className="issue-row-main no-underline"
+					>
+						<div className="min-w-0">
+							<div className="flex min-w-0 items-center gap-2">
+								<Badge className="issue-row-id-badge">
+									#{issue.issueNumber}
+								</Badge>
+								<p className="m-0 truncate whitespace-nowrap text-sm font-medium text-[var(--text)]">
+									{issue.title}
+								</p>
+								{issue.parentIssueId ? (
+									<Badge className="issue-hierarchy-badge">Sub-issue</Badge>
+								) : null}
+							</div>
+							<p className="m-0 truncate whitespace-nowrap text-xs text-[var(--muted-text)]">
+								{issue.description?.trim() || "No description"}
+							</p>
+							{progressLabel ? (
+								<div className="issue-progress-inline">
+									<div className="issue-progress-bar" aria-hidden="true">
+										<div
+											className="issue-progress-bar-fill"
+											style={{ width: `${completionRate}%` }}
+										/>
+									</div>
+									<span className="issue-progress-text">
+										{progressLabel} ({completionRate}%)
+									</span>
+								</div>
+							) : null}
+						</div>
+					</Link>
+
+					<div className="issue-row-col issue-row-col-assignee">
+						{canWrite ? (
+							<InlineSelectTrigger
+								ariaLabel="Assign issue"
+								value={issue.assigneeId ?? ""}
+								onChange={(nextAssigneeId) => {
+									void updateIssue({
+										issueId: issue._id,
+										assigneeId: (nextAssigneeId || null) as Id<"users"> | null,
+									});
+								}}
+								options={[
+									{ value: "", label: "Unassigned" },
+									...(assignableUsers ?? []).map((user) => ({
+										value: user._id,
+										label: user.name,
+									})),
+								]}
+								className="issue-inline-select-assignee"
+							>
+								<AssigneeAvatar
+									name={assignee?.name}
+									imageUrl={assignee?.imageUrl}
+									unassigned={!assignee}
+								/>
+							</InlineSelectTrigger>
+						) : (
+							<AssigneeAvatar
+								name={assignee?.name}
+								imageUrl={assignee?.imageUrl}
+								unassigned={!assignee}
+							/>
+						)}
+					</div>
+
+					<div className="issue-row-col issue-row-col-due">
+						<Badge className="issue-row-badge">
+							{issue.dueDate ? formatDate(issue.dueDate) : "No due"}
+						</Badge>
+					</div>
+
+					<div className="issue-row-col issue-row-col-status">
+						{canWrite ? (
+							<InlineSelectTrigger
+								ariaLabel="Update status"
+								value={issue.status}
+								onChange={(nextStatus) => {
+									void handleIssueStatusChange(
+										issue,
+										nextStatus as (typeof ISSUE_STATUSES)[number],
+									);
+								}}
+								options={ISSUE_STATUSES.map((value) => ({
+									value,
+									label: issueStatusLabel[value],
+								}))}
+								className="issue-inline-select-full"
+							>
+								<span className="issue-row-badge-slot">
+									<IssueStatusBadge status={issue.status} />
+								</span>
+							</InlineSelectTrigger>
+						) : (
+							<span className="issue-row-badge-slot">
+								<IssueStatusBadge status={issue.status} />
+							</span>
+						)}
+					</div>
+
+					<div className="issue-row-col issue-row-col-priority">
+						{canWrite ? (
+							<InlineSelectTrigger
+								ariaLabel="Update priority"
+								value={issue.priority}
+								onChange={(nextPriority) => {
+									void updateIssue({
+										issueId: issue._id,
+										priority: nextPriority as (typeof ISSUE_PRIORITIES)[number],
+									});
+								}}
+								options={ISSUE_PRIORITIES.map((value) => ({
+									value,
+									label: issuePriorityLabel[value],
+								}))}
+								className="issue-inline-select-full"
+							>
+								<span className="issue-row-badge-slot">
+									<IssuePriorityBadge priority={issue.priority} />
+								</span>
+							</InlineSelectTrigger>
+						) : (
+							<span className="issue-row-badge-slot">
+								<IssuePriorityBadge priority={issue.priority} />
+							</span>
+						)}
+					</div>
+				</div>
+
+				{children.length ? (
+					<div className="issue-tree-children">
+						{children.map((childNode) => renderListIssueNode(childNode))}
+					</div>
+				) : null}
+			</div>
+		);
+	}
+
+	function renderKanbanIssueNode(node: IssueTreeNode) {
+		const { issue, children } = node;
+		const assignee = issue.assigneeId
+			? assignableUserById.get(issue.assigneeId)
+			: null;
+		const progressLabel = formatChildProgress(issue);
+		const completionRate = roundCompletionRate(issue);
+
+		return (
+			<div
+				key={issue._id}
+				className={cn(
+					"kanban-tree-node",
+					issue.parentIssueId ? "kanban-tree-node-child" : "",
+				)}
+			>
+				<article
+					aria-label={`Issue ${issue.issueNumber}`}
+					className={cn(
+						"kanban-card",
+						issue.parentIssueId ? "kanban-card-subissue" : "",
+						draggingIssueId === issue._id ? "kanban-card-dragging" : "",
+					)}
+					draggable={canWrite}
+					onDragStart={(event) => handleKanbanDragStart(event, issue)}
+					onDragEnd={handleKanbanDragEnd}
+				>
+					<Link
+						to="/issues/$issueId"
+						params={{ issueId: issue._id }}
+						className="kanban-card-link no-underline"
+					>
+						<div className="flex items-center gap-2">
+							<Badge className="issue-row-id-badge">#{issue.issueNumber}</Badge>
+							<p className="m-0 truncate text-sm font-medium text-[var(--text)]">
+								{issue.title}
+							</p>
+						</div>
+						<p className="m-0 mt-1 truncate text-xs text-[var(--muted-text)]">
+							{issue.description?.trim() || "No description"}
+						</p>
+						<div className="mt-2 flex flex-wrap items-center gap-1.5">
+							{issue.parentIssueId ? (
+								<Badge className="issue-hierarchy-badge">Sub-issue</Badge>
+							) : null}
+							{progressLabel ? (
+								<Badge className="issue-progress-badge">
+									{progressLabel} ({completionRate}%)
+								</Badge>
+							) : null}
+						</div>
+						{progressLabel ? (
+							<div className="issue-progress-inline mt-2">
+								<div className="issue-progress-bar" aria-hidden="true">
+									<div
+										className="issue-progress-bar-fill"
+										style={{ width: `${completionRate}%` }}
+									/>
+								</div>
+							</div>
+						) : null}
+					</Link>
+
+					<div className="mt-2 flex items-center justify-between gap-2">
+						<div className="flex items-center gap-1.5">
+							<AssigneeAvatar
+								name={assignee?.name}
+								imageUrl={assignee?.imageUrl}
+								unassigned={!assignee}
+							/>
+							{issue.dueDate ? (
+								<Badge className="px-1.5 py-0 text-[10px]">
+									{formatDate(issue.dueDate)}
+								</Badge>
+							) : null}
+						</div>
+						<IssuePriorityBadge priority={issue.priority} />
+					</div>
+				</article>
+
+				{children.length ? (
+					<div className="kanban-subcards">
+						{children.map((childNode) => renderKanbanIssueNode(childNode))}
+					</div>
+				) : null}
+			</div>
+		);
 	}
 
 	return (
@@ -980,6 +1472,7 @@ function ProjectDetailPage() {
 								variant="secondary"
 								onClick={() => {
 									setCreateError(null);
+									setIssueForm(createIssueDraft());
 									setCreateOpen(true);
 								}}
 							>
@@ -1074,6 +1567,9 @@ function ProjectDetailPage() {
 				<p className="mb-4 text-sm text-[var(--muted-text)]">
 					{importExportMessage}
 				</p>
+			) : null}
+			{statusUpdateError ? (
+				<p className="mb-4 text-sm text-[var(--danger)]">{statusUpdateError}</p>
 			) : null}
 
 			{editingProject ? (
@@ -1372,145 +1868,7 @@ function ProjectDetailPage() {
 												<Badge>{group.items.length}</Badge>
 											</div>
 
-											{group.items.map((issue) => {
-												const assignee = issue.assigneeId
-													? assignableUserById.get(issue.assigneeId)
-													: null;
-
-												return (
-													<div
-														key={issue._id}
-														className="issue-row issue-row-compact"
-													>
-														<Link
-															to="/issues/$issueId"
-															params={{ issueId: issue._id }}
-															className="issue-row-main no-underline"
-														>
-															<div className="min-w-0">
-																<div className="flex min-w-0 items-center gap-2">
-																	<Badge className="issue-row-id-badge">
-																		#{issue.issueNumber}
-																	</Badge>
-																	<p className="m-0 truncate whitespace-nowrap text-sm font-medium text-[var(--text)]">
-																		{issue.title}
-																	</p>
-																</div>
-																<p className="m-0 truncate whitespace-nowrap text-xs text-[var(--muted-text)]">
-																	{issue.description?.trim() ||
-																		"No description"}
-																</p>
-															</div>
-														</Link>
-
-														<div className="issue-row-col issue-row-col-assignee">
-															{canWrite ? (
-																<InlineSelectTrigger
-																	ariaLabel="Assign issue"
-																	value={issue.assigneeId ?? ""}
-																	onChange={(nextAssigneeId) => {
-																		void updateIssue({
-																			issueId: issue._id,
-																			assigneeId: (nextAssigneeId ||
-																				null) as Id<"users"> | null,
-																		});
-																	}}
-																	options={[
-																		{ value: "", label: "Unassigned" },
-																		...(assignableUsers ?? []).map((user) => ({
-																			value: user._id,
-																			label: user.name,
-																		})),
-																	]}
-																	className="issue-inline-select-assignee"
-																>
-																	<AssigneeAvatar
-																		name={assignee?.name}
-																		imageUrl={assignee?.imageUrl}
-																		unassigned={!assignee}
-																	/>
-																</InlineSelectTrigger>
-															) : (
-																<AssigneeAvatar
-																	name={assignee?.name}
-																	imageUrl={assignee?.imageUrl}
-																	unassigned={!assignee}
-																/>
-															)}
-														</div>
-
-														<div className="issue-row-col issue-row-col-due">
-															<Badge className="issue-row-badge">
-																{issue.dueDate
-																	? formatDate(issue.dueDate)
-																	: "No due"}
-															</Badge>
-														</div>
-
-														<div className="issue-row-col issue-row-col-status">
-															{canWrite ? (
-																<InlineSelectTrigger
-																	ariaLabel="Update status"
-																	value={issue.status}
-																	onChange={(nextStatus) => {
-																		void updateIssue({
-																			issueId: issue._id,
-																			status:
-																				nextStatus as (typeof ISSUE_STATUSES)[number],
-																		});
-																	}}
-																	options={ISSUE_STATUSES.map((value) => ({
-																		value,
-																		label: issueStatusLabel[value],
-																	}))}
-																	className="issue-inline-select-full"
-																>
-																	<span className="issue-row-badge-slot">
-																		<IssueStatusBadge status={issue.status} />
-																	</span>
-																</InlineSelectTrigger>
-															) : (
-																<span className="issue-row-badge-slot">
-																	<IssueStatusBadge status={issue.status} />
-																</span>
-															)}
-														</div>
-
-														<div className="issue-row-col issue-row-col-priority">
-															{canWrite ? (
-																<InlineSelectTrigger
-																	ariaLabel="Update priority"
-																	value={issue.priority}
-																	onChange={(nextPriority) => {
-																		void updateIssue({
-																			issueId: issue._id,
-																			priority:
-																				nextPriority as (typeof ISSUE_PRIORITIES)[number],
-																		});
-																	}}
-																	options={ISSUE_PRIORITIES.map((value) => ({
-																		value,
-																		label: issuePriorityLabel[value],
-																	}))}
-																	className="issue-inline-select-full"
-																>
-																	<span className="issue-row-badge-slot">
-																		<IssuePriorityBadge
-																			priority={issue.priority}
-																		/>
-																	</span>
-																</InlineSelectTrigger>
-															) : (
-																<span className="issue-row-badge-slot">
-																	<IssuePriorityBadge
-																		priority={issue.priority}
-																	/>
-																</span>
-															)}
-														</div>
-													</div>
-												);
-											})}
+											{group.tree.map((node) => renderListIssueNode(node))}
 										</div>
 									))}
 									{issues && issues.length === 0 ? (
@@ -1551,66 +1909,7 @@ function ProjectDetailPage() {
 											</div>
 											<div className="kanban-column-body">
 												{column.items.length ? (
-													column.items.map((issue) => {
-														const assignee = issue.assigneeId
-															? assignableUserById.get(issue.assigneeId)
-															: null;
-
-														return (
-															<article
-																key={issue._id}
-																aria-label={`Issue ${issue.issueNumber}`}
-																className={cn(
-																	"kanban-card",
-																	draggingIssueId === issue._id
-																		? "kanban-card-dragging"
-																		: "",
-																)}
-																draggable={canWrite}
-																onDragStart={(event) =>
-																	handleKanbanDragStart(event, issue)
-																}
-																onDragEnd={handleKanbanDragEnd}
-															>
-																<Link
-																	to="/issues/$issueId"
-																	params={{ issueId: issue._id }}
-																	className="kanban-card-link no-underline"
-																>
-																	<div className="flex items-center gap-2">
-																		<Badge className="issue-row-id-badge">
-																			#{issue.issueNumber}
-																		</Badge>
-																		<p className="m-0 truncate text-sm font-medium text-[var(--text)]">
-																			{issue.title}
-																		</p>
-																	</div>
-																	<p className="m-0 mt-1 truncate text-xs text-[var(--muted-text)]">
-																		{issue.description?.trim() ||
-																			"No description"}
-																	</p>
-																</Link>
-
-																<div className="mt-2 flex items-center justify-between gap-2">
-																	<div className="flex items-center gap-1.5">
-																		<AssigneeAvatar
-																			name={assignee?.name}
-																			imageUrl={assignee?.imageUrl}
-																			unassigned={!assignee}
-																		/>
-																		{issue.dueDate ? (
-																			<Badge className="px-1.5 py-0 text-[10px]">
-																				{formatDate(issue.dueDate)}
-																			</Badge>
-																		) : null}
-																	</div>
-																	<IssuePriorityBadge
-																		priority={issue.priority}
-																	/>
-																</div>
-															</article>
-														);
-													})
+													column.tree.map((node) => renderKanbanIssueNode(node))
 												) : (
 													<p className="kanban-empty">
 														No issues in this status.
@@ -1888,6 +2187,7 @@ function ProjectDetailPage() {
 								variant="ghost"
 								onClick={() => {
 									setCreateError(null);
+									setIssueForm(createIssueDraft());
 									setCreateOpen(false);
 								}}
 							>
@@ -1930,7 +2230,8 @@ function ProjectDetailPage() {
 									onChange={(event) =>
 										setIssueForm((prev) => ({
 											...prev,
-											status: event.target.value,
+											status: event.target
+												.value as (typeof ISSUE_STATUSES)[number],
 										}))
 									}
 								>
@@ -1948,7 +2249,8 @@ function ProjectDetailPage() {
 									onChange={(event) =>
 										setIssueForm((prev) => ({
 											...prev,
-											priority: event.target.value,
+											priority: event.target
+												.value as (typeof ISSUE_PRIORITIES)[number],
 										}))
 									}
 								>
@@ -1974,6 +2276,50 @@ function ProjectDetailPage() {
 									{(issueLists ?? []).map((list) => (
 										<option key={list._id} value={list._id}>
 											{list.name}
+										</option>
+									))}
+								</Select>
+							</div>
+							<div>
+								<Label>Parent Issue</Label>
+								<Select
+									value={issueForm.parentIssueId}
+									onChange={(event) => {
+										const nextParentIssueId = event.target.value;
+										const parentIssue = nextParentIssueId
+											? projectIssueById.get(nextParentIssueId as Id<"issues">)
+											: null;
+
+										setIssueForm((prev) => ({
+											...prev,
+											parentIssueId: nextParentIssueId,
+											listId:
+												prev.listId || !parentIssue?.listId
+													? prev.listId
+													: parentIssue.listId,
+											status:
+												prev.status === "todo" && parentIssue
+													? parentIssue.status
+													: prev.status,
+											priority:
+												prev.priority === "none" && parentIssue
+													? parentIssue.priority
+													: prev.priority,
+											assigneeId:
+												prev.assigneeId || !parentIssue?.assigneeId
+													? prev.assigneeId
+													: parentIssue.assigneeId,
+											dueDate:
+												prev.dueDate || !parentIssue?.dueDate
+													? prev.dueDate
+													: formatIssueInputDate(parentIssue.dueDate),
+										}));
+									}}
+								>
+									<option value="">No parent</option>
+									{parentIssueOptions.map((issue) => (
+										<option key={issue.value} value={issue.value}>
+											{issue.label}
 										</option>
 									))}
 								</Select>
@@ -2033,6 +2379,7 @@ function ProjectDetailPage() {
 									variant="ghost"
 									onClick={() => {
 										setCreateError(null);
+										setIssueForm(createIssueDraft());
 										setCreateOpen(false);
 									}}
 								>
@@ -2082,6 +2429,22 @@ function ProjectDetailPage() {
 				isConfirming={isTogglingArchive}
 				onCancel={() => setIsArchiveConfirmOpen(false)}
 				onConfirm={confirmArchiveToggle}
+			/>
+
+			<ConfirmDialog
+				open={Boolean(completionConfirm)}
+				title="Complete parent issue and sub-issues"
+				description={
+					completionConfirm
+						? `"${completionConfirm.title}" still has ${completionConfirm.unfinishedDescendantCount} unfinished sub-issue${completionConfirm.unfinishedDescendantCount === 1 ? "" : "s"}. Mark all descendants as done too?`
+						: ""
+				}
+				confirmLabel="Mark all done"
+				confirmingLabel="Updating..."
+				confirmVariant="primary"
+				isConfirming={isCompletingIssueTree}
+				onCancel={() => setCompletionConfirm(null)}
+				onConfirm={confirmCascadeCompletion}
 			/>
 		</div>
 	);

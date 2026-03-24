@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
-import type { Id } from './_generated/dataModel'
+import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
 import { issuePriorityValidator, issueStatusValidator } from './constants'
 import {
@@ -14,6 +14,61 @@ import { createActivity } from './lib/activity'
 
 function buildSearchText(title: string, description?: string) {
   return `${title} ${description ?? ''}`.trim().toLowerCase()
+}
+
+type IssueProgress = {
+  childIssueCount: number
+  completedChildIssueCount: number
+  childCompletionRate: number
+  hasChildren: boolean
+}
+
+function buildIssueProgressMap(issues: Doc<'issues'>[]) {
+  const childrenByParent = new Map<string, Doc<'issues'>[]>()
+
+  for (const issue of issues) {
+    if (!issue.parentIssueId) {
+      continue
+    }
+
+    const siblings = childrenByParent.get(issue.parentIssueId) ?? []
+    siblings.push(issue)
+    childrenByParent.set(issue.parentIssueId, siblings)
+  }
+
+  const progressByIssueId = new Map<string, IssueProgress>()
+  for (const issue of issues) {
+    const childIssues = childrenByParent.get(issue._id) ?? []
+    const completedChildIssueCount = childIssues.filter(
+      (childIssue) => childIssue.status === 'done',
+    ).length
+
+    progressByIssueId.set(issue._id, {
+      childIssueCount: childIssues.length,
+      completedChildIssueCount,
+      childCompletionRate: childIssues.length
+        ? completedChildIssueCount / childIssues.length
+        : 0,
+      hasChildren: childIssues.length > 0,
+    })
+  }
+
+  return progressByIssueId
+}
+
+function decorateIssueWithProgress(
+  issue: Doc<'issues'>,
+  progressByIssueId: Map<string, IssueProgress>,
+) {
+  return {
+    ...issue,
+    ...(progressByIssueId.get(issue._id) ?? {
+      childIssueCount: 0,
+      completedChildIssueCount: 0,
+      childCompletionRate: 0,
+      hasChildren: false,
+    }),
+  }
 }
 
 async function ensureAssigneeAllowed(
@@ -66,6 +121,149 @@ async function ensureIssueListBelongsToProject(
   return issueList
 }
 
+async function ensureParentIssueBelongsToProject(
+  ctx: MutationCtx,
+  projectId: Id<'projects'>,
+  parentIssueId: Id<'issues'>,
+) {
+  const parentIssue = await ctx.db.get(parentIssueId)
+  if (
+    !parentIssue ||
+    parentIssue.projectId !== projectId ||
+    parentIssue.deletedAt ||
+    parentIssue.archived
+  ) {
+    throw new ConvexError({
+      code: 'VALIDATION_ERROR',
+      message: 'Parent issue not found in this project.',
+    })
+  }
+
+  if (parentIssue.parentIssueId) {
+    throw new ConvexError({
+      code: 'VALIDATION_ERROR',
+      message: 'Only top-level issues can have sub-issues.',
+    })
+  }
+
+  return parentIssue
+}
+
+async function ensureIssueCanBecomeChild(ctx: MutationCtx, issue: Doc<'issues'>) {
+  const childIssues = await ctx.db
+    .query('issues')
+    .withIndex('by_parentIssueId', (q) => q.eq('parentIssueId', issue._id))
+    .collect()
+
+  const hasVisibleChildren = childIssues.some(
+    (childIssue) => !childIssue.deletedAt && !childIssue.archived,
+  )
+  if (hasVisibleChildren) {
+    throw new ConvexError({
+      code: 'VALIDATION_ERROR',
+      message: 'An issue with sub-issues cannot be converted into a child issue.',
+    })
+  }
+}
+
+async function ensureNoIssueCycle(
+  ctx: MutationCtx,
+  issueId: Id<'issues'>,
+  parentIssueId: Id<'issues'>,
+) {
+  if (issueId === parentIssueId) {
+    throw new ConvexError({
+      code: 'VALIDATION_ERROR',
+      message: 'An issue cannot be its own parent.',
+    })
+  }
+
+  let cursor: Id<'issues'> | undefined = parentIssueId
+  while (cursor) {
+    if (cursor === issueId) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'This parent issue would create a cycle.',
+      })
+    }
+
+    const currentIssue: Doc<'issues'> | null = await ctx.db.get(cursor)
+    cursor = currentIssue?.parentIssueId
+  }
+}
+
+async function collectIssueDescendants(
+  ctx: MutationCtx,
+  projectId: Id<'projects'>,
+  rootIssueId: Id<'issues'>,
+) {
+  const issues = await ctx.db
+    .query('issues')
+    .withIndex('by_projectId', (q) => q.eq('projectId', projectId))
+    .collect()
+
+  const descendantsByParent = new Map<string, Id<'issues'>[]>()
+  for (const issue of issues) {
+    if (!issue.parentIssueId || issue.deletedAt) {
+      continue
+    }
+
+    const siblings = descendantsByParent.get(issue.parentIssueId) ?? []
+    siblings.push(issue._id)
+    descendantsByParent.set(issue.parentIssueId, siblings)
+  }
+
+  const issueIds: Id<'issues'>[] = []
+  const queue: Id<'issues'>[] = [rootIssueId]
+  const visited = new Set<string>()
+
+  while (queue.length) {
+    const currentIssueId = queue.shift()
+    if (!currentIssueId || visited.has(currentIssueId)) {
+      continue
+    }
+
+    visited.add(currentIssueId)
+    issueIds.push(currentIssueId)
+    queue.push(...(descendantsByParent.get(currentIssueId) ?? []))
+  }
+
+  return issueIds
+}
+
+async function getVisibleIssueDescendants(
+  ctx: MutationCtx,
+  projectId: Id<'projects'>,
+  rootIssueId: Id<'issues'>,
+) {
+  const descendantIds = await collectIssueDescendants(ctx, projectId, rootIssueId)
+  const descendants = (
+    await Promise.all(descendantIds.map((issueId) => ctx.db.get(issueId)))
+  ).filter((issue): issue is Doc<'issues'> => Boolean(issue))
+
+  return descendants.filter((issue) => !issue.deletedAt && !issue.archived)
+}
+
+async function getVisibleIssueAncestors(
+  ctx: MutationCtx,
+  issue: Doc<'issues'>,
+) {
+  const ancestors: Doc<'issues'>[] = []
+  let cursor = issue.parentIssueId
+
+  while (cursor) {
+    const parentIssue = await ctx.db.get(cursor)
+    if (!parentIssue || parentIssue.deletedAt || parentIssue.archived) {
+      break
+    }
+
+    ancestors.push(parentIssue)
+    cursor = parentIssue.parentIssueId
+  }
+
+  return ancestors
+}
+
 export const listByProject = query({
   args: {
     projectId: v.id('projects'),
@@ -90,23 +288,21 @@ export const listByProject = query({
   handler: async (ctx, args) => {
     const { user } = await requireProjectViewAccess(ctx, args.projectId)
 
-    let issues
-    if (args.search?.trim() && !args.includeArchived) {
-      issues = await ctx.db
-        .query('issues')
-        .withSearchIndex('search_text', (q) =>
-          q
-            .search('searchText', args.search!.trim().toLowerCase())
-            .eq('projectId', args.projectId)
-            .eq('archived', false),
-        )
-        .take(200)
-    } else {
-      issues = await ctx.db
-        .query('issues')
-        .withIndex('by_projectId', (q) => q.eq('projectId', args.projectId))
-        .collect()
-    }
+    const issues = await ctx.db
+      .query('issues')
+      .withIndex('by_projectId', (q) => q.eq('projectId', args.projectId))
+      .collect()
+
+    const progressSourceIssues = issues.filter((issue) => {
+      if (issue.deletedAt) {
+        return false
+      }
+      if (!args.includeArchived && issue.archived) {
+        return false
+      }
+      return true
+    })
+    const progressByIssueId = buildIssueProgressMap(progressSourceIssues)
 
     let rows = issues.filter((issue) => {
       if (!args.includeArchived && issue.archived) {
@@ -187,7 +383,7 @@ export const listByProject = query({
         break
     }
 
-    return rows
+    return rows.map((issue) => decorateIssueWithProgress(issue, progressByIssueId))
   },
 })
 
@@ -203,14 +399,49 @@ export const getById = query({
 
     const { project } = await requireProjectViewAccess(ctx, issue.projectId)
 
+    const projectIssues = await ctx.db
+      .query('issues')
+      .withIndex('by_projectId', (q) => q.eq('projectId', issue.projectId))
+      .collect()
+    const visibleIssues = projectIssues.filter(
+      (projectIssue) => !projectIssue.deletedAt && !projectIssue.archived,
+    )
+    const progressByIssueId = buildIssueProgressMap(visibleIssues)
+
     const assignee = issue.assigneeId ? await ctx.db.get(issue.assigneeId) : null
     const reporter = await ctx.db.get(issue.reporterId)
+    const parentIssue =
+      issue.parentIssueId && !issue.archived
+        ? projectIssues.find(
+            (projectIssue) =>
+              projectIssue._id === issue.parentIssueId &&
+              !projectIssue.deletedAt &&
+              !projectIssue.archived,
+          ) ?? null
+        : null
+    const childIssues = (
+      await Promise.all(
+        visibleIssues
+          .filter((projectIssue) => projectIssue.parentIssueId === issue._id)
+          .sort((left, right) => left.issueNumber - right.issueNumber)
+          .map(async (childIssue) => ({
+            issue: decorateIssueWithProgress(childIssue, progressByIssueId),
+            assignee: childIssue.assigneeId
+              ? await ctx.db.get(childIssue.assigneeId)
+              : null,
+          })),
+      )
+    ).filter((row) => row.issue)
 
     return {
-      issue,
+      issue: decorateIssueWithProgress(issue, progressByIssueId),
       project,
       assignee,
       reporter,
+      parentIssue: parentIssue
+        ? decorateIssueWithProgress(parentIssue, progressByIssueId)
+        : null,
+      childIssues,
     }
   },
 })
@@ -224,6 +455,7 @@ export const create = mutation({
     priority: v.optional(issuePriorityValidator),
     assigneeId: v.optional(v.id('users')),
     listId: v.optional(v.id('issueLists')),
+    parentIssueId: v.optional(v.id('issues')),
     labels: v.optional(v.array(v.string())),
     dueDate: v.optional(v.number()),
   },
@@ -235,6 +467,13 @@ export const create = mutation({
     }
     if (args.listId) {
       await ensureIssueListBelongsToProject(ctx, args.projectId, args.listId)
+    }
+    if (args.parentIssueId) {
+      await ensureParentIssueBelongsToProject(
+        ctx,
+        args.projectId,
+        args.parentIssueId,
+      )
     }
 
     const now = Date.now()
@@ -272,6 +511,7 @@ export const create = mutation({
       description: args.description?.trim(),
       searchText: buildSearchText(args.title, args.description),
       listId: args.listId,
+      parentIssueId: args.parentIssueId,
       status: args.status ?? 'todo',
       priority: args.priority ?? 'none',
       assigneeId: args.assigneeId,
@@ -299,6 +539,7 @@ export const create = mutation({
       metadata: {
         issueNumber,
         title: args.title,
+        parentIssueId: args.parentIssueId,
       },
     })
 
@@ -315,6 +556,8 @@ export const update = mutation({
     priority: v.optional(issuePriorityValidator),
     assigneeId: v.optional(v.union(v.id('users'), v.null())),
     listId: v.optional(v.union(v.id('issueLists'), v.null())),
+    parentIssueId: v.optional(v.union(v.id('issues'), v.null())),
+    cascadeDescendantsToDone: v.optional(v.boolean()),
     labels: v.optional(v.array(v.string())),
     dueDate: v.optional(v.union(v.number(), v.null())),
     archived: v.optional(v.boolean()),
@@ -334,6 +577,52 @@ export const update = mutation({
       patch.description = args.description.trim()
     }
     if (args.status !== undefined) {
+      if (args.status === 'done') {
+        const visibleDescendants = await getVisibleIssueDescendants(
+          ctx,
+          issue.projectId,
+          issue._id,
+        )
+        const unfinishedDescendants = visibleDescendants.filter(
+          (descendant) => descendant._id !== issue._id && descendant.status !== 'done',
+        )
+
+        if (
+          unfinishedDescendants.length > 0 &&
+          !args.cascadeDescendantsToDone
+        ) {
+          throw new ConvexError({
+            code: 'VALIDATION_ERROR',
+            message:
+              'This issue has unfinished sub-issues. Confirm to mark all descendants as done.',
+          })
+        }
+
+        if (args.cascadeDescendantsToDone) {
+          await Promise.all(
+            unfinishedDescendants.map((descendant) =>
+              ctx.db.patch(descendant._id, {
+                status: 'done',
+                completedAt: now,
+                updatedAt: now,
+              }),
+            ),
+          )
+        }
+      } else {
+        const visibleAncestors = await getVisibleIssueAncestors(ctx, issue)
+        const doneAncestor = visibleAncestors.find(
+          (ancestor) => ancestor.status === 'done',
+        )
+
+        if (doneAncestor) {
+          throw new ConvexError({
+            code: 'VALIDATION_ERROR',
+            message: `Cannot move this sub-issue out of done while parent issue #${doneAncestor.issueNumber} is still done. Reopen the parent first.`,
+          })
+        }
+      }
+
       patch.status = args.status
       patch.completedAt = args.status === 'done' ? now : undefined
     }
@@ -351,6 +640,18 @@ export const update = mutation({
         await ensureIssueListBelongsToProject(ctx, issue.projectId, args.listId)
       }
       patch.listId = args.listId ?? undefined
+    }
+    if (args.parentIssueId !== undefined) {
+      if (args.parentIssueId) {
+        await ensureParentIssueBelongsToProject(
+          ctx,
+          issue.projectId,
+          args.parentIssueId,
+        )
+        await ensureNoIssueCycle(ctx, issue._id, args.parentIssueId)
+        await ensureIssueCanBecomeChild(ctx, issue)
+      }
+      patch.parentIssueId = args.parentIssueId ?? undefined
     }
     if (args.labels !== undefined) {
       patch.labels = args.labels.map((label) => label.trim()).filter(Boolean)
@@ -457,11 +758,21 @@ export const remove = mutation({
     await requireProjectIssueDeleteAccess(ctx, issue.projectId)
 
     const now = Date.now()
-    await ctx.db.patch(args.issueId, {
-      deletedAt: now,
-      archived: true,
-      updatedAt: now,
-    })
+    const issueIdsToDelete = await collectIssueDescendants(
+      ctx,
+      issue.projectId,
+      args.issueId,
+    )
+
+    await Promise.all(
+      issueIdsToDelete.map((issueId) =>
+        ctx.db.patch(issueId, {
+          deletedAt: now,
+          archived: true,
+          updatedAt: now,
+        }),
+      ),
+    )
 
     await ctx.db.patch(issue.projectId, {
       updatedAt: now,
@@ -476,11 +787,13 @@ export const remove = mutation({
       action: 'issue.deleted',
       metadata: {
         issueNumber: issue.issueNumber,
+        deletedIssueCount: issueIdsToDelete.length,
       },
     })
 
     return {
       issueId: issue._id,
+      deletedIssueCount: issueIdsToDelete.length,
       deletedAt: now,
     }
   },

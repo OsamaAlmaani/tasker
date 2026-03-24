@@ -6,6 +6,7 @@ import {
 	History,
 	MessageSquare,
 	Pencil,
+	Plus,
 	Trash2,
 	X,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { Input } from "#/components/ui/input";
+import { Label } from "#/components/ui/label";
 import { Select } from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
@@ -25,7 +27,11 @@ import {
 	issuePriorityLabel,
 	issueStatusLabel,
 } from "#/features/tasker/model";
-import { commentFormSchema } from "#/features/tasker/validation";
+import {
+	commentFormSchema,
+	issueFormSchema,
+} from "#/features/tasker/validation";
+import { getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Doc, Id } from "#convex/_generated/dataModel";
 
@@ -76,6 +82,111 @@ type TimelineItem =
 			activity: Doc<"activities">;
 	  };
 
+type IssueDetailRow = Doc<"issues"> & {
+	childIssueCount: number;
+	completedChildIssueCount: number;
+	childCompletionRate: number;
+	hasChildren: boolean;
+};
+
+type DescendantStats = {
+	unfinishedDescendantCount: number;
+};
+
+function createSubIssueDraft(parentIssue?: IssueDetailRow) {
+	return {
+		title: "",
+		description: "",
+		status: parentIssue?.status ?? ("todo" as (typeof ISSUE_STATUSES)[number]),
+		priority:
+			parentIssue?.priority ?? ("none" as (typeof ISSUE_PRIORITIES)[number]),
+		assigneeId: parentIssue?.assigneeId ?? "",
+		listId: parentIssue?.listId ?? "",
+		parentIssueId: parentIssue?._id ?? "",
+		dueDate: parentIssue?.dueDate
+			? new Date(parentIssue.dueDate).toISOString().slice(0, 10)
+			: "",
+		labels: "",
+	};
+}
+
+function formatChildProgress(issue: IssueDetailRow) {
+	if (!issue.hasChildren) {
+		return null;
+	}
+
+	return `${issue.completedChildIssueCount}/${issue.childIssueCount} done`;
+}
+
+function roundCompletionRate(issue: IssueDetailRow) {
+	return Math.round(issue.childCompletionRate * 100);
+}
+
+function buildDescendantStats(rows: IssueDetailRow[]) {
+	const childrenByParent = new Map<string, IssueDetailRow[]>();
+
+	for (const issue of rows) {
+		if (!issue.parentIssueId) {
+			continue;
+		}
+
+		const children = childrenByParent.get(issue.parentIssueId) ?? [];
+		children.push(issue);
+		childrenByParent.set(issue.parentIssueId, children);
+	}
+
+	const statsByIssueId = new Map<string, DescendantStats>();
+
+	function visit(issueId: string): DescendantStats {
+		const cached = statsByIssueId.get(issueId);
+		if (cached) {
+			return cached;
+		}
+
+		const children = childrenByParent.get(issueId) ?? [];
+		let unfinishedDescendantCount = 0;
+
+		for (const child of children) {
+			if (child.status !== "done") {
+				unfinishedDescendantCount += 1;
+			}
+
+			unfinishedDescendantCount += visit(child._id).unfinishedDescendantCount;
+		}
+
+		const stats = { unfinishedDescendantCount };
+		statsByIssueId.set(issueId, stats);
+		return stats;
+	}
+
+	for (const issue of rows) {
+		visit(issue._id);
+	}
+
+	return statsByIssueId;
+}
+
+function findDoneAncestorIssue(
+	issue: IssueDetailRow,
+	issueById: Map<string, IssueDetailRow>,
+) {
+	let cursor = issue.parentIssueId;
+
+	while (cursor) {
+		const parentIssue = issueById.get(cursor);
+		if (!parentIssue) {
+			return null;
+		}
+		if (parentIssue.status === "done") {
+			return parentIssue;
+		}
+
+		cursor = parentIssue.parentIssueId;
+	}
+
+	return null;
+}
+
 function IssueDetailPage() {
 	const { issueId: issueIdParam } = Route.useParams();
 	const issueId = issueIdParam as Id<"issues">;
@@ -101,7 +212,14 @@ function IssueDetailPage() {
 		api.issueLists.listByProject,
 		issueProjectId ? { projectId: issueProjectId } : "skip",
 	);
+	const projectIssues = useQuery(
+		api.issues.listByProject,
+		issueProjectId
+			? { projectId: issueProjectId, sortBy: "created_desc" }
+			: "skip",
+	);
 
+	const createIssue = useMutation(api.issues.create);
 	const updateIssue = useMutation(api.issues.update);
 	const deleteIssue = useMutation(api.issues.remove);
 	const createComment = useMutation(api.comments.create);
@@ -117,12 +235,32 @@ function IssueDetailPage() {
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
+	const [statusUpdateError, setStatusUpdateError] = useState<string | null>(
+		null,
+	);
+	const [subIssueFormOpen, setSubIssueFormOpen] = useState(false);
+	const [subIssueError, setSubIssueError] = useState<string | null>(null);
+	const [subIssueForm, setSubIssueForm] = useState(createSubIssueDraft());
+	const [completionConfirm, setCompletionConfirm] = useState<{
+		issueId: Id<"issues">;
+		title: string;
+		unfinishedDescendantCount: number;
+	} | null>(null);
+	const [isCompletingIssueTree, setIsCompletingIssueTree] = useState(false);
 
 	const canWrite = me?.globalRole === "admin" || me?.globalRole === "member";
 
 	const commentRows = useMemo<CommentRow[]>(
 		() => (commentsData?.comments ?? []) as CommentRow[],
 		[commentsData?.comments],
+	);
+	const descendantStatsByIssueId = useMemo(
+		() => buildDescendantStats((projectIssues ?? []) as IssueDetailRow[]),
+		[projectIssues],
+	);
+	const projectIssueById = useMemo(
+		() => new Map((projectIssues ?? []).map((issue) => [issue._id, issue])),
+		[projectIssues],
 	);
 	const timelineItems = useMemo<TimelineItem[]>(() => {
 		const commentItems: TimelineItem[] = commentRows.map((row) => ({
@@ -170,7 +308,9 @@ function IssueDetailPage() {
 		);
 	}
 	const projectId = issueData.project._id;
+	const currentIssue = issueData.issue;
 	const canDeleteIssue = canWrite && issueData.project.allowIssueDelete;
+	const childIssueRows = issueData.childIssues ?? [];
 
 	function goBack() {
 		if (typeof window !== "undefined" && window.history.length > 1) {
@@ -215,9 +355,10 @@ function IssueDetailPage() {
 			});
 		} catch (error) {
 			setDeleteError(
-				error instanceof Error
-					? error.message
-					: "Issue deletion is not allowed for this project.",
+				getClientErrorMessage(
+					error,
+					"Issue deletion is not allowed for this project.",
+				),
 			);
 		} finally {
 			setIsDeleting(false);
@@ -227,7 +368,7 @@ function IssueDetailPage() {
 
 	async function saveTitle() {
 		const nextTitle = titleDraft.trim();
-		if (!nextTitle || nextTitle === issueData.issue.title) {
+		if (!nextTitle || nextTitle === currentIssue.title) {
 			setEditingTitle(false);
 			return;
 		}
@@ -237,6 +378,119 @@ function IssueDetailPage() {
 			title: nextTitle,
 		});
 		setEditingTitle(false);
+	}
+
+	async function submitSubIssue(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		setSubIssueError(null);
+
+		const parsed = issueFormSchema.safeParse(subIssueForm);
+		if (!parsed.success) {
+			setSubIssueError(
+				parsed.error.issues[0]?.message ?? "Sub-issue form is invalid.",
+			);
+			return;
+		}
+
+		try {
+			await createIssue({
+				projectId,
+				title: parsed.data.title,
+				description: parsed.data.description,
+				status: parsed.data.status,
+				priority: parsed.data.priority,
+				assigneeId: (parsed.data.assigneeId || undefined) as
+					| Id<"users">
+					| undefined,
+				listId: (parsed.data.listId || undefined) as
+					| Id<"issueLists">
+					| undefined,
+				parentIssueId: issueId,
+				dueDate: parsed.data.dueDate
+					? new Date(parsed.data.dueDate).getTime()
+					: undefined,
+				labels: parsed.data.labels
+					? parsed.data.labels
+							.split(",")
+							.map((item) => item.trim())
+							.filter(Boolean)
+					: undefined,
+			});
+			setSubIssueForm(createSubIssueDraft(currentIssue));
+			setSubIssueFormOpen(false);
+		} catch (error) {
+			setSubIssueError(
+				getClientErrorMessage(error, "Failed to create sub-issue."),
+			);
+		}
+	}
+
+	async function handleIssueStatusChange(
+		issue: IssueDetailRow,
+		nextStatus: (typeof ISSUE_STATUSES)[number],
+	) {
+		setStatusUpdateError(null);
+
+		try {
+			if (nextStatus !== "done") {
+				const doneAncestor = findDoneAncestorIssue(issue, projectIssueById);
+				if (doneAncestor) {
+					setStatusUpdateError(
+						`Cannot move this sub-issue out of done while parent issue #${doneAncestor.issueNumber} is still done. Reopen the parent first.`,
+					);
+					return;
+				}
+
+				await updateIssue({
+					issueId: issue._id,
+					status: nextStatus,
+				});
+				return;
+			}
+
+			const unfinishedDescendantCount =
+				descendantStatsByIssueId.get(issue._id)?.unfinishedDescendantCount ?? 0;
+			if (unfinishedDescendantCount > 0) {
+				setCompletionConfirm({
+					issueId: issue._id,
+					title: issue.title,
+					unfinishedDescendantCount,
+				});
+				return;
+			}
+
+			await updateIssue({
+				issueId: issue._id,
+				status: nextStatus,
+			});
+		} catch (error) {
+			setStatusUpdateError(
+				getClientErrorMessage(error, "Failed to update issue status."),
+			);
+		}
+	}
+
+	async function confirmCascadeCompletion() {
+		if (!completionConfirm) {
+			return;
+		}
+
+		setIsCompletingIssueTree(true);
+		try {
+			setStatusUpdateError(null);
+			await updateIssue({
+				issueId: completionConfirm.issueId,
+				status: "done",
+				cascadeDescendantsToDone: true,
+			});
+			setCompletionConfirm(null);
+		} catch (error) {
+			setStatusUpdateError(
+				getClientErrorMessage(error, "Failed to update issue status."),
+			);
+		} finally {
+			setIsCompletingIssueTree(false);
+		}
 	}
 
 	return (
@@ -278,9 +532,42 @@ function IssueDetailPage() {
 			{deleteError ? (
 				<p className="mb-3 mt-0 text-sm text-[var(--danger)]">{deleteError}</p>
 			) : null}
+			{statusUpdateError ? (
+				<p className="mb-3 mt-0 text-sm text-[var(--danger)]">
+					{statusUpdateError}
+				</p>
+			) : null}
 
 			<div className="issue-detail-layout">
 				<div className="issue-detail-main">
+					{issueData.parentIssue ? (
+						<section className="issue-overview-block">
+							<div className="issue-overview-toolbar">
+								<span className="issue-overview-kicker">Parent Issue</span>
+							</div>
+							<Link
+								to="/issues/$issueId"
+								params={{ issueId: issueData.parentIssue._id }}
+								className="issue-related-link no-underline"
+							>
+								<div className="flex items-center gap-2">
+									<Badge className="issue-row-id-badge">
+										#{issueData.parentIssue.issueNumber}
+									</Badge>
+									<p className="m-0 text-sm font-medium text-[var(--text)]">
+										{issueData.parentIssue.title}
+									</p>
+								</div>
+								<div className="mt-2 flex items-center gap-2">
+									<Badge className="issue-hierarchy-badge">Parent</Badge>
+									<Badge>
+										{issueStatusLabel[issueData.parentIssue.status]}
+									</Badge>
+								</div>
+							</Link>
+						</section>
+					) : null}
+
 					<section className="issue-overview-block">
 						<div className="issue-overview-toolbar">
 							<span className="issue-overview-kicker">Title</span>
@@ -328,9 +615,39 @@ function IssueDetailPage() {
 								</div>
 							</form>
 						) : (
-							<h1 className="m-0 text-4xl font-bold leading-tight tracking-[-0.02em] text-[var(--text)]">
-								{issueData.issue.title}
-							</h1>
+							<div className="space-y-3">
+								<h1 className="m-0 text-4xl font-bold leading-tight tracking-[-0.02em] text-[var(--text)]">
+									{issueData.issue.title}
+								</h1>
+								{issueData.issue.parentIssueId ? (
+									<div>
+										<Badge className="issue-hierarchy-badge">Sub-issue</Badge>
+									</div>
+								) : null}
+								{issueData.issue.hasChildren ? (
+									<div className="issue-progress-panel">
+										<div className="flex items-center justify-between gap-3">
+											<span className="issue-progress-text">
+												Sub-issue progress
+											</span>
+											<span className="issue-progress-text">
+												{formatChildProgress(issueData.issue as IssueDetailRow)}{" "}
+												(
+												{roundCompletionRate(issueData.issue as IssueDetailRow)}
+												%)
+											</span>
+										</div>
+										<div className="issue-progress-bar" aria-hidden="true">
+											<div
+												className="issue-progress-bar-fill"
+												style={{
+													width: `${roundCompletionRate(issueData.issue as IssueDetailRow)}%`,
+												}}
+											/>
+										</div>
+									</div>
+								) : null}
+							</div>
 						)}
 					</section>
 
@@ -387,6 +704,237 @@ function IssueDetailPage() {
 							</p>
 						)}
 					</section>
+
+					{!currentIssue.parentIssueId ? (
+						<Card className="issue-subissues-card">
+							<CardHeader className="pb-2">
+								<div className="flex items-center justify-between gap-3">
+									<CardTitle className="text-base">
+										Sub-issues ({childIssueRows.length})
+									</CardTitle>
+									{canWrite ? (
+										<Button
+											type="button"
+											size="sm"
+											variant={subIssueFormOpen ? "ghost" : "secondary"}
+											onClick={() => {
+												setSubIssueError(null);
+												setSubIssueForm(createSubIssueDraft(issueData.issue));
+												setSubIssueFormOpen((current) => !current);
+											}}
+										>
+											<Plus className="mr-1.5 h-3.5 w-3.5" />
+											{subIssueFormOpen ? "Close" : "Add sub-issue"}
+										</Button>
+									) : null}
+								</div>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								{childIssueRows.length ? (
+									<div className="issue-tree-children issue-tree-list">
+										{childIssueRows.map((row) => (
+											<div
+												key={row.issue._id}
+												className="issue-tree-node issue-tree-node-child"
+											>
+												<Link
+													to="/issues/$issueId"
+													params={{ issueId: row.issue._id }}
+													className="issue-related-link no-underline"
+												>
+													<div className="flex items-center gap-2">
+														<Badge className="issue-row-id-badge">
+															#{row.issue.issueNumber}
+														</Badge>
+														<p className="m-0 text-sm font-medium text-[var(--text)]">
+															{row.issue.title}
+														</p>
+														<Badge className="issue-hierarchy-badge">
+															Sub-issue
+														</Badge>
+													</div>
+													<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
+														{row.issue.description?.trim() || "No description"}
+													</p>
+													<div className="mt-2 flex flex-wrap items-center gap-2">
+														<Badge>{issueStatusLabel[row.issue.status]}</Badge>
+														<Badge>
+															{issuePriorityLabel[row.issue.priority]}
+														</Badge>
+														{row.assignee ? (
+															<Badge>{row.assignee.name}</Badge>
+														) : null}
+														{row.issue.hasChildren ? (
+															<Badge className="issue-progress-badge">
+																{formatChildProgress(row.issue)} (
+																{roundCompletionRate(row.issue)}%)
+															</Badge>
+														) : null}
+													</div>
+												</Link>
+											</div>
+										))}
+									</div>
+								) : (
+									<p className="m-0 text-sm text-[var(--muted-text)]">
+										No sub-issues yet.
+									</p>
+								)}
+
+								{subIssueFormOpen ? (
+									<form
+										onSubmit={submitSubIssue}
+										className="grid gap-3 border-t border-[var(--line)] pt-4 md:grid-cols-2"
+									>
+										<div className="md:col-span-2">
+											<Label>Title</Label>
+											<Input
+												value={subIssueForm.title}
+												onChange={(event) =>
+													setSubIssueForm((prev) => ({
+														...prev,
+														title: event.target.value,
+													}))
+												}
+											/>
+										</div>
+										<div className="md:col-span-2">
+											<Label>Description</Label>
+											<Textarea
+												value={subIssueForm.description}
+												onChange={(event) =>
+													setSubIssueForm((prev) => ({
+														...prev,
+														description: event.target.value,
+													}))
+												}
+											/>
+										</div>
+										<div>
+											<Label>Status</Label>
+											<Select
+												value={subIssueForm.status}
+												onChange={(event) =>
+													setSubIssueForm((prev) => ({
+														...prev,
+														status: event.target
+															.value as (typeof ISSUE_STATUSES)[number],
+													}))
+												}
+											>
+												{ISSUE_STATUSES.map((value) => (
+													<option key={value} value={value}>
+														{issueStatusLabel[value]}
+													</option>
+												))}
+											</Select>
+										</div>
+										<div>
+											<Label>Priority</Label>
+											<Select
+												value={subIssueForm.priority}
+												onChange={(event) =>
+													setSubIssueForm((prev) => ({
+														...prev,
+														priority: event.target
+															.value as (typeof ISSUE_PRIORITIES)[number],
+													}))
+												}
+											>
+												{ISSUE_PRIORITIES.map((value) => (
+													<option key={value} value={value}>
+														{issuePriorityLabel[value]}
+													</option>
+												))}
+											</Select>
+										</div>
+										<div>
+											<Label>List</Label>
+											<Select
+												value={subIssueForm.listId}
+												onChange={(event) =>
+													setSubIssueForm((prev) => ({
+														...prev,
+														listId: event.target.value,
+													}))
+												}
+											>
+												<option value="">No list</option>
+												{(issueLists ?? []).map((list) => (
+													<option key={list._id} value={list._id}>
+														{list.name}
+													</option>
+												))}
+											</Select>
+										</div>
+										<div>
+											<Label>Assignee</Label>
+											<Select
+												value={subIssueForm.assigneeId}
+												onChange={(event) =>
+													setSubIssueForm((prev) => ({
+														...prev,
+														assigneeId: event.target.value,
+													}))
+												}
+											>
+												<option value="">Unassigned</option>
+												{(assignableUsers ?? []).map((user) => (
+													<option key={user._id} value={user._id}>
+														{user.name}
+													</option>
+												))}
+											</Select>
+										</div>
+										<div>
+											<Label>Due Date</Label>
+											<Input
+												type="date"
+												value={subIssueForm.dueDate}
+												onChange={(event) =>
+													setSubIssueForm((prev) => ({
+														...prev,
+														dueDate: event.target.value,
+													}))
+												}
+											/>
+										</div>
+										<div className="md:col-span-2">
+											<Label>Labels (comma-separated)</Label>
+											<Input
+												value={subIssueForm.labels}
+												onChange={(event) =>
+													setSubIssueForm((prev) => ({
+														...prev,
+														labels: event.target.value,
+													}))
+												}
+											/>
+										</div>
+										{subIssueError ? (
+											<p className="m-0 text-sm text-[var(--danger)]">
+												{subIssueError}
+											</p>
+										) : null}
+										<div className="md:col-span-2 flex items-center justify-end gap-2">
+											<Button
+												type="button"
+												variant="ghost"
+												onClick={() => {
+													setSubIssueError(null);
+													setSubIssueForm(createSubIssueDraft(issueData.issue));
+													setSubIssueFormOpen(false);
+												}}
+											>
+												Cancel
+											</Button>
+											<Button type="submit">Create sub-issue</Button>
+										</div>
+									</form>
+								) : null}
+							</CardContent>
+						</Card>
+					) : null}
 				</div>
 
 				<aside className="issue-detail-settings issue-meta-panel">
@@ -428,13 +976,12 @@ function IssueDetailPage() {
 							{canWrite ? (
 								<Select
 									className="issue-meta-control"
-									value={issueData.issue.status}
+									value={currentIssue.status}
 									onChange={(event) =>
-										updateIssue({
-											issueId,
-											status: event.target
-												.value as (typeof ISSUE_STATUSES)[number],
-										})
+										void handleIssueStatusChange(
+											currentIssue,
+											event.target.value as (typeof ISSUE_STATUSES)[number],
+										)
 									}
 								>
 									{ISSUE_STATUSES.map((value) => (
@@ -717,6 +1264,22 @@ function IssueDetailPage() {
 				isConfirming={isDeleting}
 				onCancel={() => setShowDeleteConfirm(false)}
 				onConfirm={confirmDeleteIssue}
+			/>
+
+			<ConfirmDialog
+				open={Boolean(completionConfirm)}
+				title="Complete parent issue and sub-issues"
+				description={
+					completionConfirm
+						? `"${completionConfirm.title}" still has ${completionConfirm.unfinishedDescendantCount} unfinished sub-issue${completionConfirm.unfinishedDescendantCount === 1 ? "" : "s"}. Mark all descendants as done too?`
+						: ""
+				}
+				confirmLabel="Mark all done"
+				confirmingLabel="Updating..."
+				confirmVariant="primary"
+				isConfirming={isCompletingIssueTree}
+				onCancel={() => setCompletionConfirm(null)}
+				onConfirm={confirmCascadeCompletion}
 			/>
 		</div>
 	);

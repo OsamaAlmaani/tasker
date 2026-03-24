@@ -13,6 +13,7 @@ import { Textarea } from "#/components/ui/textarea";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatRelative } from "#/features/tasker/format";
 import { projectFormSchema } from "#/features/tasker/validation";
+import { getClientErrorMessage, parseConvexError } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
 
@@ -25,34 +26,6 @@ export const Route = createFileRoute("/_app/projects/")({
 	component: ProjectsPage,
 });
 
-function parseConvexError(
-	error: unknown,
-): { code?: string; message?: string } | null {
-	if (!(error instanceof Error)) {
-		return null;
-	}
-
-	const marker = "Uncaught ConvexError:";
-	const markerIndex = error.message.indexOf(marker);
-	if (markerIndex === -1) {
-		return null;
-	}
-
-	const payload = error.message.slice(markerIndex + marker.length).trim();
-	try {
-		const parsed = JSON.parse(payload) as {
-			code?: unknown;
-			message?: unknown;
-		};
-		return {
-			code: typeof parsed.code === "string" ? parsed.code : undefined,
-			message: typeof parsed.message === "string" ? parsed.message : undefined,
-		};
-	} catch {
-		return null;
-	}
-}
-
 function getProjectCreateErrorMessage(error: unknown): string {
 	const convexError = parseConvexError(error);
 	if (convexError?.code === "CONFLICT") {
@@ -61,7 +34,7 @@ function getProjectCreateErrorMessage(error: unknown): string {
 	if (convexError?.message) {
 		return convexError.message;
 	}
-	return "Failed to create project.";
+	return getClientErrorMessage(error, "Failed to create project.");
 }
 
 function getArchiveActionErrorMessage(error: unknown): string {
@@ -69,7 +42,10 @@ function getArchiveActionErrorMessage(error: unknown): string {
 	if (convexError?.message) {
 		return convexError.message;
 	}
-	return "Failed to update project archive state.";
+	return getClientErrorMessage(
+		error,
+		"Failed to update project archive state.",
+	);
 }
 
 function ProjectsPage() {

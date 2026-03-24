@@ -72,6 +72,7 @@ export default defineSchema({
   issues: defineTable({
     projectId: v.id('projects'),
     listId: v.optional(v.id('issueLists')),
+    parentIssueId: v.optional(v.id('issues')),
     issueNumber: v.number(),
     title: v.string(),
     description: v.optional(v.string()),
@@ -95,8 +96,10 @@ export default defineSchema({
     .index('by_projectId_priority', ['projectId', 'priority'])
     .index('by_projectId_assignee', ['projectId', 'assigneeId'])
     .index('by_projectId_listId', ['projectId', 'listId'])
+    .index('by_projectId_parentIssueId', ['projectId', 'parentIssueId'])
     .index('by_assignee', ['assigneeId'])
     .index('by_listId', ['listId'])
+    .index('by_parentIssueId', ['parentIssueId'])
     .index('by_reporter', ['reporterId'])
     .index('by_createdBy', ['createdBy'])
     .searchIndex('search_text', {

@@ -283,6 +283,10 @@ button:disabled,
   row-gap: 8px;
 }
 
+.issue-row-subissue {
+  background: color-mix(in oklab, var(--surface-muted) 72%, var(--accent) 6%);
+}
+
 .issue-row-main {
   min-width: 0;
   display: block;
@@ -383,6 +387,74 @@ button:disabled,
 .issue-assignee-avatar-unassigned {
   background: transparent;
   border-style: dashed;
+}
+
+.issue-hierarchy-badge {
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  color: color-mix(in oklab, var(--accent) 88%, var(--text) 12%);
+}
+
+.issue-progress-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.issue-progress-text {
+  font-size: 0.72rem;
+  color: var(--muted-text);
+}
+
+.issue-progress-bar {
+  position: relative;
+  flex: 1;
+  min-width: 84px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--line) 70%, transparent 30%);
+}
+
+.issue-progress-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--accent) 76%, #7db0ff 24%),
+    color-mix(in oklab, var(--accent) 90%, #1d4ed8 10%)
+  );
+}
+
+.issue-progress-badge {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+  color: var(--muted-text);
+}
+
+.issue-tree-node {
+  position: relative;
+}
+
+.issue-tree-node-child {
+  position: relative;
+}
+
+.issue-tree-node-child::before {
+  content: '';
+  position: absolute;
+  left: -18px;
+  top: 22px;
+  width: 18px;
+  border-top: 1px solid color-mix(in oklab, var(--line) 84%, transparent 16%);
+}
+
+.issue-tree-children {
+  display: grid;
+  gap: 8px;
+  margin-left: 18px;
+  margin-top: 8px;
+  padding-left: 18px;
+  border-left: 1px solid color-mix(in oklab, var(--line) 84%, transparent 16%);
 }
 
 .issue-detail-layout {
@@ -496,6 +568,33 @@ button:disabled,
   min-height: 90px;
 }
 
+.issue-related-link {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--surface-muted) 92%, transparent 8%);
+  padding: 12px 14px;
+}
+
+.issue-related-link:hover {
+  border-color: color-mix(in oklab, var(--accent) 36%, var(--line));
+}
+
+.issue-progress-panel {
+  display: grid;
+  gap: 8px;
+  max-width: 360px;
+}
+
+.issue-subissues-card {
+  border-radius: 14px;
+}
+
+.issue-tree-list {
+  display: grid;
+  gap: 8px;
+}
+
 .modal-overlay {
   background: rgba(8, 12, 26, 0.45);
   -webkit-backdrop-filter: blur(6px);
@@ -549,6 +648,10 @@ button:disabled,
   padding: 8px;
 }
 
+.kanban-card-subissue {
+  background: color-mix(in oklab, var(--surface) 82%, var(--accent) 6%);
+}
+
 .kanban-card[draggable='true'] {
   cursor: grab;
 }
@@ -563,6 +666,28 @@ button:disabled,
 
 .kanban-card-link {
   display: block;
+}
+
+.kanban-tree-node {
+  position: relative;
+}
+
+.kanban-tree-node-child::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 20px;
+  width: 14px;
+  border-top: 1px solid color-mix(in oklab, var(--line) 84%, transparent 16%);
+}
+
+.kanban-subcards {
+  display: grid;
+  gap: 8px;
+  margin-left: 14px;
+  margin-top: 8px;
+  padding-left: 14px;
+  border-left: 1px solid color-mix(in oklab, var(--line) 84%, transparent 16%);
 }
 
 .kanban-empty {
