@@ -29,6 +29,8 @@ Use this file to track feature progress. Check items off as they ship.
 - 2026-03-25: Extracted shared issue status orchestration to `src/features/tasker/issues/useIssueStatusFlow.ts`, removing duplicated done-ancestor validation and cascade-completion flow from both large route files.
 - 2026-03-25: Extracted project task import/export state, menu behavior, and file parsing to `src/features/tasker/projects/useProjectTaskImportExport.ts`, reducing project-route-only workflow logic.
 - 2026-03-25: Extracted the repeated task draft modal/form UI to `src/features/tasker/issues/components/IssueDraftDialog.tsx` and reused it for both project task creation and issue sub-task creation.
+- 2026-03-25: Extracted project member management dialogs to `src/features/tasker/projects/components/ProjectMembersDialog.tsx` and `src/features/tasker/projects/components/ProjectInviteDialog.tsx`, removing another large route-owned UI block from the project page.
+- 2026-03-25: Extracted issue discussion and activity rendering to `src/features/tasker/issues/components/IssueDiscussionPanel.tsx`, removing comment/edit UI and activity labeling from the issue route.
 
 ## Product Direction
 

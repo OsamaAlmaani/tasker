@@ -7,11 +7,8 @@ import {
 	ListTodo,
 	MoreHorizontal,
 	Plus,
-	RefreshCw,
 	Settings2,
 	Upload,
-	UserPlus,
-	Users,
 } from "lucide-react";
 import {
 	type DragEvent,
@@ -38,7 +35,7 @@ import {
 } from "#/features/tasker/components/IssueBadges";
 import { MemberAvatarStack } from "#/features/tasker/components/MemberAvatarStack";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
-import { formatDate, formatRelative } from "#/features/tasker/format";
+import { formatDate } from "#/features/tasker/format";
 import {
 	type IssueDraft,
 	IssueDraftDialog,
@@ -50,6 +47,8 @@ import {
 	issuePriorityLabel,
 	issueStatusLabel,
 } from "#/features/tasker/model";
+import { ProjectInviteDialog } from "#/features/tasker/projects/components/ProjectInviteDialog";
+import { ProjectMembersDialog } from "#/features/tasker/projects/components/ProjectMembersDialog";
 import { useProjectTaskImportExport } from "#/features/tasker/projects/useProjectTaskImportExport";
 import { issueFormSchema } from "#/features/tasker/validation";
 import { cn, getClientErrorMessage } from "#/lib/utils";
@@ -1622,234 +1621,50 @@ function ProjectDetailPage() {
 				)}
 			</div>
 
-			{isMembersModalOpen ? (
-				<div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
-					<div
-						role="dialog"
-						aria-modal="true"
-						aria-label="Project members"
-						className="w-full max-w-xl rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
-					>
-						<div className="mb-4 flex items-center justify-between gap-3">
-							<h2 className="m-0 flex items-center gap-2 text-base font-semibold text-[var(--text)]">
-								<Users className="h-4 w-4" />
-								Members ({memberRows.length})
-							</h2>
-							<div className="flex items-center gap-2">
-								{projectData.canManageMembers ? (
-									<Button
-										size="sm"
-										variant="secondary"
-										onClick={() => {
-											setIsMembersModalOpen(false);
-											setIsInviteModalOpen(true);
-										}}
-									>
-										<UserPlus className="mr-1.5 h-3.5 w-3.5" />
-										Invite members
-									</Button>
-								) : null}
-								<Button
-									size="sm"
-									variant="ghost"
-									onClick={() => setIsMembersModalOpen(false)}
-								>
-									Close
-								</Button>
-							</div>
-						</div>
+			<ProjectMembersDialog
+				canManageMembers={projectData.canManageMembers}
+				createdBy={projectData.project.createdBy}
+				memberRows={memberRows}
+				onClose={() => setIsMembersModalOpen(false)}
+				onInviteMembers={() => {
+					setIsMembersModalOpen(false);
+					setIsInviteModalOpen(true);
+				}}
+				onRemoveMember={(member) =>
+					setMemberToRemove({
+						id: member.id as Id<"users">,
+						name: member.name,
+					})
+				}
+				open={isMembersModalOpen}
+			/>
 
-						<div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
-							{memberRows.map((row) => (
-								<div
-									key={row.membership._id}
-									className="flex items-center justify-between rounded-md border border-[var(--line)] px-3 py-2"
-								>
-									<div className="flex items-center gap-3">
-										<div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-[var(--line)] bg-[var(--surface-muted)] text-[11px] font-semibold text-[var(--muted-text)]">
-											{row.user.imageUrl ? (
-												<img
-													src={row.user.imageUrl}
-													alt={row.user.name}
-													className="h-full w-full object-cover"
-												/>
-											) : (
-												row.user.name.slice(0, 2).toUpperCase()
-											)}
-										</div>
-										<div>
-											<p className="m-0 text-sm font-medium text-[var(--text)]">
-												{row.user.name}
-											</p>
-											<p className="m-0 text-xs text-[var(--muted-text)]">
-												{row.user.email}
-											</p>
-										</div>
-									</div>
-									{projectData.canManageMembers &&
-									row.user._id !== projectData.project.createdBy ? (
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() =>
-												setMemberToRemove({
-													id: row.user._id,
-													name: row.user.name,
-												})
-											}
-										>
-											Remove
-										</Button>
-									) : null}
-								</div>
-							))}
-						</div>
-					</div>
-				</div>
-			) : null}
-
-			{projectData.canManageMembers && isInviteModalOpen ? (
-				<div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
-					<div
-						role="dialog"
-						aria-modal="true"
-						aria-label="Invite members"
-						className="w-full max-w-2xl rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_30px_70px_rgba(8,12,26,0.35)]"
-					>
-						<div className="mb-4 flex items-center justify-between">
-							<h2 className="m-0 flex items-center gap-2 text-base font-semibold text-[var(--text)]">
-								<UserPlus className="h-4 w-4" />
-								Invite members
-							</h2>
-							<Button
-								size="sm"
-								variant="ghost"
-								onClick={() => setIsInviteModalOpen(false)}
-							>
-								Close
-							</Button>
-						</div>
-
-						<div className="space-y-3">
-							<form onSubmit={submitEmailInvite} className="space-y-2">
-								<Label>Invite by email</Label>
-								<div className="flex gap-2">
-									<Input
-										type="email"
-										value={inviteEmail}
-										onChange={(event) => setInviteEmail(event.target.value)}
-										placeholder="teammate@company.com"
-									/>
-									<Button
-										type="submit"
-										size="md"
-										variant="secondary"
-										className="whitespace-nowrap"
-										disabled={isSendingInvite}
-									>
-										{isSendingInvite ? "Sending..." : "Send invite"}
-									</Button>
-								</div>
-								{inviteError ? (
-									<p className="m-0 text-sm text-[var(--danger)]">
-										{inviteError}
-									</p>
-								) : null}
-								{inviteMessage ? (
-									<p className="m-0 text-sm text-[var(--muted-text)]">
-										{inviteMessage}
-									</p>
-								) : null}
-							</form>
-
-							<div className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-3">
-								<p className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
-									Pending invites
-								</p>
-								<div className="space-y-2">
-									{(projectInvites ?? [])
-										.filter((row) => row.invite.status === "pending")
-										.map((row) => (
-											<div
-												key={row.invite._id}
-												className="flex items-center justify-between rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
-											>
-												<div>
-													<p className="m-0 text-sm font-medium text-[var(--text)]">
-														{row.invite.email}
-													</p>
-													<p className="m-0 text-xs text-[var(--muted-text)]">
-														Sent {formatRelative(row.invite.createdAt)}
-													</p>
-												</div>
-												<Button
-													type="button"
-													size="sm"
-													variant="ghost"
-													onClick={() =>
-														setInviteToRevoke({
-															id: row.invite._id,
-															email: row.invite.email,
-														})
-													}
-												>
-													Revoke
-												</Button>
-											</div>
-										))}
-									{!projectInvites?.some(
-										(row) => row.invite.status === "pending",
-									) ? (
-										<p className="m-0 text-sm text-[var(--muted-text)]">
-											No pending invites.
-										</p>
-									) : null}
-								</div>
-							</div>
-
-							<Label>Add existing users</Label>
-							<Input
-								value={inviteSearch}
-								onChange={(event) => setInviteSearch(event.target.value)}
-								placeholder="Search users"
-							/>
-							{(inviteCandidates ?? []).map((user) => (
-								<div
-									key={user._id}
-									className="flex items-center justify-between rounded-md border border-[var(--line)] px-3 py-2"
-								>
-									<div>
-										<p className="m-0 text-sm font-medium text-[var(--text)]">
-											{user.name}
-										</p>
-										<p className="m-0 text-xs text-[var(--muted-text)]">
-											{user.email}
-										</p>
-									</div>
-									<Button
-										size="sm"
-										variant="secondary"
-										onClick={() =>
-											addMember({
-												projectId,
-												userId: user._id,
-											})
-										}
-									>
-										<RefreshCw className="mr-1 h-3.5 w-3.5" />
-										Add
-									</Button>
-								</div>
-							))}
-							{!inviteCandidates?.length ? (
-								<p className="m-0 text-sm text-[var(--muted-text)]">
-									No invite candidates.
-								</p>
-							) : null}
-						</div>
-					</div>
-				</div>
-			) : null}
+			<ProjectInviteDialog
+				inviteCandidates={inviteCandidates}
+				inviteEmail={inviteEmail}
+				inviteError={inviteError}
+				inviteMessage={inviteMessage}
+				inviteSearch={inviteSearch}
+				isSendingInvite={isSendingInvite}
+				onAddMember={(userId) =>
+					void addMember({
+						projectId,
+						userId: userId as Id<"users">,
+					})
+				}
+				onClose={() => setIsInviteModalOpen(false)}
+				onInviteEmailChange={setInviteEmail}
+				onInviteSearchChange={setInviteSearch}
+				onRevokeInvite={(invite) =>
+					setInviteToRevoke({
+						id: invite.id as Id<"projectInvites">,
+						email: invite.email,
+					})
+				}
+				onSubmit={submitEmailInvite}
+				open={projectData.canManageMembers && isInviteModalOpen}
+				projectInvites={projectInvites}
+			/>
 
 			<IssueDraftDialog
 				assignableUsers={assignableUsers}
