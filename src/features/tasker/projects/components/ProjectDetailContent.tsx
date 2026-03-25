@@ -1,3 +1,4 @@
+import { useMutation } from "convex/react";
 import {
 	Download,
 	History,
@@ -6,13 +7,16 @@ import {
 	Settings2,
 	Upload,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { ActivityFeed } from "#/features/tasker/components/ActivityFeed";
 import { MemberAvatarStack } from "#/features/tasker/components/MemberAvatarStack";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
+import { IssueBulkActionsBar } from "#/features/tasker/issues/components/IssueBulkActionsBar";
 import { IssueDraftDialog } from "#/features/tasker/issues/components/IssueDraftDialog";
+import { findDoneAncestorIssue } from "#/features/tasker/issues/hierarchy";
 import { ProjectInviteDialog } from "#/features/tasker/projects/components/ProjectInviteDialog";
 import {
 	ProjectIssueKanbanTree,
@@ -31,6 +35,8 @@ import {
 	type ProjectDetailPageState,
 	type ProjectIssueRow,
 } from "#/features/tasker/projects/useProjectDetailPage";
+import { getClientErrorMessage } from "#/lib/utils";
+import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
 
 type ProjectDetailContentProps = {
@@ -49,6 +55,7 @@ export function ProjectDetailContent({
 	projectId,
 	updateProjectSearch,
 }: ProjectDetailContentProps) {
+	const bulkUpdateIssues = useMutation(api.issues.bulkUpdate);
 	const {
 		addMember,
 		addStatusFilter,
@@ -101,6 +108,7 @@ export function ProjectDetailContent({
 		issueLists,
 		issues,
 		kanbanColumns,
+		allProjectIssues,
 		memberRows,
 		memberToRemove,
 		membersForStack,
@@ -137,6 +145,91 @@ export function ProjectDetailContent({
 		toggleImportExportMenu,
 		updateIssue,
 	} = page;
+	const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(
+		() => new Set(),
+	);
+	const [bulkActionError, setBulkActionError] = useState<string | null>(null);
+	const [isApplyingBulkAction, setIsApplyingBulkAction] = useState(false);
+	const visibleIssueIds = useMemo(
+		() => new Set((issues ?? []).map((issue) => issue._id)),
+		[issues],
+	);
+	const projectIssueById = useMemo(
+		() => new Map((allProjectIssues ?? []).map((issue) => [issue._id, issue])),
+		[allProjectIssues],
+	);
+
+	useEffect(() => {
+		setSelectedIssueIds((current) => {
+			const next = new Set(
+				[...current].filter((issueId) => visibleIssueIds.has(issueId)),
+			);
+			return next.size === current.size ? current : next;
+		});
+	}, [visibleIssueIds]);
+
+	useEffect(() => {
+		if (issueLayout !== "list") {
+			setSelectedIssueIds(new Set());
+		}
+	}, [issueLayout]);
+
+	function toggleIssueSelection(issueId: string) {
+		setSelectedIssueIds((current) => {
+			const next = new Set(current);
+			if (next.has(issueId)) {
+				next.delete(issueId);
+			} else {
+				next.add(issueId);
+			}
+			return next;
+		});
+	}
+
+	async function applyBulkAction(changes: {
+		archived?: boolean;
+		assigneeId?: Id<"users"> | null;
+		priority?: ProjectIssueRow["priority"];
+		status?: ProjectIssueRow["status"];
+	}) {
+		if (!selectedIssueIds.size) {
+			return;
+		}
+
+		setBulkActionError(null);
+
+		if (changes.status && changes.status !== "done") {
+			for (const issueId of selectedIssueIds) {
+				const issue = projectIssueById.get(issueId as Id<"issues">);
+				if (!issue) {
+					continue;
+				}
+
+				const doneAncestor = findDoneAncestorIssue(issue, projectIssueById);
+				if (doneAncestor && !selectedIssueIds.has(doneAncestor._id)) {
+					setBulkActionError(
+						`Cannot reopen sub-task #${issue.issueNumber} while parent task #${doneAncestor.issueNumber} is still done. Reopen the parent first or include it in the bulk selection.`,
+					);
+					return;
+				}
+			}
+		}
+
+		setIsApplyingBulkAction(true);
+		try {
+			await bulkUpdateIssues({
+				issueIds: [...selectedIssueIds] as Id<"issues">[],
+				...changes,
+				cascadeDescendantsToDone: changes.status === "done" ? true : undefined,
+			});
+		} catch (error) {
+			setBulkActionError(
+				getClientErrorMessage(error, "Failed to update selected tasks."),
+			);
+		} finally {
+			setIsApplyingBulkAction(false);
+		}
+	}
 
 	return (
 		<div>
@@ -259,6 +352,9 @@ export function ProjectDetailContent({
 			{statusUpdateError ? (
 				<p className="mb-4 text-sm text-[var(--danger)]">{statusUpdateError}</p>
 			) : null}
+			{bulkActionError ? (
+				<p className="mb-4 text-sm text-[var(--danger)]">{bulkActionError}</p>
+			) : null}
 
 			<ProjectSettingsCard
 				archived={projectData.project.archived}
@@ -274,6 +370,29 @@ export function ProjectDetailContent({
 					<ProjectTasksPanel
 						assignableUsers={assignableUsers}
 						assigneeId={assigneeId}
+						bulkActions={
+							issueLayout === "list" && selectedIssueIds.size ? (
+								<IssueBulkActionsBar
+									assignableUsers={assignableUsers}
+									selectedCount={selectedIssueIds.size}
+									isApplying={isApplyingBulkAction}
+									onClearSelection={() => setSelectedIssueIds(new Set())}
+									onStatusChange={(status) => void applyBulkAction({ status })}
+									onPriorityChange={(priority) =>
+										void applyBulkAction({ priority })
+									}
+									onAssigneeChange={(nextAssigneeId) =>
+										void applyBulkAction({
+											assigneeId: (nextAssigneeId ||
+												null) as Id<"users"> | null,
+										})
+									}
+									onArchiveChange={(archived) =>
+										void applyBulkAction({ archived })
+									}
+								/>
+							) : null
+						}
 						canWrite={canWrite}
 						dragOverStatus={dragOverStatus}
 						groupBy={groupBy}
@@ -377,6 +496,9 @@ export function ProjectDetailContent({
 										nextStatus,
 									);
 								}}
+								onToggleSelection={toggleIssueSelection}
+								selectedIssueIds={selectedIssueIds}
+								selectionEnabled={canWrite}
 							/>
 						)}
 						search={search}

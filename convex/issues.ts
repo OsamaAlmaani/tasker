@@ -16,6 +16,20 @@ function buildSearchText(title: string, description?: string) {
   return `${title} ${description ?? ''}`.trim().toLowerCase()
 }
 
+type IssueUpdateChanges = {
+  title?: string
+  description?: string
+  status?: Doc<'issues'>['status']
+  priority?: Doc<'issues'>['priority']
+  assigneeId?: Id<'users'> | null
+  listId?: Id<'issueLists'> | null
+  parentIssueId?: Id<'issues'> | null
+  cascadeDescendantsToDone?: boolean
+  labels?: string[]
+  dueDate?: number | null
+  archived?: boolean
+}
+
 type IssueProgress = {
   childIssueCount: number
   completedChildIssueCount: number
@@ -262,6 +276,224 @@ async function getVisibleIssueAncestors(
   }
 
   return ancestors
+}
+
+function getIssueSelectionDepth(
+  issueId: Id<'issues'>,
+  issueById: Map<Id<'issues'>, Doc<'issues'>>,
+  depthByIssueId: Map<Id<'issues'>, number>,
+): number {
+  const cachedDepth = depthByIssueId.get(issueId)
+  if (cachedDepth !== undefined) {
+    return cachedDepth
+  }
+
+  const issue = issueById.get(issueId)
+  if (!issue?.parentIssueId || !issueById.has(issue.parentIssueId)) {
+    depthByIssueId.set(issueId, 0)
+    return 0
+  }
+
+  const depth =
+    getIssueSelectionDepth(issue.parentIssueId, issueById, depthByIssueId) + 1
+  depthByIssueId.set(issueId, depth)
+  return depth
+}
+
+async function applyIssueUpdate(
+  ctx: MutationCtx,
+  {
+    issue,
+    user,
+    changes,
+    now = Date.now(),
+  }: {
+    issue: Doc<'issues'>
+    user: Doc<'users'>
+    changes: IssueUpdateChanges
+    now?: number
+  },
+) {
+  const patch: Record<string, unknown> = {
+    updatedAt: now,
+  }
+
+  if (changes.title !== undefined) {
+    patch.title = changes.title.trim()
+  }
+  if (changes.description !== undefined) {
+    patch.description = changes.description.trim()
+  }
+  if (changes.status !== undefined) {
+    if (changes.status === 'done') {
+      const visibleDescendants = await getVisibleIssueDescendants(
+        ctx,
+        issue.projectId,
+        issue._id,
+      )
+      const unfinishedDescendants = visibleDescendants.filter(
+        (descendant) => descendant._id !== issue._id && descendant.status !== 'done',
+      )
+
+      if (
+        unfinishedDescendants.length > 0 &&
+        !changes.cascadeDescendantsToDone
+      ) {
+        throw new ConvexError({
+          code: 'VALIDATION_ERROR',
+          message:
+            'This issue has unfinished sub-issues. Confirm to mark all descendants as done.',
+        })
+      }
+
+      if (changes.cascadeDescendantsToDone) {
+        await Promise.all(
+          unfinishedDescendants.map((descendant) =>
+            ctx.db.patch(descendant._id, {
+              status: 'done',
+              completedAt: now,
+              updatedAt: now,
+            }),
+          ),
+        )
+      }
+    } else {
+      const visibleAncestors = await getVisibleIssueAncestors(ctx, issue)
+      const doneAncestor = visibleAncestors.find(
+        (ancestor) => ancestor.status === 'done',
+      )
+
+      if (doneAncestor) {
+        throw new ConvexError({
+          code: 'VALIDATION_ERROR',
+          message: `Cannot move this sub-issue out of done while parent issue #${doneAncestor.issueNumber} is still done. Reopen the parent first.`,
+        })
+      }
+    }
+
+    patch.status = changes.status
+    patch.completedAt = changes.status === 'done' ? now : undefined
+  }
+  if (changes.priority !== undefined) {
+    patch.priority = changes.priority
+  }
+  if (changes.assigneeId !== undefined) {
+    if (changes.assigneeId) {
+      await ensureAssigneeAllowed(ctx, issue.projectId, changes.assigneeId)
+    }
+    patch.assigneeId = changes.assigneeId ?? undefined
+  }
+  if (changes.listId !== undefined) {
+    if (changes.listId) {
+      await ensureIssueListBelongsToProject(ctx, issue.projectId, changes.listId)
+    }
+    patch.listId = changes.listId ?? undefined
+  }
+  if (changes.parentIssueId !== undefined) {
+    if (changes.parentIssueId) {
+      await ensureParentIssueBelongsToProject(
+        ctx,
+        issue.projectId,
+        changes.parentIssueId,
+      )
+      await ensureNoIssueCycle(ctx, issue._id, changes.parentIssueId)
+      await ensureIssueCanBecomeChild(ctx, issue)
+    }
+    patch.parentIssueId = changes.parentIssueId ?? undefined
+  }
+  if (changes.labels !== undefined) {
+    patch.labels = changes.labels.map((label) => label.trim()).filter(Boolean)
+  }
+  if (changes.dueDate !== undefined) {
+    patch.dueDate = changes.dueDate ?? undefined
+  }
+  if (changes.archived !== undefined) {
+    patch.archived = changes.archived
+  }
+
+  const nextTitle = (patch.title as string | undefined) ?? issue.title
+  const nextDescription =
+    (patch.description as string | undefined) ?? issue.description
+  patch.searchText = buildSearchText(nextTitle, nextDescription)
+
+  await ctx.db.patch(issue._id, patch)
+  await ctx.db.patch(issue.projectId, {
+    updatedAt: now,
+  })
+
+  await createActivity(ctx, {
+    actorId: user._id,
+    projectId: issue.projectId,
+    issueId: issue._id,
+    entityType: 'issue',
+    entityId: issue._id,
+    action: 'issue.updated',
+    metadata: {
+      changedFields: Object.keys(patch),
+    },
+  })
+
+  if (changes.status !== undefined && changes.status !== issue.status) {
+    await createActivity(ctx, {
+      actorId: user._id,
+      projectId: issue.projectId,
+      issueId: issue._id,
+      entityType: 'issue',
+      entityId: issue._id,
+      action: 'issue.status_changed',
+      metadata: {
+        from: issue.status,
+        to: changes.status,
+      },
+    })
+  }
+
+  if (changes.priority !== undefined && changes.priority !== issue.priority) {
+    await createActivity(ctx, {
+      actorId: user._id,
+      projectId: issue.projectId,
+      issueId: issue._id,
+      entityType: 'issue',
+      entityId: issue._id,
+      action: 'issue.priority_changed',
+      metadata: {
+        from: issue.priority,
+        to: changes.priority,
+      },
+    })
+  }
+
+  if (changes.assigneeId !== undefined && changes.assigneeId !== issue.assigneeId) {
+    await createActivity(ctx, {
+      actorId: user._id,
+      projectId: issue.projectId,
+      issueId: issue._id,
+      entityType: 'issue',
+      entityId: issue._id,
+      action: 'issue.assignee_changed',
+      metadata: {
+        from: issue.assigneeId,
+        to: changes.assigneeId,
+      },
+    })
+  }
+
+  if (changes.listId !== undefined && changes.listId !== issue.listId) {
+    await createActivity(ctx, {
+      actorId: user._id,
+      projectId: issue.projectId,
+      issueId: issue._id,
+      entityType: 'issue',
+      entityId: issue._id,
+      action: 'issue.list_changed',
+      metadata: {
+        from: issue.listId,
+        to: changes.listId,
+      },
+    })
+  }
+
+  return await ctx.db.get(issue._id)
 }
 
 export const listByProject = query({
@@ -574,188 +806,100 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const { issue, user } = await requireIssueWriteAccess(ctx, args.issueId)
+    return await applyIssueUpdate(ctx, {
+      issue,
+      user,
+      changes: args,
+    })
+  },
+})
 
-    const now = Date.now()
-    const patch: Record<string, unknown> = {
-      updatedAt: now,
+export const bulkUpdate = mutation({
+  args: {
+    issueIds: v.array(v.id('issues')),
+    status: v.optional(issueStatusValidator),
+    priority: v.optional(issuePriorityValidator),
+    assigneeId: v.optional(v.union(v.id('users'), v.null())),
+    archived: v.optional(v.boolean()),
+    cascadeDescendantsToDone: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const uniqueIssueIds = [...new Set(args.issueIds)]
+    if (!uniqueIssueIds.length) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'Select at least one task.',
+      })
     }
 
-    if (args.title !== undefined) {
-      patch.title = args.title.trim()
+    if (
+      args.status === undefined &&
+      args.priority === undefined &&
+      args.assigneeId === undefined &&
+      args.archived === undefined
+    ) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'Choose at least one bulk action.',
+      })
     }
-    if (args.description !== undefined) {
-      patch.description = args.description.trim()
+
+    if (uniqueIssueIds.length > 100) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'Bulk actions are limited to 100 tasks at a time.',
+      })
     }
-    if (args.status !== undefined) {
-      if (args.status === 'done') {
-        const visibleDescendants = await getVisibleIssueDescendants(
-          ctx,
-          issue.projectId,
-          issue._id,
-        )
-        const unfinishedDescendants = visibleDescendants.filter(
-          (descendant) => descendant._id !== issue._id && descendant.status !== 'done',
-        )
 
-        if (
-          unfinishedDescendants.length > 0 &&
-          !args.cascadeDescendantsToDone
-        ) {
-          throw new ConvexError({
-            code: 'VALIDATION_ERROR',
-            message:
-              'This issue has unfinished sub-issues. Confirm to mark all descendants as done.',
-          })
-        }
+    const selectedIssues = []
+    for (const issueId of uniqueIssueIds) {
+      selectedIssues.push(await requireIssueWriteAccess(ctx, issueId))
+    }
 
-        if (args.cascadeDescendantsToDone) {
-          await Promise.all(
-            unfinishedDescendants.map((descendant) =>
-              ctx.db.patch(descendant._id, {
-                status: 'done',
-                completedAt: now,
-                updatedAt: now,
-              }),
-            ),
-          )
-        }
-      } else {
-        const visibleAncestors = await getVisibleIssueAncestors(ctx, issue)
-        const doneAncestor = visibleAncestors.find(
-          (ancestor) => ancestor.status === 'done',
-        )
+    const issueById = new Map(
+      selectedIssues.map(({ issue }) => [issue._id, issue]),
+    )
+    const depthByIssueId = new Map<Id<'issues'>, number>()
+    const orderedSelections = [...selectedIssues].sort((left, right) => {
+      const leftDepth = getIssueSelectionDepth(
+        left.issue._id,
+        issueById,
+        depthByIssueId,
+      )
+      const rightDepth = getIssueSelectionDepth(
+        right.issue._id,
+        issueById,
+        depthByIssueId,
+      )
 
-        if (doneAncestor) {
-          throw new ConvexError({
-            code: 'VALIDATION_ERROR',
-            message: `Cannot move this sub-issue out of done while parent issue #${doneAncestor.issueNumber} is still done. Reopen the parent first.`,
-          })
-        }
+      if (args.status && args.status !== 'done') {
+        return leftDepth - rightDepth
       }
 
-      patch.status = args.status
-      patch.completedAt = args.status === 'done' ? now : undefined
-    }
-    if (args.priority !== undefined) {
-      patch.priority = args.priority
-    }
-    if (args.assigneeId !== undefined) {
-      if (args.assigneeId) {
-        await ensureAssigneeAllowed(ctx, issue.projectId, args.assigneeId)
-      }
-      patch.assigneeId = args.assigneeId ?? undefined
-    }
-    if (args.listId !== undefined) {
-      if (args.listId) {
-        await ensureIssueListBelongsToProject(ctx, issue.projectId, args.listId)
-      }
-      patch.listId = args.listId ?? undefined
-    }
-    if (args.parentIssueId !== undefined) {
-      if (args.parentIssueId) {
-        await ensureParentIssueBelongsToProject(
-          ctx,
-          issue.projectId,
-          args.parentIssueId,
-        )
-        await ensureNoIssueCycle(ctx, issue._id, args.parentIssueId)
-        await ensureIssueCanBecomeChild(ctx, issue)
-      }
-      patch.parentIssueId = args.parentIssueId ?? undefined
-    }
-    if (args.labels !== undefined) {
-      patch.labels = args.labels.map((label) => label.trim()).filter(Boolean)
-    }
-    if (args.dueDate !== undefined) {
-      patch.dueDate = args.dueDate ?? undefined
-    }
-    if (args.archived !== undefined) {
-      patch.archived = args.archived
-    }
-
-    const nextTitle = (patch.title as string | undefined) ?? issue.title
-    const nextDescription =
-      (patch.description as string | undefined) ?? issue.description
-    patch.searchText = buildSearchText(nextTitle, nextDescription)
-
-    await ctx.db.patch(args.issueId, patch)
-    await ctx.db.patch(issue.projectId, {
-      updatedAt: now,
+      return rightDepth - leftDepth
     })
 
-    await createActivity(ctx, {
-      actorId: user._id,
-      projectId: issue.projectId,
-      issueId: issue._id,
-      entityType: 'issue',
-      entityId: issue._id,
-      action: 'issue.updated',
-      metadata: {
-        changedFields: Object.keys(patch),
-      },
-    })
-
-    if (args.status !== undefined && args.status !== issue.status) {
-      await createActivity(ctx, {
-        actorId: user._id,
-        projectId: issue.projectId,
-        issueId: issue._id,
-        entityType: 'issue',
-        entityId: issue._id,
-        action: 'issue.status_changed',
-        metadata: {
-          from: issue.status,
-          to: args.status,
-        },
-      })
+    const results = []
+    for (const { issue, user } of orderedSelections) {
+      results.push(
+        await applyIssueUpdate(ctx, {
+          issue,
+          user,
+          changes: {
+            status: args.status,
+            priority: args.priority,
+            assigneeId: args.assigneeId,
+            archived: args.archived,
+            cascadeDescendantsToDone: args.cascadeDescendantsToDone,
+          },
+        }),
+      )
     }
 
-    if (args.priority !== undefined && args.priority !== issue.priority) {
-      await createActivity(ctx, {
-        actorId: user._id,
-        projectId: issue.projectId,
-        issueId: issue._id,
-        entityType: 'issue',
-        entityId: issue._id,
-        action: 'issue.priority_changed',
-        metadata: {
-          from: issue.priority,
-          to: args.priority,
-        },
-      })
+    return {
+      issueIds: uniqueIssueIds,
+      updatedIssueCount: results.length,
     }
-
-    if (args.assigneeId !== undefined && args.assigneeId !== issue.assigneeId) {
-      await createActivity(ctx, {
-        actorId: user._id,
-        projectId: issue.projectId,
-        issueId: issue._id,
-        entityType: 'issue',
-        entityId: issue._id,
-        action: 'issue.assignee_changed',
-        metadata: {
-          from: issue.assigneeId,
-          to: args.assigneeId,
-        },
-      })
-    }
-
-    if (args.listId !== undefined && args.listId !== issue.listId) {
-      await createActivity(ctx, {
-        actorId: user._id,
-        projectId: issue.projectId,
-        issueId: issue._id,
-        entityType: 'issue',
-        entityId: issue._id,
-        action: 'issue.list_changed',
-        metadata: {
-          from: issue.listId,
-          to: args.listId,
-        },
-      })
-    }
-
-    return await ctx.db.get(args.issueId)
   },
 })
 

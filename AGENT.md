@@ -86,7 +86,7 @@ Main route files:
 
 - [`src/routes/index.tsx`](./src/routes/index.tsx): public landing page
 - [`src/routes/_app.dashboard.tsx`](./src/routes/_app.dashboard.tsx): dashboard summary
-- [`src/routes/_app.my-work.tsx`](./src/routes/_app.my-work.tsx): opinionated personal queue for assigned work with route-backed preset views plus persisted last/default view preferences
+- [`src/routes/_app.my-work.tsx`](./src/routes/_app.my-work.tsx): opinionated personal queue for assigned work with route-backed preset views, persisted last/default view preferences, and first-pass bulk actions
 - [`src/routes/_app.projects.index.tsx`](./src/routes/_app.projects.index.tsx): project list + project creation
 - [`src/routes/_app.projects.$projectId.tsx`](./src/routes/_app.projects.$projectId.tsx): project detail, task list/kanban, filters, members, invites, import/export, project settings
 - [`src/routes/_app.issues.$issueId.tsx`](./src/routes/_app.issues.$issueId.tsx): issue detail, sub-tasks, comments, activity
@@ -104,7 +104,7 @@ Key backend files:
 - [`convex/lib/activity.ts`](./convex/lib/activity.ts): activity insertion helper
 - [`convex/users.ts`](./convex/users.ts): user sync/bootstrap, personal `My Work` view preferences, and admin controls
 - [`convex/projects.ts`](./convex/projects.ts): project CRUD, members, sidebar, activity
-- [`convex/issues.ts`](./convex/issues.ts): task CRUD, filtering, hierarchy, status rules
+- [`convex/issues.ts`](./convex/issues.ts): task CRUD, filtering, hierarchy, status rules, and first-pass bulk updates
 - [`convex/myWork.ts`](./convex/myWork.ts): personalized assigned-work overview for the My Work route
 - [`convex/issueLists.ts`](./convex/issueLists.ts): per-project task lists
 - [`convex/comments.ts`](./convex/comments.ts): comments
@@ -220,6 +220,7 @@ Invite flow is split intentionally:
 - The `My Work` page is intentionally opinionated around assigned-task sections: `Focus`, `Due Soon`, `Overdue`, `Backlog & Todo`, and `Recently Completed`.
 - `My Work` uses route search state for preset views (`overview`, `focus`, `due_soon`, `overdue`, `backlog`, `completed`) instead of exposing a full custom filter builder as the default experience.
 - `My Work` also persists the user’s last selected preset view and supports pinning one preset as the default landing view.
+- Bulk task actions currently cover `status`, `priority`, `archive`, and project-scoped `assignee` updates. `My Work` intentionally omits bulk reassignment because selections can span multiple projects with different membership rules.
 - Permissions remain simple by default: `admin` has full access, `member` can write in accessible projects, and `viewer` is read-only.
 
 ## Frontend Structure Notes
@@ -232,6 +233,7 @@ Invite flow is split intentionally:
 - Place shared task draft modal/form UI in `src/features/tasker/issues/components/IssueDraftDialog.tsx` and reuse it across project and issue flows instead of duplicating form markup.
 - Place issue discussion/activity rendering and comment editing UI in `src/features/tasker/issues/components/IssueDiscussionPanel.tsx` instead of keeping that block inline in the issue route.
 - Place issue overview, sub-task list, and metadata UI in `src/features/tasker/issues/components/IssueDetailPanels.tsx` and keep the issue route focused on local edit state and mutation callbacks.
+- Place shared task multi-select/bulk-action controls in `src/features/tasker/issues/components/IssueBulkActionsBar.tsx` instead of duplicating selection toolbars across routes.
 - Place issue detail page queries, derived state, edit state, dialog state, and mutation handlers in `src/features/tasker/issues/useIssueDetailPage.ts` so the route stays focused on params, back-navigation, and page composition.
 - Place project route search schema and normalization helpers in `src/features/tasker/projects/projectSearch.ts` instead of redefining query-string helpers inside route files.
 - Place project issue tree/grouping derivation and task input-date helpers in `src/features/tasker/projects/issueGrouping.ts` instead of keeping that pure board logic inline in controller hooks.

@@ -143,6 +143,9 @@ type ProjectIssueListTreeProps = {
 		issue: ProjectIssue,
 		nextStatus: (typeof ISSUE_STATUSES)[number],
 	) => void;
+	onToggleSelection?: (issueId: string) => void;
+	selectedIssueIds?: Set<string>;
+	selectionEnabled?: boolean;
 };
 
 export function ProjectIssueListTree({
@@ -153,6 +156,9 @@ export function ProjectIssueListTree({
 	onAssigneeChange,
 	onPriorityChange,
 	onStatusChange,
+	onToggleSelection,
+	selectedIssueIds,
+	selectionEnabled = false,
 }: ProjectIssueListTreeProps) {
 	return (
 		<>
@@ -176,8 +182,23 @@ export function ProjectIssueListTree({
 							className={cn(
 								"issue-row issue-row-compact",
 								issue.parentIssueId ? "issue-row-subissue" : "",
+								selectionEnabled ? "issue-row-selectable" : "",
+								selectedIssueIds?.has(issue._id)
+									? "ring-1 ring-[var(--accent)]"
+									: "",
 							)}
 						>
+							{selectionEnabled ? (
+								<div className="issue-row-selection">
+									<input
+										type="checkbox"
+										aria-label={`Select task ${issue.title}`}
+										checked={selectedIssueIds?.has(issue._id) ?? false}
+										onChange={() => onToggleSelection?.(issue._id)}
+										className="h-4 w-4 rounded border border-[var(--line)] bg-[var(--surface-muted)] accent-[var(--accent)]"
+									/>
+								</div>
+							) : null}
 							<Link
 								to="/issues/$issueId"
 								params={{ issueId: issue._id }}
@@ -316,6 +337,9 @@ export function ProjectIssueListTree({
 									onAssigneeChange={onAssigneeChange}
 									onPriorityChange={onPriorityChange}
 									onStatusChange={onStatusChange}
+									onToggleSelection={onToggleSelection}
+									selectedIssueIds={selectedIssueIds}
+									selectionEnabled={selectionEnabled}
 								/>
 							</div>
 						) : null}

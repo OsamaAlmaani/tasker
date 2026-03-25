@@ -8,6 +8,7 @@ import {
 	Pin,
 	Target,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
@@ -17,7 +18,10 @@ import {
 } from "#/features/tasker/components/IssueBadges";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatDate, formatRelative } from "#/features/tasker/format";
+import { IssueBulkActionsBar } from "#/features/tasker/issues/components/IssueBulkActionsBar";
+import { cn, getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
+import type { Id } from "#convex/_generated/dataModel";
 
 const MY_WORK_VIEW_OPTIONS = [
 	"overview",
@@ -38,6 +42,9 @@ export const Route = createFileRoute("/_app/my-work")({
 });
 
 type MyWorkView = z.infer<typeof myWorkSearchSchema>["view"];
+type MyWorkOverview = NonNullable<
+	ReturnType<typeof useQuery<typeof api.myWork.overview>>
+>;
 type MyWorkIssue = NonNullable<
 	ReturnType<typeof useQuery<typeof api.myWork.overview>>
 >["focusIssues"][number];
@@ -46,11 +53,17 @@ function MyWorkSection({
 	description,
 	emptyMessage,
 	issues,
+	onToggleSelection,
+	selectionEnabled,
+	selectedIssueIds,
 	title,
 }: {
 	description: string;
 	emptyMessage: string;
 	issues: MyWorkIssue[];
+	onToggleSelection: (issueId: string) => void;
+	selectionEnabled: boolean;
+	selectedIssueIds: Set<string>;
 	title: string;
 }) {
 	return (
@@ -61,30 +74,48 @@ function MyWorkSection({
 			</CardHeader>
 			<CardContent className="space-y-2">
 				{issues.map((issue) => (
-					<Link
+					<div
 						key={issue._id}
-						to="/issues/$issueId"
-						params={{ issueId: issue._id }}
-						className="issue-row"
+						className={cn(
+							"issue-row",
+							selectionEnabled && selectedIssueIds.has(issue._id)
+								? "ring-1 ring-[var(--accent)]"
+								: "",
+						)}
 					>
-						<div className="min-w-0">
-							<p className="m-0 truncate text-sm font-medium text-[var(--text)]">
-								{issue.title}
-							</p>
-							<p className="m-0 text-xs text-[var(--muted-text)]">
-								{issue.project ? `${issue.project.key} · ` : ""}#
-								{issue.issueNumber}
-								{issue.dueDate ? ` · Due ${formatDate(issue.dueDate)}` : ""}
-								{!issue.dueDate
-									? ` · Updated ${formatRelative(issue.updatedAt)}`
-									: ""}
-							</p>
-						</div>
+						{selectionEnabled ? (
+							<input
+								type="checkbox"
+								aria-label={`Select task ${issue.title}`}
+								checked={selectedIssueIds.has(issue._id)}
+								onChange={() => onToggleSelection(issue._id)}
+								className="h-4 w-4 rounded border border-[var(--line)] bg-[var(--surface-muted)] accent-[var(--accent)]"
+							/>
+						) : null}
+						<Link
+							to="/issues/$issueId"
+							params={{ issueId: issue._id }}
+							className="issue-row-main no-underline"
+						>
+							<div className="min-w-0">
+								<p className="m-0 truncate text-sm font-medium text-[var(--text)]">
+									{issue.title}
+								</p>
+								<p className="m-0 text-xs text-[var(--muted-text)]">
+									{issue.project ? `${issue.project.key} · ` : ""}#
+									{issue.issueNumber}
+									{issue.dueDate ? ` · Due ${formatDate(issue.dueDate)}` : ""}
+									{!issue.dueDate
+										? ` · Updated ${formatRelative(issue.updatedAt)}`
+										: ""}
+								</p>
+							</div>
+						</Link>
 						<div className="flex items-center gap-2">
 							<IssueStatusBadge status={issue.status} />
 							<IssuePriorityBadge priority={issue.priority} />
 						</div>
-					</Link>
+					</div>
 				))}
 				{!issues.length ? (
 					<p className="m-0 text-sm text-[var(--muted-text)]">{emptyMessage}</p>
@@ -139,26 +170,43 @@ function MyWorkPage() {
 	const updateMyWorkPreferences = useMutation(
 		api.users.updateMyWorkPreferences,
 	);
+	const bulkUpdateIssues = useMutation(api.issues.bulkUpdate);
 	const defaultView = me?.myWorkDefaultView ?? "overview";
 	const selectedView =
 		search.view ?? me?.myWorkDefaultView ?? me?.myWorkLastView ?? "overview";
-
-	if (!overview || !me) {
-		return <div className="page-loading">Loading my work…</div>;
-	}
+	const canWrite = me?.globalRole === "admin" || me?.globalRole === "member";
+	const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(
+		() => new Set(),
+	);
+	const [bulkActionError, setBulkActionError] = useState<string | null>(null);
+	const [isApplyingBulkAction, setIsApplyingBulkAction] = useState(false);
+	const overviewData: MyWorkOverview = overview ?? {
+		quickStats: {
+			active: 0,
+			focus: 0,
+			dueSoon: 0,
+			overdue: 0,
+			completedRecently: 0,
+		},
+		focusIssues: [],
+		dueSoonIssues: [],
+		overdueIssues: [],
+		backlogIssues: [],
+		recentlyCompletedIssues: [],
+	};
 
 	const stats = [
-		{ label: "Active", value: overview.quickStats.active, icon: ListTodo },
-		{ label: "Focus", value: overview.quickStats.focus, icon: Target },
-		{ label: "Due Soon", value: overview.quickStats.dueSoon, icon: Clock3 },
+		{ label: "Active", value: overviewData.quickStats.active, icon: ListTodo },
+		{ label: "Focus", value: overviewData.quickStats.focus, icon: Target },
+		{ label: "Due Soon", value: overviewData.quickStats.dueSoon, icon: Clock3 },
 		{
 			label: "Overdue",
-			value: overview.quickStats.overdue,
+			value: overviewData.quickStats.overdue,
 			icon: AlertTriangle,
 		},
 		{
 			label: "Completed",
-			value: overview.quickStats.completedRecently,
+			value: overviewData.quickStats.completedRecently,
 			icon: CheckCheck,
 		},
 	];
@@ -203,14 +251,14 @@ function MyWorkPage() {
 			? {
 					title: "Focus",
 					description: "Assigned tasks already in progress or review.",
-					issues: overview.focusIssues,
+					issues: overviewData.focusIssues,
 					emptyMessage: "No focus tasks right now.",
 				}
 			: selectedView === "due_soon"
 				? {
 						title: "Due Soon",
 						description: "Assigned tasks due within the next seven days.",
-						issues: overview.dueSoonIssues,
+						issues: overviewData.dueSoonIssues,
 						emptyMessage: "Nothing due soon.",
 					}
 				: selectedView === "overdue"
@@ -218,24 +266,92 @@ function MyWorkPage() {
 							title: "Overdue",
 							description:
 								"Assigned tasks with past due dates that still need attention.",
-							issues: overview.overdueIssues,
+							issues: overviewData.overdueIssues,
 							emptyMessage: "Nothing overdue.",
 						}
 					: selectedView === "backlog"
 						? {
 								title: "Backlog & Todo",
 								description: "Assigned tasks not started yet.",
-								issues: overview.backlogIssues,
+								issues: overviewData.backlogIssues,
 								emptyMessage: "No backlog items assigned to you.",
 							}
 						: selectedView === "completed"
 							? {
 									title: "Recently Completed",
 									description: "Assigned work you recently finished.",
-									issues: overview.recentlyCompletedIssues,
+									issues: overviewData.recentlyCompletedIssues,
 									emptyMessage: "No recently completed assigned tasks.",
 								}
 							: null;
+	const visibleIssues = useMemo(() => {
+		if (selectedSection) {
+			return selectedSection.issues;
+		}
+
+		return [
+			...overviewData.focusIssues,
+			...overviewData.overdueIssues,
+			...overviewData.dueSoonIssues,
+			...overviewData.backlogIssues,
+			...overviewData.recentlyCompletedIssues,
+		];
+	}, [overviewData, selectedSection]);
+	const visibleIssueIds = useMemo(
+		() => new Set(visibleIssues.map((issue) => issue._id)),
+		[visibleIssues],
+	);
+
+	useEffect(() => {
+		setSelectedIssueIds((current) => {
+			const next = new Set(
+				[...current].filter((issueId) => visibleIssueIds.has(issueId)),
+			);
+			return next.size === current.size ? current : next;
+		});
+	}, [visibleIssueIds]);
+
+	function toggleIssueSelection(issueId: string) {
+		setSelectedIssueIds((current) => {
+			const next = new Set(current);
+			if (next.has(issueId)) {
+				next.delete(issueId);
+			} else {
+				next.add(issueId);
+			}
+			return next;
+		});
+	}
+
+	async function applyBulkAction(changes: {
+		status?: MyWorkIssue["status"];
+		priority?: MyWorkIssue["priority"];
+		archived?: boolean;
+	}) {
+		if (!selectedIssueIds.size) {
+			return;
+		}
+
+		setBulkActionError(null);
+		setIsApplyingBulkAction(true);
+		try {
+			await bulkUpdateIssues({
+				issueIds: [...selectedIssueIds] as Id<"issues">[],
+				...changes,
+				cascadeDescendantsToDone: changes.status === "done" ? true : undefined,
+			});
+		} catch (error) {
+			setBulkActionError(
+				getClientErrorMessage(error, "Failed to update selected tasks."),
+			);
+		} finally {
+			setIsApplyingBulkAction(false);
+		}
+	}
+
+	if (!overview || !me) {
+		return <div className="page-loading">Loading my work…</div>;
+	}
 
 	return (
 		<div>
@@ -327,6 +443,22 @@ function MyWorkPage() {
 				</Card>
 			</section>
 
+			{canWrite && selectedIssueIds.size ? (
+				<section className="mt-5">
+					<IssueBulkActionsBar
+						selectedCount={selectedIssueIds.size}
+						isApplying={isApplyingBulkAction}
+						onClearSelection={() => setSelectedIssueIds(new Set())}
+						onStatusChange={(status) => void applyBulkAction({ status })}
+						onPriorityChange={(priority) => void applyBulkAction({ priority })}
+						onArchiveChange={(archived) => void applyBulkAction({ archived })}
+					/>
+				</section>
+			) : null}
+			{bulkActionError ? (
+				<p className="mt-4 text-sm text-[var(--danger)]">{bulkActionError}</p>
+			) : null}
+
 			{selectedSection ? (
 				<section className="mt-5">
 					<MyWorkSection
@@ -334,6 +466,9 @@ function MyWorkPage() {
 						description={selectedSection.description}
 						issues={selectedSection.issues}
 						emptyMessage={selectedSection.emptyMessage}
+						onToggleSelection={toggleIssueSelection}
+						selectionEnabled={canWrite}
+						selectedIssueIds={selectedIssueIds}
 					/>
 				</section>
 			) : (
@@ -342,14 +477,20 @@ function MyWorkPage() {
 						<MyWorkSection
 							title="Focus"
 							description="Assigned tasks already in progress or review."
-							issues={overview.focusIssues}
+							issues={overviewData.focusIssues}
 							emptyMessage="No focus tasks right now."
+							onToggleSelection={toggleIssueSelection}
+							selectionEnabled={canWrite}
+							selectedIssueIds={selectedIssueIds}
 						/>
 						<MyWorkSection
 							title="Overdue"
 							description="Assigned tasks with past due dates that still need attention."
-							issues={overview.overdueIssues}
+							issues={overviewData.overdueIssues}
 							emptyMessage="Nothing overdue."
+							onToggleSelection={toggleIssueSelection}
+							selectionEnabled={canWrite}
+							selectedIssueIds={selectedIssueIds}
 						/>
 					</section>
 
@@ -357,14 +498,20 @@ function MyWorkPage() {
 						<MyWorkSection
 							title="Due Soon"
 							description="Assigned tasks due within the next seven days."
-							issues={overview.dueSoonIssues}
+							issues={overviewData.dueSoonIssues}
 							emptyMessage="Nothing due soon."
+							onToggleSelection={toggleIssueSelection}
+							selectionEnabled={canWrite}
+							selectedIssueIds={selectedIssueIds}
 						/>
 						<MyWorkSection
 							title="Backlog & Todo"
 							description="Assigned tasks not started yet."
-							issues={overview.backlogIssues}
+							issues={overviewData.backlogIssues}
 							emptyMessage="No backlog items assigned to you."
+							onToggleSelection={toggleIssueSelection}
+							selectionEnabled={canWrite}
+							selectedIssueIds={selectedIssueIds}
 						/>
 					</section>
 
@@ -372,8 +519,11 @@ function MyWorkPage() {
 						<MyWorkSection
 							title="Recently Completed"
 							description="Assigned work you recently finished."
-							issues={overview.recentlyCompletedIssues}
+							issues={overviewData.recentlyCompletedIssues}
 							emptyMessage="No recently completed assigned tasks."
+							onToggleSelection={toggleIssueSelection}
+							selectionEnabled={canWrite}
+							selectedIssueIds={selectedIssueIds}
 						/>
 					</section>
 				</>

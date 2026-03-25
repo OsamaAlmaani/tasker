@@ -70,6 +70,9 @@ Use this file to track feature progress. Check items off as they ship.
 - [ ] Add undo and recovery flows for destructive actions
 - [ ] Add a proper trash / restore flow for deleted tasks and projects if deletion remains part of the product
 
+Core workflow progress:
+- 2026-03-25: Added first-pass bulk task actions for status, priority, archive, and project-scoped assignee updates across `My Work` and project list views, backed by `convex/issues.bulkUpdate`. Bulk list moves and bulk delete remain open.
+
 ## Planning
 
 - [ ] Add calendar view

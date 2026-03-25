@@ -35,6 +35,7 @@ type AssignableUserOption = {
 type ProjectTasksPanelProps = {
 	assignableUsers?: AssignableUserOption[];
 	assigneeId: string;
+	bulkActions?: ReactNode;
 	canWrite: boolean;
 	dragOverStatus: (typeof ISSUE_STATUSES)[number] | null;
 	groupBy: string;
@@ -73,6 +74,7 @@ type ProjectTasksPanelProps = {
 export function ProjectTasksPanel({
 	assignableUsers,
 	assigneeId,
+	bulkActions,
 	canWrite,
 	dragOverStatus,
 	groupBy,
@@ -228,6 +230,7 @@ export function ProjectTasksPanel({
 						</Button>
 					</div>
 				) : null}
+				{bulkActions ? <div className="mb-3">{bulkActions}</div> : null}
 
 				{issueLayout === "list" ? (
 					<div className="space-y-4">
@@ -240,11 +243,14 @@ export function ProjectTasksPanel({
 									<Badge>{group.items.length}</Badge>
 								</div>
 
-								{group.tree.map((node, index) => (
-									<div key={`${group.key}-${index}`}>
-										{renderListIssueNode(node)}
-									</div>
-								))}
+								{group.tree.map((node) => {
+									const issueNode = node as { issue: { _id: string } };
+									return (
+										<div key={issueNode.issue._id}>
+											{renderListIssueNode(node)}
+										</div>
+									);
+								})}
 							</div>
 						))}
 						{showEmptyState ? (
@@ -279,11 +285,14 @@ export function ProjectTasksPanel({
 								</div>
 								<div className="kanban-column-body">
 									{column.items.length ? (
-										column.tree.map((node, index) => (
-											<div key={`${column.status}-${index}`}>
-												{renderKanbanIssueNode(node)}
-											</div>
-										))
+										column.tree.map((node) => {
+											const issueNode = node as { issue: { _id: string } };
+											return (
+												<div key={issueNode.issue._id}>
+													{renderKanbanIssueNode(node)}
+												</div>
+											);
+										})
 									) : (
 										<p className="kanban-empty">No tasks in this status.</p>
 									)}

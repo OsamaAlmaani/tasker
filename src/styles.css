@@ -1512,8 +1512,18 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
   row-gap: 8px;
 }
 
+.issue-row-selectable {
+  grid-template-columns: 28px minmax(260px, 1fr) 40px 92px 126px 120px;
+}
+
 .issue-row-subissue {
   background: color-mix(in oklab, var(--surface-muted) 72%, var(--accent) 6%);
+}
+
+.issue-row-selection {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .issue-row-main {
@@ -2416,21 +2426,52 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
     align-items: start;
   }
 
+  .issue-row-selectable {
+    grid-template-columns: 28px minmax(0, 1fr) repeat(3, minmax(0, max-content));
+  }
+
+  .issue-row-selectable .issue-row-main {
+    grid-column: 2 / -1;
+  }
+
+  .issue-row-selectable .issue-row-selection {
+    grid-column: 1 / 2;
+    grid-row: 1 / span 2;
+    align-self: start;
+    padding-top: 2px;
+  }
+
   .issue-row-col-assignee {
     grid-column: 1 / 2;
     justify-content: flex-start;
+  }
+
+  .issue-row-selectable .issue-row-col-assignee {
+    grid-column: 2 / 3;
   }
 
   .issue-row-col-due {
     grid-column: 2 / 3;
   }
 
+  .issue-row-selectable .issue-row-col-due {
+    grid-column: 3 / 4;
+  }
+
   .issue-row-col-status {
     grid-column: 3 / 4;
   }
 
+  .issue-row-selectable .issue-row-col-status {
+    grid-column: 4 / 5;
+  }
+
   .issue-row-col-priority {
     grid-column: 4 / 5;
+  }
+
+  .issue-row-selectable .issue-row-col-priority {
+    grid-column: 5 / 6;
   }
 
   .kanban-board {

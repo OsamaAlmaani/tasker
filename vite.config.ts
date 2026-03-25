@@ -9,7 +9,11 @@ import tsconfigPaths from "vite-tsconfig-paths";
 const config = defineConfig({
 	plugins: [
 		devtools(),
-		nitro({ rollupConfig: { external: [/^@sentry\//, /^swr(\/.*)?$/] } }),
+		nitro({
+			rollupConfig: {
+				external: [/^@sentry\//, /^swr(\/.*)?$/, /^lucide-react(\/.*)?$/],
+			},
+		}),
 		tsconfigPaths({ projects: ["./tsconfig.json"] }),
 		tailwindcss(),
 		tanstackStart(),
