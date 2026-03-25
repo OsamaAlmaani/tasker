@@ -216,6 +216,7 @@ Invite flow is split intentionally:
 - Place shared issue status transition/cascade-confirmation orchestration in `src/features/tasker/issues/useIssueStatusFlow.ts` and reuse it instead of reimplementing route-local mutation guards.
 - Place shared task draft modal/form UI in `src/features/tasker/issues/components/IssueDraftDialog.tsx` and reuse it across project and issue flows instead of duplicating form markup.
 - Place issue discussion/activity rendering and comment editing UI in `src/features/tasker/issues/components/IssueDiscussionPanel.tsx` instead of keeping that block inline in the issue route.
+- Place issue overview, sub-task list, and metadata UI in `src/features/tasker/issues/components/IssueDetailPanels.tsx` and keep the issue route focused on local edit state and mutation callbacks.
 - Place project task import/export state, menu behavior, and file parsing in `src/features/tasker/projects/useProjectTaskImportExport.ts` instead of keeping that workflow inline in route files.
 - Place project members/invite modal UI in `src/features/tasker/projects/components/` and keep the route focused on modal state plus mutation wiring.
 - Place the project settings form card in `src/features/tasker/projects/components/ProjectSettingsCard.tsx` and keep the route focused on settings state, submit handlers, and archive confirmation state.

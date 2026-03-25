@@ -24,6 +24,7 @@ Refactor oversized route files into maintainable feature modules while preservin
   - [x] Extract issue discussion/activity UI into a dedicated issue component.
   - [x] Extract the project settings card into a dedicated project component.
   - [x] Extract the project task board/filter card into a dedicated project component.
+  - [x] Extract the issue overview/sub-task and metadata panels into dedicated issue components.
 - [ ] Consolidate repeated project/task presentation patterns.
 
 ## Phase 3: Stabilization
@@ -42,3 +43,4 @@ Refactor oversized route files into maintainable feature modules while preservin
 - Latest extraction complete: issue discussion/activity UI now lives in `src/features/tasker/issues/components/IssueDiscussionPanel.tsx`.
 - Latest extraction complete: project settings card UI now lives in `src/features/tasker/projects/components/ProjectSettingsCard.tsx`.
 - Latest extraction complete: project task board/filter UI now lives in `src/features/tasker/projects/components/ProjectTasksPanel.tsx`.
+- Latest extraction complete: issue overview/sub-task and metadata UI now lives in `src/features/tasker/issues/components/IssueDetailPanels.tsx`.

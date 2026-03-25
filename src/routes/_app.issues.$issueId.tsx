@@ -1,28 +1,22 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
-import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ConfirmDialog } from "#/components/ui/confirm-dialog";
-import { Input } from "#/components/ui/input";
-import { Select } from "#/components/ui/select";
-import { Textarea } from "#/components/ui/textarea";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
-import { formatDate, formatRelative } from "#/features/tasker/format";
+import { formatRelative } from "#/features/tasker/format";
+import {
+	IssueMetadataPanel,
+	IssueOverviewPanel,
+} from "#/features/tasker/issues/components/IssueDetailPanels";
 import { IssueDiscussionPanel } from "#/features/tasker/issues/components/IssueDiscussionPanel";
 import {
 	type IssueDraft,
 	IssueDraftDialog,
 } from "#/features/tasker/issues/components/IssueDraftDialog";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
-import {
-	ISSUE_PRIORITIES,
-	ISSUE_STATUSES,
-	issuePriorityLabel,
-	issueStatusLabel,
-} from "#/features/tasker/model";
+import type { ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
 import {
 	commentFormSchema,
 	issueFormSchema,
@@ -77,18 +71,6 @@ function createSubIssueDraft(parentIssue?: IssueDetailRow): IssueDraft {
 			: "",
 		labels: "",
 	};
-}
-
-function formatChildProgress(issue: IssueDetailRow) {
-	if (!issue.hasChildren) {
-		return null;
-	}
-
-	return `${issue.completedChildIssueCount}/${issue.childIssueCount} done`;
-}
-
-function roundCompletionRate(issue: IssueDetailRow) {
-	return Math.round(issue.childCompletionRate * 100);
 }
 
 function IssueDetailPage() {
@@ -369,422 +351,84 @@ function IssueDetailPage() {
 			) : null}
 
 			<div className="issue-detail-layout">
-				<div className="issue-detail-main">
-					{issueData.parentIssue ? (
-						<section className="issue-overview-block">
-							<div className="issue-overview-toolbar">
-								<span className="issue-overview-kicker">Parent Task</span>
-							</div>
-							<Link
-								to="/issues/$issueId"
-								params={{ issueId: issueData.parentIssue._id }}
-								className="issue-related-link no-underline"
-							>
-								<div className="flex items-center gap-2">
-									<Badge className="issue-row-id-badge">
-										#{issueData.parentIssue.issueNumber}
-									</Badge>
-									<p className="m-0 text-sm font-medium text-[var(--text)]">
-										{issueData.parentIssue.title}
-									</p>
-								</div>
-								<div className="mt-2 flex items-center gap-2">
-									<Badge className="issue-hierarchy-badge">Parent</Badge>
-									<Badge>
-										{issueStatusLabel[issueData.parentIssue.status]}
-									</Badge>
-								</div>
-							</Link>
-						</section>
-					) : null}
+				<IssueOverviewPanel
+					canWrite={canWrite}
+					childIssueRows={
+						childIssueRows as Array<{
+							issue: IssueDetailRow;
+							assignee: { name: string } | null;
+						}>
+					}
+					currentIssue={currentIssue as IssueDetailRow}
+					descriptionDraft={descriptionDraft}
+					editingDescription={editingDescription}
+					editingTitle={editingTitle}
+					onCancelDescriptionEdit={() => setEditingDescription(false)}
+					onCancelTitleEdit={() => setEditingTitle(false)}
+					onDescriptionDraftChange={setDescriptionDraft}
+					onOpenSubIssueForm={() => {
+						setSubIssueError(null);
+						setSubIssueForm(createSubIssueDraft(issueData.issue));
+						setSubIssueFormOpen(true);
+					}}
+					onSaveDescription={async () => {
+						await updateIssue({
+							issueId,
+							description: descriptionDraft,
+						});
+						setEditingDescription(false);
+					}}
+					onStartDescriptionEdit={() => {
+						setEditingDescription(true);
+						setDescriptionDraft(issueData.issue.description ?? "");
+					}}
+					onStartTitleEdit={() => {
+						setEditingTitle(true);
+						setTitleDraft(issueData.issue.title);
+					}}
+					onSubmitTitle={async (event) => {
+						event.preventDefault();
+						await saveTitle();
+					}}
+					onTitleDraftChange={setTitleDraft}
+					parentIssue={issueData.parentIssue ?? null}
+					titleDraft={titleDraft}
+				/>
 
-					<section className="issue-overview-block">
-						<div className="issue-overview-toolbar">
-							<span className="issue-overview-kicker">Title</span>
-							{canWrite && !editingTitle ? (
-								<Button
-									size="sm"
-									variant="ghost"
-									className="h-7 w-7 p-0"
-									aria-label="Edit title"
-									title="Edit title"
-									onClick={() => {
-										setEditingTitle(true);
-										setTitleDraft(issueData.issue.title);
-									}}
-								>
-									<Pencil className="h-3.5 w-3.5" />
-								</Button>
-							) : null}
-						</div>
-						{editingTitle ? (
-							<form
-								className="space-y-2"
-								onSubmit={async (event) => {
-									event.preventDefault();
-									await saveTitle();
-								}}
-							>
-								<Input
-									value={titleDraft}
-									onChange={(event) => setTitleDraft(event.target.value)}
-									autoFocus
-								/>
-								<div className="flex items-center gap-2">
-									<Button type="submit" size="sm">
-										Save
-									</Button>
-									<Button
-										size="sm"
-										variant="ghost"
-										type="button"
-										onClick={() => setEditingTitle(false)}
-									>
-										Cancel
-									</Button>
-								</div>
-							</form>
-						) : (
-							<div className="space-y-3">
-								<h1 className="m-0 text-4xl font-bold leading-tight tracking-[-0.02em] text-[var(--text)]">
-									{issueData.issue.title}
-								</h1>
-								{issueData.issue.parentIssueId ? (
-									<div>
-										<Badge className="issue-hierarchy-badge">Sub-task</Badge>
-									</div>
-								) : null}
-								{issueData.issue.hasChildren ? (
-									<div className="issue-progress-panel">
-										<div className="flex items-center justify-between gap-3">
-											<span className="issue-progress-text">
-												Sub-task progress
-											</span>
-											<span className="issue-progress-text">
-												{formatChildProgress(issueData.issue as IssueDetailRow)}{" "}
-												(
-												{roundCompletionRate(issueData.issue as IssueDetailRow)}
-												%)
-											</span>
-										</div>
-										<div className="issue-progress-bar" aria-hidden="true">
-											<div
-												className="issue-progress-bar-fill"
-												style={{
-													width: `${roundCompletionRate(issueData.issue as IssueDetailRow)}%`,
-												}}
-											/>
-										</div>
-									</div>
-								) : null}
-							</div>
-						)}
-					</section>
-
-					<section className="issue-overview-block issue-overview-block-description">
-						<div className="issue-overview-toolbar">
-							<span className="issue-overview-kicker">Description</span>
-							{canWrite && !editingDescription ? (
-								<Button
-									size="sm"
-									variant="ghost"
-									className="h-7 w-7 p-0"
-									aria-label="Edit description"
-									title="Edit description"
-									onClick={() => {
-										setEditingDescription(true);
-										setDescriptionDraft(issueData.issue.description ?? "");
-									}}
-								>
-									<Pencil className="h-3.5 w-3.5" />
-								</Button>
-							) : null}
-						</div>
-						{editingDescription ? (
-							<div className="space-y-2">
-								<Textarea
-									value={descriptionDraft}
-									onChange={(event) => setDescriptionDraft(event.target.value)}
-								/>
-								<div className="flex items-center gap-2">
-									<Button
-										size="sm"
-										onClick={async () => {
-											await updateIssue({
-												issueId,
-												description: descriptionDraft,
-											});
-											setEditingDescription(false);
-										}}
-									>
-										Save
-									</Button>
-									<Button
-										size="sm"
-										variant="ghost"
-										onClick={() => setEditingDescription(false)}
-									>
-										Cancel
-									</Button>
-								</div>
-							</div>
-						) : (
-							<p className="m-0 whitespace-pre-wrap text-[1.05rem] leading-relaxed text-[var(--text)]">
-								{issueData.issue.description || "No description provided."}
-							</p>
-						)}
-					</section>
-
-					{!currentIssue.parentIssueId ? (
-						<Card className="issue-subissues-card">
-							<CardHeader className="pb-2">
-								<div className="flex items-center justify-between gap-3">
-									<CardTitle className="text-base">
-										Sub-tasks ({childIssueRows.length})
-									</CardTitle>
-									{canWrite ? (
-										<Button
-											type="button"
-											size="sm"
-											variant="secondary"
-											onClick={() => {
-												setSubIssueError(null);
-												setSubIssueForm(createSubIssueDraft(issueData.issue));
-												setSubIssueFormOpen(true);
-											}}
-										>
-											<Plus className="mr-1.5 h-3.5 w-3.5" />
-											Add sub-task
-										</Button>
-									) : null}
-								</div>
-							</CardHeader>
-							<CardContent className="space-y-4">
-								{childIssueRows.length ? (
-									<div className="issue-tree-children issue-tree-list">
-										{childIssueRows.map((row) => (
-											<div
-												key={row.issue._id}
-												className="issue-tree-node issue-tree-node-child"
-											>
-												<Link
-													to="/issues/$issueId"
-													params={{ issueId: row.issue._id }}
-													className="issue-related-link no-underline"
-												>
-													<div className="flex items-center gap-2">
-														<Badge className="issue-row-id-badge">
-															#{row.issue.issueNumber}
-														</Badge>
-														<p className="m-0 text-sm font-medium text-[var(--text)]">
-															{row.issue.title}
-														</p>
-														<Badge className="issue-hierarchy-badge">
-															Sub-task
-														</Badge>
-													</div>
-													<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
-														{row.issue.description?.trim() || "No description"}
-													</p>
-													<div className="mt-2 flex flex-wrap items-center gap-2">
-														<Badge>{issueStatusLabel[row.issue.status]}</Badge>
-														<Badge>
-															{issuePriorityLabel[row.issue.priority]}
-														</Badge>
-														{row.assignee ? (
-															<Badge>{row.assignee.name}</Badge>
-														) : null}
-														{row.issue.hasChildren ? (
-															<Badge className="issue-progress-badge">
-																{formatChildProgress(row.issue)} (
-																{roundCompletionRate(row.issue)}%)
-															</Badge>
-														) : null}
-													</div>
-												</Link>
-											</div>
-										))}
-									</div>
-								) : (
-									<p className="m-0 text-sm text-[var(--muted-text)]">
-										No sub-tasks yet.
-									</p>
-								)}
-							</CardContent>
-						</Card>
-					) : null}
-				</div>
-
-				<aside className="issue-detail-settings issue-meta-panel">
-					<div className="issue-meta-row">
-						<span className="issue-meta-label">List</span>
-						<div className="issue-meta-value">
-							{canWrite ? (
-								<Select
-									className="issue-meta-control"
-									value={issueData.issue.listId ?? ""}
-									onChange={(event) =>
-										updateIssue({
-											issueId,
-											listId: (event.target.value ||
-												null) as Id<"issueLists"> | null,
-										})
-									}
-								>
-									<option value="">No list</option>
-									{(issueLists ?? []).map((list) => (
-										<option key={list._id} value={list._id}>
-											{list.name}
-										</option>
-									))}
-								</Select>
-							) : (
-								<span className="issue-meta-static">
-									{issueLists?.find(
-										(list) => list._id === issueData.issue.listId,
-									)?.name ?? "No list"}
-								</span>
-							)}
-						</div>
-					</div>
-
-					<div className="issue-meta-row">
-						<span className="issue-meta-label">Status</span>
-						<div className="issue-meta-value">
-							{canWrite ? (
-								<Select
-									className="issue-meta-control"
-									value={currentIssue.status}
-									onChange={(event) =>
-										void handleIssueStatusChange(
-											currentIssue,
-											event.target.value as (typeof ISSUE_STATUSES)[number],
-										)
-									}
-								>
-									{ISSUE_STATUSES.map((value) => (
-										<option key={value} value={value}>
-											{issueStatusLabel[value]}
-										</option>
-									))}
-								</Select>
-							) : (
-								<span className="issue-meta-static">
-									{issueStatusLabel[issueData.issue.status]}
-								</span>
-							)}
-						</div>
-					</div>
-
-					<div className="issue-meta-row">
-						<span className="issue-meta-label">Priority</span>
-						<div className="issue-meta-value">
-							{canWrite ? (
-								<Select
-									className="issue-meta-control"
-									value={issueData.issue.priority}
-									onChange={(event) =>
-										updateIssue({
-											issueId,
-											priority: event.target
-												.value as (typeof ISSUE_PRIORITIES)[number],
-										})
-									}
-								>
-									{ISSUE_PRIORITIES.map((value) => (
-										<option key={value} value={value}>
-											{issuePriorityLabel[value]}
-										</option>
-									))}
-								</Select>
-							) : (
-								<span className="issue-meta-static">
-									{issuePriorityLabel[issueData.issue.priority]}
-								</span>
-							)}
-						</div>
-					</div>
-
-					<div className="issue-meta-row">
-						<span className="issue-meta-label">Assignee</span>
-						<div className="issue-meta-value">
-							{canWrite ? (
-								<Select
-									className="issue-meta-control"
-									value={issueData.issue.assigneeId ?? ""}
-									onChange={(event) =>
-										updateIssue({
-											issueId,
-											assigneeId: (event.target.value ||
-												null) as Id<"users"> | null,
-										})
-									}
-								>
-									<option value="">Unassigned</option>
-									{(assignableUsers ?? []).map((user) => (
-										<option key={user._id} value={user._id}>
-											{user.name}
-										</option>
-									))}
-								</Select>
-							) : (
-								<span className="issue-meta-static">
-									{issueData.assignee?.name ?? "Unassigned"}
-								</span>
-							)}
-						</div>
-					</div>
-
-					<div className="issue-meta-row">
-						<span className="issue-meta-label">Due Date</span>
-						<div className="issue-meta-value">
-							{canWrite ? (
-								<Input
-									className="issue-meta-control"
-									type="date"
-									value={
-										issueData.issue.dueDate
-											? new Date(issueData.issue.dueDate)
-													.toISOString()
-													.slice(0, 10)
-											: ""
-									}
-									onChange={(event) =>
-										updateIssue({
-											issueId,
-											dueDate: event.target.value
-												? new Date(event.target.value).getTime()
-												: null,
-										})
-									}
-								/>
-							) : (
-								<span className="issue-meta-static">
-									{issueData.issue.dueDate
-										? formatDate(issueData.issue.dueDate)
-										: "No due date"}
-								</span>
-							)}
-						</div>
-					</div>
-
-					<div className="issue-meta-row issue-meta-row-last">
-						<span className="issue-meta-label">Labels</span>
-						<div className="issue-meta-value">
-							{issueData.issue.labels.length ? (
-								<div className="flex flex-wrap justify-end gap-1.5">
-									{issueData.issue.labels.map((label) => (
-										<Badge key={label} className="issue-meta-tag">
-											{label}
-										</Badge>
-									))}
-								</div>
-							) : (
-								<span className="issue-meta-static">None</span>
-							)}
-						</div>
-					</div>
-				</aside>
+				<IssueMetadataPanel
+					assignableUsers={assignableUsers}
+					assigneeName={issueData.assignee?.name ?? undefined}
+					canWrite={canWrite}
+					currentIssue={currentIssue as IssueDetailRow}
+					issueLists={issueLists}
+					onAssigneeChange={(value) =>
+						void updateIssue({
+							issueId,
+							assigneeId: (value || null) as Id<"users"> | null,
+						})
+					}
+					onDueDateChange={(value) =>
+						void updateIssue({
+							issueId,
+							dueDate: value ? new Date(value).getTime() : null,
+						})
+					}
+					onListChange={(value) =>
+						void updateIssue({
+							issueId,
+							listId: (value || null) as Id<"issueLists"> | null,
+						})
+					}
+					onPriorityChange={(value) =>
+						void updateIssue({
+							issueId,
+							priority: value,
+						})
+					}
+					onStatusChange={(value) =>
+						void handleIssueStatusChange(currentIssue, value)
+					}
+				/>
 
 				<IssueDiscussionPanel
 					canWrite={canWrite}
