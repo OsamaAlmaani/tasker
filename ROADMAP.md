@@ -34,6 +34,7 @@ Use this file to track feature progress. Check items off as they ship.
 - 2026-03-25: Extracted project settings form UI to `src/features/tasker/projects/components/ProjectSettingsCard.tsx`, leaving the project route with state and mutation wiring instead of settings form markup.
 - 2026-03-25: Extracted the project task board/filter card to `src/features/tasker/projects/components/ProjectTasksPanel.tsx`, removing the search/filter/layout shell from the project route while preserving route-owned task handlers.
 - 2026-03-25: Extracted issue overview, sub-task list, and metadata controls to `src/features/tasker/issues/components/IssueDetailPanels.tsx`, removing the largest remaining inline UI block from the issue route.
+- 2026-03-25: Extracted recursive project issue-tree rendering to `src/features/tasker/projects/components/ProjectIssueTree.tsx`, removing inline task row/card renderers and their helper controls from the project route.
 
 ## Product Direction
 
