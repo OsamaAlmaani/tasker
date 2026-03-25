@@ -42,13 +42,23 @@ Use this file to track feature progress. Check items off as they ship.
 - 2026-03-25: Extracted project issue tree/grouping helpers to `src/features/tasker/projects/issueGrouping.ts` and added Vitest coverage for tree building, grouped issue derivation, kanban column derivation, and input-date formatting.
 - 2026-03-25: Extracted project draft/settings defaults and invite result messaging to `src/features/tasker/projects/projectDrafts.ts`, reducing controller-hook-only logic and adding direct Vitest coverage for those defaults and inheritance rules.
 - 2026-03-25: Wrapped the foundation refactor by reducing the project detail route to `75` lines and the issue detail route to `264` lines, with route-shell architecture, extracted feature modules, and passing `pnpm test`/`pnpm check`.
+- 2026-03-25: Defined the default product shape in the roadmap and shipped the first post-foundation feature: a dedicated `My Work` view with opinionated personal sections backed by `convex/myWork.ts` and exposed in app navigation.
 
 ## Product Direction
 
-- [ ] Define opinionated defaults for project setup, task structure, views, and permissions
+- [x] Define opinionated defaults for project setup, task structure, views, and permissions
 - [ ] Keep the product simple enough for chaotic teams who mainly want a fast todo-list experience
 - [ ] Keep the product extensible enough for advanced teams who want planning, automation, reporting, and integrations
 - [ ] Design a layered UX so basic teams are not overwhelmed by advanced capabilities
+
+### Default Product Shape
+
+- New projects start active with member invites enabled and task deletion enabled.
+- The default task workflow is `backlog -> todo -> in_progress -> in_review -> done`.
+- The default project working view is task-first: list layout, grouped by list, sorted by recently updated.
+- The default personal working surfaces are `Dashboard`, `My Work`, and `Projects`.
+- `My Work` defaults to opinionated sections instead of a blank filter builder: `Focus`, `Due Soon`, `Overdue`, `Backlog & Todo`, and `Recently Completed`.
+- Permissions remain intentionally simple by default: `admin` has full access, `member` can write in accessible projects, and `viewer` is read-only.
 
 ## Core Workflow
 
@@ -69,7 +79,7 @@ Use this file to track feature progress. Check items off as they ship.
 
 ## Personal Productivity
 
-- [ ] Add a dedicated "My Work" view
+- [x] Add a dedicated "My Work" view
 - [ ] Add saved filters and saved views
 - [ ] Add personal bookmarks / pinning
 - [ ] Add private notes on tasks

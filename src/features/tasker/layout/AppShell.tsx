@@ -6,6 +6,7 @@ import {
 	Command,
 	FolderKanban,
 	Home,
+	ListChecks,
 	Menu,
 	MoreHorizontal,
 	Pencil,
@@ -27,6 +28,7 @@ import { globalRoleLabel } from "../model";
 
 const navItems = [
 	{ to: "/dashboard", label: "Dashboard", icon: Home },
+	{ to: "/my-work", label: "My Work", icon: ListChecks },
 	{ to: "/projects", label: "Projects", icon: FolderKanban },
 	{ to: "/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -83,6 +85,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	const quickCommands = useMemo(() => {
 		const commandRows = [
 			{ id: "go-dashboard", label: "Go to Dashboard", to: "/dashboard" },
+			{ id: "go-my-work", label: "Open My Work", to: "/my-work" },
 			{ id: "go-projects", label: "Go to Projects", to: "/projects" },
 			{ id: "go-settings", label: "Open Settings", to: "/settings" },
 		];

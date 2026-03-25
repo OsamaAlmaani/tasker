@@ -17,6 +17,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as AppMyWorkRouteImport } from './routes/_app.my-work'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppProjectsIndexRouteImport } from './routes/_app.projects.index'
 import { Route as AppProjectsProjectIdRouteImport } from './routes/_app.projects.$projectId'
@@ -62,6 +63,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMyWorkRoute = AppMyWorkRouteImport.update({
+  id: '/my-work',
+  path: '/my-work',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/dashboard': typeof AppDashboardRoute
+  '/my-work': typeof AppMyWorkRoute
   '/settings': typeof AppSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/issues/$issueId': typeof AppIssuesIssueIdRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/dashboard': typeof AppDashboardRoute
+  '/my-work': typeof AppMyWorkRoute
   '/settings': typeof AppSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/issues/$issueId': typeof AppIssuesIssueIdRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/my-work': typeof AppMyWorkRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/issues/$issueId': typeof AppIssuesIssueIdRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/unauthorized'
     | '/dashboard'
+    | '/my-work'
     | '/settings'
     | '/admin/users'
     | '/issues/$issueId'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/unauthorized'
     | '/dashboard'
+    | '/my-work'
     | '/settings'
     | '/admin/users'
     | '/issues/$issueId'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/unauthorized'
     | '/_app/dashboard'
+    | '/_app/my-work'
     | '/_app/settings'
     | '/_app/admin/users'
     | '/_app/issues/$issueId'
@@ -246,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/my-work': {
+      id: '/_app/my-work'
+      path: '/my-work'
+      fullPath: '/my-work'
+      preLoaderRoute: typeof AppMyWorkRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -286,6 +305,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
+  AppMyWorkRoute: typeof AppMyWorkRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
   AppIssuesIssueIdRoute: typeof AppIssuesIssueIdRoute
@@ -295,6 +315,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
+  AppMyWorkRoute: AppMyWorkRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
   AppIssuesIssueIdRoute: AppIssuesIssueIdRoute,
