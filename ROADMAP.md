@@ -58,6 +58,7 @@ Use this file to track feature progress. Check items off as they ship.
 - The default project working view is task-first: list layout, grouped by list, sorted by recently updated.
 - The default personal working surfaces are `Dashboard`, `My Work`, and `Projects`.
 - `My Work` defaults to opinionated sections instead of a blank filter builder: `Focus`, `Due Soon`, `Overdue`, `Backlog & Todo`, and `Recently Completed`.
+- `My Work` should remember the user’s last selected preset view and allow pinning one preset as their default landing view.
 - Permissions remain intentionally simple by default: `admin` has full access, `member` can write in accessible projects, and `viewer` is read-only.
 
 ## Core Workflow
@@ -88,6 +89,7 @@ Use this file to track feature progress. Check items off as they ship.
 
 Personal productivity progress:
 - 2026-03-25: Added first-pass route-backed `My Work` saved views for `Overview`, `Focus`, `Due Soon`, `Overdue`, `Backlog`, and `Completed`. Full user-defined saved filters/views remain open.
+- 2026-03-25: Persisted `My Work` last-view and default-view preferences on the user record so preset views survive navigation and can be pinned as a personal default. Full user-defined saved filters/views remain open.
 
 ## Collaboration
 

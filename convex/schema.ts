@@ -7,6 +7,7 @@ import {
   inviteStatusValidator,
   issuePriorityValidator,
   issueStatusValidator,
+  myWorkViewValidator,
 } from './constants'
 
 export default defineSchema({
@@ -15,6 +16,8 @@ export default defineSchema({
     email: v.string(),
     name: v.string(),
     imageUrl: v.optional(v.string()),
+    myWorkDefaultView: v.optional(myWorkViewValidator),
+    myWorkLastView: v.optional(myWorkViewValidator),
     globalRole: globalRoleValidator,
     isActive: v.boolean(),
     createdAt: v.number(),

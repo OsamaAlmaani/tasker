@@ -58,6 +58,14 @@ export const INVITE_STATUSES = [
   'revoked',
   'expired',
 ] as const
+export const MY_WORK_VIEWS = [
+  'overview',
+  'focus',
+  'due_soon',
+  'overdue',
+  'backlog',
+  'completed',
+] as const
 
 export type GlobalRole = (typeof GLOBAL_ROLES)[number]
 export type IssueStatus = (typeof ISSUE_STATUSES)[number]
@@ -65,6 +73,7 @@ export type IssuePriority = (typeof ISSUE_PRIORITIES)[number]
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number]
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number]
 export type InviteStatus = (typeof INVITE_STATUSES)[number]
+export type MyWorkView = (typeof MY_WORK_VIEWS)[number]
 
 export const globalRoleValidator = v.union(
   v.literal('admin'),
@@ -129,4 +138,13 @@ export const inviteStatusValidator = v.union(
   v.literal('accepted'),
   v.literal('revoked'),
   v.literal('expired'),
+)
+
+export const myWorkViewValidator = v.union(
+  v.literal('overview'),
+  v.literal('focus'),
+  v.literal('due_soon'),
+  v.literal('overdue'),
+  v.literal('backlog'),
+  v.literal('completed'),
 )

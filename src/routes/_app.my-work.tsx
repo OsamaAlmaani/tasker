@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import {
 	AlertTriangle,
 	CheckCheck,
 	Clock3,
 	ListTodo,
+	Pin,
 	Target,
 } from "lucide-react";
 import { z } from "zod";
@@ -133,10 +134,16 @@ const viewOptions: Array<{
 function MyWorkPage() {
 	const navigate = useNavigate();
 	const search = Route.useSearch();
+	const me = useQuery(api.users.me);
 	const overview = useQuery(api.myWork.overview);
-	const selectedView = search.view ?? "overview";
+	const updateMyWorkPreferences = useMutation(
+		api.users.updateMyWorkPreferences,
+	);
+	const defaultView = me?.myWorkDefaultView ?? "overview";
+	const selectedView =
+		search.view ?? me?.myWorkDefaultView ?? me?.myWorkLastView ?? "overview";
 
-	if (!overview) {
+	if (!overview || !me) {
 		return <div className="page-loading">Loading my work…</div>;
 	}
 
@@ -157,11 +164,38 @@ function MyWorkPage() {
 	];
 
 	function updateView(view: NonNullable<MyWorkView>) {
+		void updateMyWorkPreferences({
+			lastView: view,
+		});
 		void navigate({
 			to: "/my-work",
-			search: view === "overview" ? {} : { view },
+			search: { view },
 			replace: true,
 		});
+	}
+
+	function setDefaultView(view: NonNullable<MyWorkView>) {
+		void updateMyWorkPreferences({
+			lastView: selectedView,
+			defaultView: view,
+		});
+	}
+
+	function clearDefaultView() {
+		void updateMyWorkPreferences({
+			lastView: selectedView,
+			defaultView: null,
+		});
+	}
+
+	function toggleDefaultView(view: NonNullable<MyWorkView>) {
+		if (defaultView === view && view !== "overview") {
+			clearDefaultView();
+			return;
+		}
+		if (defaultView !== view) {
+			setDefaultView(view);
+		}
 	}
 
 	const selectedSection =
@@ -240,20 +274,55 @@ function MyWorkPage() {
 							filters each time.
 						</p>
 					</CardHeader>
-					<CardContent className="flex flex-wrap gap-2">
-						{viewOptions.map((option) => (
-							<Button
-								key={option.value}
-								type="button"
-								variant={
-									selectedView === option.value ? "primary" : "secondary"
-								}
-								onClick={() => updateView(option.value)}
-								title={option.description}
-							>
-								{option.label}
-							</Button>
-						))}
+					<CardContent className="space-y-3">
+						<div className="flex flex-wrap gap-2">
+							{viewOptions.map((option) => {
+								const isSelected = selectedView === option.value;
+								const isPinnedDefault = defaultView === option.value;
+								const showPinToggle =
+									isSelected &&
+									(defaultView !== option.value || option.value !== "overview");
+
+								return (
+									<div key={option.value} className="relative">
+										<Button
+											type="button"
+											variant={isSelected ? "primary" : "secondary"}
+											onClick={() => updateView(option.value)}
+											title={option.description}
+											className={showPinToggle ? "pr-10" : undefined}
+										>
+											{option.label}
+											{isPinnedDefault ? " · Default" : ""}
+										</Button>
+										{showPinToggle ? (
+											<button
+												type="button"
+												className="absolute inset-y-0 right-2 inline-flex items-center justify-center text-current opacity-80 transition hover:opacity-100 focus-visible:outline-none"
+												title={
+													isPinnedDefault
+														? "Clear default view"
+														: "Set this view as default"
+												}
+												aria-label={
+													isPinnedDefault
+														? "Clear default view"
+														: "Set this view as default"
+												}
+												onClick={(event) => {
+													event.stopPropagation();
+													toggleDefaultView(option.value);
+												}}
+											>
+												<Pin
+													className={`h-3.5 w-3.5 ${isPinnedDefault ? "fill-current" : ""}`}
+												/>
+											</button>
+										) : null}
+									</div>
+								);
+							})}
+						</div>
 					</CardContent>
 				</Card>
 			</section>

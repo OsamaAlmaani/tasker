@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": "22.x",
+    "node": "25.x",
     "pnpm": "10.x"
   },
   "imports": {

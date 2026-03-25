@@ -33,7 +33,7 @@ Expectations:
 ## Runtime / Tooling
 
 - Package manager: `pnpm`
-- Target Node: `22.x` from [`package.json`](./package.json)
+- Target Node: `25.x` from [`package.json`](./package.json)
 - TS/path aliases from [`tsconfig.json`](./tsconfig.json):
   - `#/*` -> `src/*`
   - `#convex/*` -> `convex/*`
@@ -86,7 +86,7 @@ Main route files:
 
 - [`src/routes/index.tsx`](./src/routes/index.tsx): public landing page
 - [`src/routes/_app.dashboard.tsx`](./src/routes/_app.dashboard.tsx): dashboard summary
-- [`src/routes/_app.my-work.tsx`](./src/routes/_app.my-work.tsx): opinionated personal queue for assigned work with route-backed preset views
+- [`src/routes/_app.my-work.tsx`](./src/routes/_app.my-work.tsx): opinionated personal queue for assigned work with route-backed preset views plus persisted last/default view preferences
 - [`src/routes/_app.projects.index.tsx`](./src/routes/_app.projects.index.tsx): project list + project creation
 - [`src/routes/_app.projects.$projectId.tsx`](./src/routes/_app.projects.$projectId.tsx): project detail, task list/kanban, filters, members, invites, import/export, project settings
 - [`src/routes/_app.issues.$issueId.tsx`](./src/routes/_app.issues.$issueId.tsx): issue detail, sub-tasks, comments, activity
@@ -102,7 +102,7 @@ Key backend files:
 - [`convex/schema.ts`](./convex/schema.ts): tables and indexes
 - [`convex/lib/auth.ts`](./convex/lib/auth.ts): permission helpers
 - [`convex/lib/activity.ts`](./convex/lib/activity.ts): activity insertion helper
-- [`convex/users.ts`](./convex/users.ts): user sync/bootstrap and admin controls
+- [`convex/users.ts`](./convex/users.ts): user sync/bootstrap, personal `My Work` view preferences, and admin controls
 - [`convex/projects.ts`](./convex/projects.ts): project CRUD, members, sidebar, activity
 - [`convex/issues.ts`](./convex/issues.ts): task CRUD, filtering, hierarchy, status rules
 - [`convex/myWork.ts`](./convex/myWork.ts): personalized assigned-work overview for the My Work route
@@ -133,6 +133,7 @@ Notable schema choices:
 - `issues.archived` exists separately from `deletedAt`.
 - Task search is backed by `issues.searchText` plus Convex `searchIndex`, though current query logic mainly filters in memory.
 - Project issue numbering is per project via `projectCounters.nextIssueNumber`.
+- `users.myWorkDefaultView` and `users.myWorkLastView` persist the current user’s preferred preset view for the `My Work` page.
 
 ## Auth / Permission Model
 
@@ -218,6 +219,7 @@ Invite flow is split intentionally:
 - The default personal working surfaces are `Dashboard`, `My Work`, and `Projects`.
 - The `My Work` page is intentionally opinionated around assigned-task sections: `Focus`, `Due Soon`, `Overdue`, `Backlog & Todo`, and `Recently Completed`.
 - `My Work` uses route search state for preset views (`overview`, `focus`, `due_soon`, `overdue`, `backlog`, `completed`) instead of exposing a full custom filter builder as the default experience.
+- `My Work` also persists the user’s last selected preset view and supports pinning one preset as the default landing view.
 - Permissions remain simple by default: `admin` has full access, `member` can write in accessible projects, and `viewer` is read-only.
 
 ## Frontend Structure Notes

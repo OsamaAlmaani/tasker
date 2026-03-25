@@ -2,7 +2,7 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
-import { GLOBAL_ROLES, globalRoleValidator } from './constants'
+import { GLOBAL_ROLES, globalRoleValidator, myWorkViewValidator } from './constants'
 import { requireAdmin, requireAuth, requireCurrentUser } from './lib/auth'
 import { createActivity } from './lib/activity'
 
@@ -145,6 +145,35 @@ export const me = query({
       ...user,
       membershipCount,
     }
+  },
+})
+
+export const updateMyWorkPreferences = mutation({
+  args: {
+    lastView: myWorkViewValidator,
+    defaultView: v.optional(v.union(myWorkViewValidator, v.null())),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx)
+    const patch: {
+      myWorkDefaultView?: typeof args.lastView
+      myWorkLastView: typeof args.lastView
+      updatedAt: number
+    } = {
+      myWorkLastView: args.lastView,
+      updatedAt: Date.now(),
+    }
+
+    if (args.defaultView !== undefined) {
+      if (args.defaultView === null) {
+        patch.myWorkDefaultView = undefined
+      } else {
+        patch.myWorkDefaultView = args.defaultView
+      }
+    }
+
+    await ctx.db.patch(user._id, patch)
+    return await ctx.db.get(user._id)
   },
 })
 
