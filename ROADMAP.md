@@ -86,6 +86,9 @@ Use this file to track feature progress. Check items off as they ship.
 - [ ] Add private user notes that are not tied to any specific project
 - [ ] Add focus mode for working through assigned tasks
 
+Personal productivity progress:
+- 2026-03-25: Added first-pass route-backed `My Work` saved views for `Overview`, `Focus`, `Due Soon`, `Overdue`, `Backlog`, and `Completed`. Full user-defined saved filters/views remain open.
+
 ## Collaboration
 
 - [ ] Add @mentions in comments

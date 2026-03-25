@@ -86,7 +86,7 @@ Main route files:
 
 - [`src/routes/index.tsx`](./src/routes/index.tsx): public landing page
 - [`src/routes/_app.dashboard.tsx`](./src/routes/_app.dashboard.tsx): dashboard summary
-- [`src/routes/_app.my-work.tsx`](./src/routes/_app.my-work.tsx): opinionated personal queue for assigned work
+- [`src/routes/_app.my-work.tsx`](./src/routes/_app.my-work.tsx): opinionated personal queue for assigned work with route-backed preset views
 - [`src/routes/_app.projects.index.tsx`](./src/routes/_app.projects.index.tsx): project list + project creation
 - [`src/routes/_app.projects.$projectId.tsx`](./src/routes/_app.projects.$projectId.tsx): project detail, task list/kanban, filters, members, invites, import/export, project settings
 - [`src/routes/_app.issues.$issueId.tsx`](./src/routes/_app.issues.$issueId.tsx): issue detail, sub-tasks, comments, activity
@@ -217,6 +217,7 @@ Invite flow is split intentionally:
 - The default project working view is list layout, grouped by list, sorted by recently updated.
 - The default personal working surfaces are `Dashboard`, `My Work`, and `Projects`.
 - The `My Work` page is intentionally opinionated around assigned-task sections: `Focus`, `Due Soon`, `Overdue`, `Backlog & Todo`, and `Recently Completed`.
+- `My Work` uses route search state for preset views (`overview`, `focus`, `due_soon`, `overdue`, `backlog`, `completed`) instead of exposing a full custom filter builder as the default experience.
 - Permissions remain simple by default: `admin` has full access, `member` can write in accessible projects, and `viewer` is read-only.
 
 ## Frontend Structure Notes
