@@ -286,9 +286,6 @@ export function IssueOverviewPanel({
 												<p className="m-0 text-sm font-medium text-[var(--text)]">
 													{row.issue.title}
 												</p>
-												<Badge className="issue-hierarchy-badge">
-													Sub-task
-												</Badge>
 											</div>
 											<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
 												{row.issue.description?.trim() || "No description"}

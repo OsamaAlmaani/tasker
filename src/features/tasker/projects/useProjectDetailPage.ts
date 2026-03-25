@@ -2,12 +2,16 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { type DragEvent, useMemo, useState } from "react";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import { type ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
-import type { ProjectSettingsForm } from "#/features/tasker/projects/components/ProjectSettingsCard";
 import {
 	buildGroupedIssues,
 	buildKanbanColumns,
-	formatIssueInputDate,
 } from "#/features/tasker/projects/issueGrouping";
+import {
+	applyParentIssueDraftDefaults,
+	createIssueDraft,
+	createProjectSettingsForm,
+	getProjectInviteResultMessage,
+} from "#/features/tasker/projects/projectDrafts";
 import {
 	type ProjectSearch,
 	parseStatusFilters,
@@ -24,20 +28,6 @@ export type ProjectIssueRow = Doc<"issues"> & {
 	childCompletionRate: number;
 	hasChildren: boolean;
 };
-
-export function createIssueDraft() {
-	return {
-		title: "",
-		description: "",
-		listId: "",
-		parentIssueId: "",
-		status: "todo" as (typeof ISSUE_STATUSES)[number],
-		priority: "none" as (typeof ISSUE_PRIORITIES)[number],
-		assigneeId: "",
-		dueDate: "",
-		labels: "",
-	};
-}
 
 type UseProjectDetailPageOptions = {
 	projectId: Id<"projects">;
@@ -131,14 +121,9 @@ export function useProjectDetailPage({
 	const [createError, setCreateError] = useState<string | null>(null);
 	const [editingProject, setEditingProject] = useState(false);
 	const [issueForm, setIssueForm] = useState(createIssueDraft);
-	const [projectForm, setProjectForm] = useState<ProjectSettingsForm>({
-		name: projectData?.project.name ?? "",
-		description: projectData?.project.description ?? "",
-		color: projectData?.project.color ?? "#4f46e5",
-		icon: projectData?.project.icon ?? "FolderKanban",
-		allowMemberInvites: projectData?.project.allowMemberInvites ?? true,
-		allowIssueDelete: projectData?.project.allowIssueDelete ?? true,
-	});
+	const [projectForm, setProjectForm] = useState(() =>
+		createProjectSettingsForm(projectData?.project),
+	);
 	const [inviteSearch, setInviteSearch] = useState("");
 	const [inviteEmail, setInviteEmail] = useState("");
 	const [inviteMessage, setInviteMessage] = useState<string | null>(null);
@@ -362,22 +347,7 @@ export function useProjectDetailPage({
 		setIsSendingInvite(true);
 		try {
 			const result = await sendProjectInvite({ projectId, email });
-			switch (result.resultType) {
-				case "added_existing_user":
-					setInviteMessage("User already exists and was added to the project.");
-					break;
-				case "already_member":
-					setInviteMessage("This user is already a project member.");
-					break;
-				case "already_invited":
-					setInviteMessage("A pending invite already exists for this email.");
-					break;
-				case "sent":
-					setInviteMessage("Invitation sent.");
-					break;
-				default:
-					setInviteMessage("Invite processed.");
-			}
+			setInviteMessage(getProjectInviteResultMessage(result.resultType));
 			setInviteEmail("");
 		} catch (error) {
 			setInviteError(getClientErrorMessage(error, "Failed to send invite."));
@@ -438,14 +408,7 @@ export function useProjectDetailPage({
 			return;
 		}
 
-		setProjectForm({
-			name: projectData.project.name ?? "",
-			description: projectData.project.description ?? "",
-			color: projectData.project.color ?? "#4f46e5",
-			icon: projectData.project.icon ?? "FolderKanban",
-			allowMemberInvites: projectData.project.allowMemberInvites ?? true,
-			allowIssueDelete: projectData.project.allowIssueDelete ?? true,
-		});
+		setProjectForm(createProjectSettingsForm(projectData.project));
 	}
 
 	function handleKanbanDragStart(
@@ -531,28 +494,9 @@ export function useProjectDetailPage({
 			? projectIssueById.get(nextParentIssueId as Id<"issues">)
 			: null;
 
-		setIssueForm((prev) => ({
-			...prev,
-			parentIssueId: nextParentIssueId,
-			listId:
-				prev.listId || !parentIssue?.listId ? prev.listId : parentIssue.listId,
-			status:
-				prev.status === "todo" && parentIssue
-					? parentIssue.status
-					: prev.status,
-			priority:
-				prev.priority === "none" && parentIssue
-					? parentIssue.priority
-					: prev.priority,
-			assigneeId:
-				prev.assigneeId || !parentIssue?.assigneeId
-					? prev.assigneeId
-					: parentIssue.assigneeId,
-			dueDate:
-				prev.dueDate || !parentIssue?.dueDate
-					? prev.dueDate
-					: formatIssueInputDate(parentIssue.dueDate),
-		}));
+		setIssueForm((prev) =>
+			applyParentIssueDraftDefaults(prev, nextParentIssueId, parentIssue),
+		);
 	}
 
 	return {
@@ -653,3 +597,4 @@ export function useProjectDetailPage({
 }
 
 export type ProjectDetailPageState = ReturnType<typeof useProjectDetailPage>;
+export { createIssueDraft } from "#/features/tasker/projects/projectDrafts";

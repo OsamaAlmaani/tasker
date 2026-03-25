@@ -191,9 +191,6 @@ export function ProjectIssueListTree({
 										<p className="m-0 truncate whitespace-nowrap text-sm font-medium text-[var(--text)]">
 											{issue.title}
 										</p>
-										{issue.parentIssueId ? (
-											<Badge className="issue-hierarchy-badge">Sub-task</Badge>
-										) : null}
 									</div>
 									<p className="m-0 truncate whitespace-nowrap text-xs text-[var(--muted-text)]">
 										{issue.description?.trim() || "No description"}
@@ -392,9 +389,6 @@ export function ProjectIssueKanbanTree({
 									{issue.description?.trim() || "No description"}
 								</p>
 								<div className="mt-2 flex flex-wrap items-center gap-1.5">
-									{issue.parentIssueId ? (
-										<Badge className="issue-hierarchy-badge">Sub-task</Badge>
-									) : null}
 									{progressLabel ? (
 										<Badge className="issue-progress-badge">
 											{progressLabel} ({completionRate}%)
