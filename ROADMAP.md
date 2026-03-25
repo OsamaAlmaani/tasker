@@ -31,6 +31,7 @@ Use this file to track feature progress. Check items off as they ship.
 - 2026-03-25: Extracted the repeated task draft modal/form UI to `src/features/tasker/issues/components/IssueDraftDialog.tsx` and reused it for both project task creation and issue sub-task creation.
 - 2026-03-25: Extracted project member management dialogs to `src/features/tasker/projects/components/ProjectMembersDialog.tsx` and `src/features/tasker/projects/components/ProjectInviteDialog.tsx`, removing another large route-owned UI block from the project page.
 - 2026-03-25: Extracted issue discussion and activity rendering to `src/features/tasker/issues/components/IssueDiscussionPanel.tsx`, removing comment/edit UI and activity labeling from the issue route.
+- 2026-03-25: Extracted project settings form UI to `src/features/tasker/projects/components/ProjectSettingsCard.tsx`, leaving the project route with state and mutation wiring instead of settings form markup.
 
 ## Product Direction
 

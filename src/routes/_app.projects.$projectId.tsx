@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
-	Archive,
 	Download,
 	History,
 	ListTodo,
@@ -23,10 +22,7 @@ import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { Input } from "#/components/ui/input";
-import { Label } from "#/components/ui/label";
 import { Select } from "#/components/ui/select";
-import { Switch } from "#/components/ui/switch";
-import { Textarea } from "#/components/ui/textarea";
 import { ActivityFeed } from "#/features/tasker/components/ActivityFeed";
 import {
 	IssuePriorityBadge,
@@ -49,6 +45,10 @@ import {
 } from "#/features/tasker/model";
 import { ProjectInviteDialog } from "#/features/tasker/projects/components/ProjectInviteDialog";
 import { ProjectMembersDialog } from "#/features/tasker/projects/components/ProjectMembersDialog";
+import {
+	ProjectSettingsCard,
+	type ProjectSettingsForm,
+} from "#/features/tasker/projects/components/ProjectSettingsCard";
 import { useProjectTaskImportExport } from "#/features/tasker/projects/useProjectTaskImportExport";
 import { issueFormSchema } from "#/features/tasker/validation";
 import { cn, getClientErrorMessage } from "#/lib/utils";
@@ -383,7 +383,7 @@ function ProjectDetailPage() {
 
 	const [issueForm, setIssueForm] = useState(createIssueDraft);
 
-	const [projectForm, setProjectForm] = useState({
+	const [projectForm, setProjectForm] = useState<ProjectSettingsForm>({
 		name: projectData?.project.name ?? "",
 		description: projectData?.project.description ?? "",
 		color: projectData?.project.color ?? "#4f46e5",
@@ -1240,104 +1240,14 @@ function ProjectDetailPage() {
 				<p className="mb-4 text-sm text-[var(--danger)]">{statusUpdateError}</p>
 			) : null}
 
-			{editingProject ? (
-				<Card className="mb-4">
-					<CardHeader>
-						<CardTitle>Project Settings</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<form
-							onSubmit={submitProjectSettings}
-							className="grid gap-3 md:grid-cols-2"
-						>
-							<div>
-								<Label>Name</Label>
-								<Input
-									value={projectForm.name}
-									onChange={(event) =>
-										setProjectForm((prev) => ({
-											...prev,
-											name: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div>
-								<Label>Color</Label>
-								<Input
-									type="color"
-									value={projectForm.color}
-									onChange={(event) =>
-										setProjectForm((prev) => ({
-											...prev,
-											color: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div className="md:col-span-2">
-								<Label>Description</Label>
-								<Textarea
-									value={projectForm.description}
-									onChange={(event) =>
-										setProjectForm((prev) => ({
-											...prev,
-											description: event.target.value,
-										}))
-									}
-								/>
-							</div>
-							<div className="flex items-center gap-2">
-								<Switch
-									checked={projectForm.allowMemberInvites}
-									onChange={(next) =>
-										setProjectForm((prev) => ({
-											...prev,
-											allowMemberInvites: next,
-										}))
-									}
-								/>
-								<span className="text-sm text-[var(--muted-text)]">
-									Allow member invites
-								</span>
-							</div>
-							<div className="flex items-center gap-2">
-								<Switch
-									checked={projectForm.allowIssueDelete}
-									onChange={(next) =>
-										setProjectForm((prev) => ({
-											...prev,
-											allowIssueDelete: next,
-										}))
-									}
-								/>
-								<span className="text-sm text-[var(--muted-text)]">
-									Allow task deletion
-								</span>
-							</div>
-							<div className="md:col-span-2">
-								<Button type="submit">Save project</Button>
-							</div>
-							<div className="md:col-span-2">
-								<div className="flex justify-end border-t border-[var(--line)] pt-3">
-									<Button
-										type="button"
-										variant={
-											projectData.project.archived ? "secondary" : "danger"
-										}
-										onClick={() => setIsArchiveConfirmOpen(true)}
-									>
-										<Archive className="mr-2 h-4 w-4" />
-										{projectData.project.archived
-											? "Unarchive project"
-											: "Archive project"}
-									</Button>
-								</div>
-							</div>
-						</form>
-					</CardContent>
-				</Card>
-			) : null}
+			<ProjectSettingsCard
+				archived={projectData.project.archived}
+				form={projectForm}
+				onArchiveClick={() => setIsArchiveConfirmOpen(true)}
+				onSubmit={submitProjectSettings}
+				open={editingProject}
+				setForm={setProjectForm}
+			/>
 
 			<div className="space-y-4">
 				{projectView === "issues" ? (
