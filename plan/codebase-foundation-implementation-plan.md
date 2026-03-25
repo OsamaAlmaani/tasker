@@ -15,10 +15,11 @@ Refactor oversized route files into maintainable feature modules while preservin
 
 ## Phase 2: Route decomposition
 - [ ] Introduce route-local composition shells for project and issue pages.
-- [ ] Move route state/mutation orchestration into focused hooks.
+- [x] Move route state/mutation orchestration into focused hooks.
   - [x] Extract shared issue status update and cascade-completion orchestration from large routes.
   - [x] Extract project task import/export state and file handling from the project route.
   - [x] Extract project detail page state, queries, and mutation handlers into a dedicated controller hook.
+  - [x] Extract issue detail page state, queries, and mutation handlers into a dedicated controller hook.
 - [ ] Split inline UI regions into dedicated feature components.
   - [x] Extract the repeated task draft dialog/form into a shared issue component.
   - [x] Extract project members and invite modals into dedicated project components.
@@ -48,3 +49,4 @@ Refactor oversized route files into maintainable feature modules while preservin
 - Latest extraction complete: issue overview/sub-task and metadata UI now lives in `src/features/tasker/issues/components/IssueDetailPanels.tsx`.
 - Latest extraction complete: project issue-tree rendering UI now lives in `src/features/tasker/projects/components/ProjectIssueTree.tsx`.
 - Latest extraction complete: project detail page state, queries, and mutation handlers now live in `src/features/tasker/projects/useProjectDetailPage.ts`.
+- Latest extraction complete: issue detail page state, queries, and mutation handlers now live in `src/features/tasker/issues/useIssueDetailPage.ts`.

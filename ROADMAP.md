@@ -14,7 +14,7 @@ Use this file to track feature progress. Check items off as they ship.
 - [ ] Reduce route files so they act as route entry points and composition shells, not feature dumping grounds
 - [ ] Define a clear structure for route-level data loading, feature hooks, feature components, dialogs, forms, and utilities
 - [x] Extract project detail page state and mutations into focused hooks
-- [ ] Extract issue detail page state and mutations into focused hooks
+- [x] Extract issue detail page state and mutations into focused hooks
 - [ ] Split large inline UI sections into dedicated components with clear ownership
 - [ ] Move repeated task/project presentation patterns into reusable components where it genuinely reduces duplication
 - [ ] Separate pure view logic from Convex wiring and mutation orchestration
@@ -36,6 +36,7 @@ Use this file to track feature progress. Check items off as they ship.
 - 2026-03-25: Extracted issue overview, sub-task list, and metadata controls to `src/features/tasker/issues/components/IssueDetailPanels.tsx`, removing the largest remaining inline UI block from the issue route.
 - 2026-03-25: Extracted recursive project issue-tree rendering to `src/features/tasker/projects/components/ProjectIssueTree.tsx`, removing inline task row/card renderers and their helper controls from the project route.
 - 2026-03-25: Extracted project detail orchestration to `src/features/tasker/projects/useProjectDetailPage.ts`, moving the project route’s queries, mutation handlers, modal state, and derived collections into a dedicated controller hook.
+- 2026-03-25: Extracted issue detail orchestration to `src/features/tasker/issues/useIssueDetailPage.ts`, moving the issue route’s queries, mutation handlers, edit state, timeline derivation, and dialog state into a dedicated controller hook.
 
 ## Product Direction
 

@@ -217,6 +217,7 @@ Invite flow is split intentionally:
 - Place shared task draft modal/form UI in `src/features/tasker/issues/components/IssueDraftDialog.tsx` and reuse it across project and issue flows instead of duplicating form markup.
 - Place issue discussion/activity rendering and comment editing UI in `src/features/tasker/issues/components/IssueDiscussionPanel.tsx` instead of keeping that block inline in the issue route.
 - Place issue overview, sub-task list, and metadata UI in `src/features/tasker/issues/components/IssueDetailPanels.tsx` and keep the issue route focused on local edit state and mutation callbacks.
+- Place issue detail page queries, derived state, edit state, dialog state, and mutation handlers in `src/features/tasker/issues/useIssueDetailPage.ts` so the route stays focused on params, back-navigation, and page composition.
 - Place project task import/export state, menu behavior, and file parsing in `src/features/tasker/projects/useProjectTaskImportExport.ts` instead of keeping that workflow inline in route files.
 - Place project detail page queries, derived state, modal state, and mutation handlers in `src/features/tasker/projects/useProjectDetailPage.ts` so the route stays focused on search-state normalization and composition.
 - Place project members/invite modal UI in `src/features/tasker/projects/components/` and keep the route focused on modal state plus mutation wiring.
@@ -243,29 +244,24 @@ This file is large and stateful. If changing shell behavior, isolate edits caref
 
 ### Project detail route
 
-[`src/routes/_app.projects.$projectId.tsx`](./src/routes/_app.projects.$projectId.tsx) is the largest route and currently owns:
+[`src/routes/_app.projects.$projectId.tsx`](./src/routes/_app.projects.$projectId.tsx) is now mostly a composition shell plus URL-search normalization and still owns:
 
 - URL-backed filters and view state
-- list vs kanban layout
-- drag-and-drop status changes
-- task create modal
-- project settings
-- member management
-- invite flows
-- task import/export
+- route composition for extracted project feature modules
+- back-and-forth coordination with the project detail controller hook
+- a smaller amount of drag-and-drop and page-level shell behavior
 
-If future work touches project detail, expect most behavior to be here rather than in smaller child components.
+Most project detail state, mutations, dialogs, and derived collections now live in `src/features/tasker/projects/useProjectDetailPage.ts` and related feature components.
 
 ### Issue detail route
 
-[`src/routes/_app.issues.$issueId.tsx`](./src/routes/_app.issues.$issueId.tsx) owns:
+[`src/routes/_app.issues.$issueId.tsx`](./src/routes/_app.issues.$issueId.tsx) is now a route shell that owns:
 
-- inline title/description editing
-- sidebar metadata editing
-- sub-task creation
-- discussion timeline
-- activity display
-- delete confirmation
+- route params and back-navigation behavior
+- issue-page composition using extracted issue feature modules
+- not-found/loading handling and confirmation-dialog wiring
+
+Most issue detail queries, derived timeline data, edit state, dialog state, and mutation handlers now live in `src/features/tasker/issues/useIssueDetailPage.ts`.
 
 ## Styling / UI Conventions
 
