@@ -5,7 +5,6 @@ import {
 	History,
 	ListTodo,
 	MoreHorizontal,
-	Plus,
 	Settings2,
 	Upload,
 } from "lucide-react";
@@ -21,13 +20,10 @@ import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ConfirmDialog } from "#/components/ui/confirm-dialog";
-import { Input } from "#/components/ui/input";
-import { Select } from "#/components/ui/select";
 import { ActivityFeed } from "#/features/tasker/components/ActivityFeed";
 import {
 	IssuePriorityBadge,
 	IssueStatusBadge,
-	RemovableIssueStatusBadge,
 } from "#/features/tasker/components/IssueBadges";
 import { MemberAvatarStack } from "#/features/tasker/components/MemberAvatarStack";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
@@ -49,6 +45,7 @@ import {
 	ProjectSettingsCard,
 	type ProjectSettingsForm,
 } from "#/features/tasker/projects/components/ProjectSettingsCard";
+import { ProjectTasksPanel } from "#/features/tasker/projects/components/ProjectTasksPanel";
 import { useProjectTaskImportExport } from "#/features/tasker/projects/useProjectTaskImportExport";
 import { issueFormSchema } from "#/features/tasker/validation";
 import { cn, getClientErrorMessage } from "#/lib/utils";
@@ -1251,268 +1248,100 @@ function ProjectDetailPage() {
 
 			<div className="space-y-4">
 				{projectView === "issues" ? (
-					<Card>
-						<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-							<CardTitle>Tasks</CardTitle>
-							{canWrite ? (
-								<Button
-									variant="secondary"
-									onClick={() => {
-										setCreateError(null);
-										setIssueForm(createIssueDraft());
-										setCreateOpen(true);
-									}}
-								>
-									<Plus className="mr-2 h-4 w-4" />
-									New Task
-								</Button>
-							) : null}
-						</CardHeader>
-						<CardContent>
-							<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-								<div className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-1">
-									<Button
-										type="button"
-										size="sm"
-										variant={issueLayout === "list" ? "secondary" : "ghost"}
-										className="h-7 px-3"
-										onClick={() =>
-											updateProjectSearch(
-												{
-													layout: "list",
-												},
-												{ replace: true },
-											)
-										}
-									>
-										List
-									</Button>
-									<Button
-										type="button"
-										size="sm"
-										variant={issueLayout === "kanban" ? "secondary" : "ghost"}
-										className="h-7 px-3"
-										onClick={() =>
-											updateProjectSearch(
-												{
-													layout: "kanban",
-												},
-												{ replace: true },
-											)
-										}
-									>
-										Kanban
-									</Button>
-								</div>
-								{issueLayout === "kanban" ? (
-									<p className="m-0 text-xs text-[var(--muted-text)]">
-										Drag cards between status columns to update status.
-									</p>
-								) : null}
-							</div>
-
-							<div
-								className={cn(
-									"mb-3 grid gap-2",
-									issueLayout === "list" ? "md:grid-cols-6" : "md:grid-cols-5",
-								)}
-							>
-								<Input
-									value={search}
-									onChange={(event) =>
-										updateProjectSearch(
-											{ q: event.target.value },
-											{ replace: true },
-										)
-									}
-									placeholder="Search tasks"
-								/>
-								<Select
-									value={statusPicker}
-									onChange={(event) => addStatusFilter(event.target.value)}
-								>
-									<option value="">Add status filter</option>
-									{ISSUE_STATUSES.map((value) => (
-										<option
-											key={value}
-											value={value}
-											disabled={selectedStatuses.includes(value)}
-										>
-											{issueStatusLabel[value]}
-										</option>
-									))}
-								</Select>
-								<Select
-									value={priority}
-									onChange={(event) =>
-										updateProjectSearch(
-											{
-												priority: (event.target.value ||
-													undefined) as ProjectSearch["priority"],
-											},
-											{ replace: true },
-										)
-									}
-								>
-									<option value="">All priority</option>
-									{ISSUE_PRIORITIES.map((value) => (
-										<option key={value} value={value}>
-											{value}
-										</option>
-									))}
-								</Select>
-								<Select
-									value={assigneeId}
-									onChange={(event) =>
-										updateProjectSearch(
-											{ assignee: event.target.value || undefined },
-											{ replace: true },
-										)
-									}
-								>
-									<option value="">All assignees</option>
-									{(assignableUsers ?? []).map((user) => (
-										<option key={user._id} value={user._id}>
-											{user.name}
-										</option>
-									))}
-								</Select>
-								{issueLayout === "list" ? (
-									<Select
-										value={groupBy}
-										onChange={(event) =>
-											updateProjectSearch(
-												{
-													groupBy: event.target
-														.value as ProjectSearch["groupBy"],
-												},
-												{ replace: true },
-											)
-										}
-									>
-										<option value="list">Group: List</option>
-										<option value="status">Group: Status</option>
-									</Select>
-								) : null}
-								<Select
-									value={sortBy}
-									onChange={(event) =>
-										updateProjectSearch(
-											{
-												sort: event.target.value as ProjectSearch["sort"],
-											},
-											{ replace: true },
-										)
-									}
-								>
-									<option value="updated_desc">Updated</option>
-									<option value="created_desc">Created</option>
-									<option value="priority_desc">Priority</option>
-									<option value="due_asc">Due date</option>
-								</Select>
-							</div>
-
-							{selectedStatuses.length ? (
-								<div className="mb-3 flex flex-wrap items-center gap-2">
-									{selectedStatuses.map((value) => (
-										<RemovableIssueStatusBadge
-											key={value}
-											status={value}
-											onRemove={() =>
-												updateProjectSearch(
-													{
-														statuses: serializeStatusFilters(
-															selectedStatuses.filter((item) => item !== value),
-														),
-													},
-													{ replace: true },
-												)
-											}
-										/>
-									))}
-									<Button
-										type="button"
-										size="sm"
-										variant="ghost"
-										onClick={() =>
-											updateProjectSearch(
-												{
-													statuses: undefined,
-												},
-												{ replace: true },
-											)
-										}
-									>
-										Clear statuses
-									</Button>
-								</div>
-							) : null}
-
-							{issueLayout === "list" ? (
-								<div className="space-y-4">
-									{groupedIssues.map((group) => (
-										<div key={group.key} className="space-y-2">
-											<div className="flex items-center justify-between">
-												<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
-													{group.title}
-												</p>
-												<Badge>{group.items.length}</Badge>
-											</div>
-
-											{group.tree.map((node) => renderListIssueNode(node))}
-										</div>
-									))}
-									{issues && issues.length === 0 ? (
-										<p className="m-0 text-sm text-[var(--muted-text)]">
-											No tasks found.
-										</p>
-									) : null}
-								</div>
-							) : (
-								<div className="kanban-board">
-									{kanbanColumns.map((column) => (
-										<section
-											key={column.status}
-											aria-label={`${column.title} column`}
-											className={cn(
-												"kanban-column",
-												dragOverStatus === column.status
-													? "kanban-column-active"
-													: "",
-											)}
-											onDragOver={(event) =>
-												handleKanbanColumnDragOver(event, column.status)
-											}
-											onDragLeave={() =>
-												setDragOverStatus((current) =>
-													current === column.status ? null : current,
-												)
-											}
-											onDrop={(event) =>
-												handleKanbanColumnDrop(event, column.status)
-											}
-										>
-											<div className="kanban-column-header">
-												<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
-													{column.title}
-												</p>
-												<Badge>{column.items.length}</Badge>
-											</div>
-											<div className="kanban-column-body">
-												{column.items.length ? (
-													column.tree.map((node) => renderKanbanIssueNode(node))
-												) : (
-													<p className="kanban-empty">
-														No tasks in this status.
-													</p>
-												)}
-											</div>
-										</section>
-									))}
-								</div>
-							)}
-						</CardContent>
-					</Card>
+					<ProjectTasksPanel
+						assignableUsers={assignableUsers}
+						assigneeId={assigneeId}
+						canWrite={canWrite}
+						dragOverStatus={dragOverStatus}
+						groupBy={groupBy}
+						groupedIssues={groupedIssues}
+						issueLayout={issueLayout}
+						kanbanColumns={kanbanColumns}
+						onAddStatusFilter={addStatusFilter}
+						onAssigneeChange={(value) =>
+							updateProjectSearch(
+								{ assignee: value || undefined },
+								{ replace: true },
+							)
+						}
+						onClearStatuses={() =>
+							updateProjectSearch(
+								{
+									statuses: undefined,
+								},
+								{ replace: true },
+							)
+						}
+						onCreateTask={() => {
+							setCreateError(null);
+							setIssueForm(createIssueDraft());
+							setCreateOpen(true);
+						}}
+						onGroupByChange={(value) =>
+							updateProjectSearch(
+								{
+									groupBy: value as ProjectSearch["groupBy"],
+								},
+								{ replace: true },
+							)
+						}
+						onKanbanColumnDragLeave={(status) =>
+							setDragOverStatus((current) =>
+								current === status ? null : current,
+							)
+						}
+						onKanbanColumnDragOver={handleKanbanColumnDragOver}
+						onKanbanColumnDrop={handleKanbanColumnDrop}
+						onPriorityChange={(value) =>
+							updateProjectSearch(
+								{
+									priority: (value || undefined) as ProjectSearch["priority"],
+								},
+								{ replace: true },
+							)
+						}
+						onRemoveStatus={(value) =>
+							updateProjectSearch(
+								{
+									statuses: serializeStatusFilters(
+										selectedStatuses.filter((item) => item !== value),
+									),
+								},
+								{ replace: true },
+							)
+						}
+						onSearchChange={(value) =>
+							updateProjectSearch({ q: value }, { replace: true })
+						}
+						onSortChange={(value) =>
+							updateProjectSearch(
+								{
+									sort: value as ProjectSearch["sort"],
+								},
+								{ replace: true },
+							)
+						}
+						onToggleLayout={(layout) =>
+							updateProjectSearch(
+								{
+									layout,
+								},
+								{ replace: true },
+							)
+						}
+						priority={priority}
+						renderKanbanIssueNode={(node) =>
+							renderKanbanIssueNode(node as IssueTreeNode)
+						}
+						renderListIssueNode={(node) =>
+							renderListIssueNode(node as IssueTreeNode)
+						}
+						search={search}
+						selectedStatuses={selectedStatuses}
+						showEmptyState={Boolean(issues) && issues.length === 0}
+						sortBy={sortBy}
+						statusPicker={statusPicker}
+					/>
 				) : (
 					<Card className="min-h-[calc(100dvh-220px)]">
 						<CardHeader>

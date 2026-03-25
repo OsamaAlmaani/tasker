@@ -219,6 +219,7 @@ Invite flow is split intentionally:
 - Place project task import/export state, menu behavior, and file parsing in `src/features/tasker/projects/useProjectTaskImportExport.ts` instead of keeping that workflow inline in route files.
 - Place project members/invite modal UI in `src/features/tasker/projects/components/` and keep the route focused on modal state plus mutation wiring.
 - Place the project settings form card in `src/features/tasker/projects/components/ProjectSettingsCard.tsx` and keep the route focused on settings state, submit handlers, and archive confirmation state.
+- Place the project task board/filter shell in `src/features/tasker/projects/components/ProjectTasksPanel.tsx` and keep the route focused on task data, render callbacks, and mutation/update handlers.
 - Prefer incremental extractions that preserve behavior over broad rewrites.
 - When roadmap work starts or completes, update:
   - `plan/codebase-foundation-implementation-plan.md` task status
