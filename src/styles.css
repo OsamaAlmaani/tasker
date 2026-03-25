@@ -1832,14 +1832,14 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
 
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(5, minmax(220px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(5, minmax(260px, 1fr));
+  gap: 12px;
   overflow-x: auto;
   padding-bottom: 4px;
 }
 
 .kanban-column {
-  min-width: 220px;
+  min-width: 260px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: color-mix(in oklab, var(--surface-muted) 88%, var(--surface) 12%);
@@ -1868,6 +1868,7 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
+  min-width: 0;
 }
 
 .kanban-card {
@@ -1875,6 +1876,8 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
   border-radius: 10px;
   background: var(--surface);
   padding: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .kanban-card-subissue {
@@ -1895,10 +1898,13 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
 
 .kanban-card-link {
   display: block;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .kanban-tree-node {
   position: relative;
+  min-width: 0;
 }
 
 .kanban-tree-node-child::before {
@@ -1917,12 +1923,28 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
   margin-top: 8px;
   padding-left: 14px;
   border-left: 1px solid color-mix(in oklab, var(--line) 84%, transparent 16%);
+  min-width: 0;
 }
 
 .kanban-empty {
   margin: 2px 0 0;
   font-size: 0.75rem;
   color: var(--muted-text);
+}
+
+.kanban-card-description {
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--muted-text);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .page-loading {
@@ -2412,7 +2434,7 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
   }
 
   .kanban-board {
-    grid-template-columns: repeat(5, minmax(250px, 1fr));
+    grid-template-columns: repeat(5, minmax(260px, 1fr));
   }
 
   .stitch-landing-main {

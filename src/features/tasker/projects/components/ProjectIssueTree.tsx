@@ -377,15 +377,15 @@ export function ProjectIssueKanbanTree({
 								params={{ issueId: issue._id }}
 								className="kanban-card-link no-underline"
 							>
-								<div className="flex items-center gap-2">
+								<div className="flex min-w-0 items-center gap-2">
 									<Badge className="issue-row-id-badge">
 										#{issue.issueNumber}
 									</Badge>
-									<p className="m-0 truncate text-sm font-medium text-[var(--text)]">
+									<p className="m-0 min-w-0 flex-1 truncate text-sm font-medium text-[var(--text)]">
 										{issue.title}
 									</p>
 								</div>
-								<p className="m-0 mt-1 truncate text-xs text-[var(--muted-text)]">
+								<p className="kanban-card-description">
 									{issue.description?.trim() || "No description"}
 								</p>
 								<div className="mt-2 flex flex-wrap items-center gap-1.5">
