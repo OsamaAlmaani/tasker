@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
+import { ISSUE_PRIORITIES } from "#/features/tasker/model";
 
 const ISSUE_SORT_OPTIONS = [
 	"updated_desc",
@@ -25,25 +25,18 @@ export const projectSearchSchema = z.object({
 
 export type ProjectSearch = z.infer<typeof projectSearchSchema>;
 
-export function parseStatusFilters(
-	raw?: string,
-): (typeof ISSUE_STATUSES)[number][] {
+export function parseStatusFilters(raw?: string): string[] {
 	if (!raw) {
 		return [];
 	}
 
-	const allowed = new Set<string>(ISSUE_STATUSES);
 	return raw
 		.split(",")
 		.map((value) => value.trim())
-		.filter((value): value is (typeof ISSUE_STATUSES)[number] =>
-			allowed.has(value),
-		);
+		.filter(Boolean);
 }
 
-export function serializeStatusFilters(
-	values: (typeof ISSUE_STATUSES)[number][],
-): string | undefined {
+export function serializeStatusFilters(values: string[]): string | undefined {
 	if (!values.length) {
 		return undefined;
 	}

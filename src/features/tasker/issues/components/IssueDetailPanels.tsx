@@ -7,13 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { Input } from "#/components/ui/input";
 import { Select } from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
+import { IssueStatusBadge } from "#/features/tasker/components/IssueBadges";
 import { formatDate } from "#/features/tasker/format";
+import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
 import {
-	ISSUE_PRIORITIES,
-	ISSUE_STATUSES,
-	issuePriorityLabel,
-	issueStatusLabel,
-} from "#/features/tasker/model";
+	getProjectStatusColor,
+	getProjectStatusLabel,
+	type ProjectStatusDefinition,
+} from "#/features/tasker/projectStatuses";
 
 type IssueLike = {
 	_id: string;
@@ -29,14 +30,14 @@ type IssueLike = {
 	listId?: string | null;
 	parentIssueId?: string | null;
 	priority: (typeof ISSUE_PRIORITIES)[number];
-	status: (typeof ISSUE_STATUSES)[number];
+	status: ProjectStatusDefinition["key"];
 	title: string;
 };
 
 type ParentIssueSummary = {
 	_id: string;
 	issueNumber: number;
-	status: (typeof ISSUE_STATUSES)[number];
+	status: ProjectStatusDefinition["key"];
 	title: string;
 };
 
@@ -82,6 +83,7 @@ type IssueOverviewPanelProps = {
 	onStartDescriptionEdit: () => void;
 	onStartTitleEdit: () => void;
 	onSubmitTitle: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+	projectStatuses: ProjectStatusDefinition[];
 	onTitleDraftChange: (value: string) => void;
 	parentIssue?: ParentIssueSummary | null;
 	titleDraft: string;
@@ -102,6 +104,7 @@ export function IssueOverviewPanel({
 	onStartDescriptionEdit,
 	onStartTitleEdit,
 	onSubmitTitle,
+	projectStatuses,
 	onTitleDraftChange,
 	parentIssue,
 	titleDraft,
@@ -128,7 +131,17 @@ export function IssueOverviewPanel({
 						</div>
 						<div className="mt-2 flex items-center gap-2">
 							<Badge className="issue-hierarchy-badge">Parent</Badge>
-							<Badge>{issueStatusLabel[parentIssue.status]}</Badge>
+							<IssueStatusBadge
+								color={getProjectStatusColor(
+									projectStatuses,
+									parentIssue.status,
+								)}
+								label={getProjectStatusLabel(
+									projectStatuses,
+									parentIssue.status,
+								)}
+								status={parentIssue.status}
+							/>
 						</div>
 					</Link>
 				</section>
@@ -291,7 +304,17 @@ export function IssueOverviewPanel({
 												{row.issue.description?.trim() || "No description"}
 											</p>
 											<div className="mt-2 flex flex-wrap items-center gap-2">
-												<Badge>{issueStatusLabel[row.issue.status]}</Badge>
+												<IssueStatusBadge
+													color={getProjectStatusColor(
+														projectStatuses,
+														row.issue.status,
+													)}
+													label={getProjectStatusLabel(
+														projectStatuses,
+														row.issue.status,
+													)}
+													status={row.issue.status}
+												/>
 												<Badge>{issuePriorityLabel[row.issue.priority]}</Badge>
 												{row.assignee ? (
 													<Badge>{row.assignee.name}</Badge>
@@ -329,7 +352,8 @@ type IssueMetadataPanelProps = {
 	onDueDateChange: (value: string) => void;
 	onListChange: (value: string) => void;
 	onPriorityChange: (value: (typeof ISSUE_PRIORITIES)[number]) => void;
-	onStatusChange: (value: (typeof ISSUE_STATUSES)[number]) => void;
+	onStatusChange: (value: ProjectStatusDefinition["key"]) => void;
+	projectStatuses: ProjectStatusDefinition[];
 };
 
 export function IssueMetadataPanel({
@@ -343,6 +367,7 @@ export function IssueMetadataPanel({
 	onListChange,
 	onPriorityChange,
 	onStatusChange,
+	projectStatuses,
 }: IssueMetadataPanelProps) {
 	return (
 		<aside className="issue-detail-settings issue-meta-panel">
@@ -380,20 +405,28 @@ export function IssueMetadataPanel({
 							value={currentIssue.status}
 							onChange={(event) =>
 								onStatusChange(
-									event.target.value as (typeof ISSUE_STATUSES)[number],
+									event.target.value as ProjectStatusDefinition["key"],
 								)
 							}
 						>
-							{ISSUE_STATUSES.map((value) => (
-								<option key={value} value={value}>
-									{issueStatusLabel[value]}
+							{projectStatuses.map((status) => (
+								<option key={status.key} value={status.key}>
+									{status.name}
 								</option>
 							))}
 						</Select>
 					) : (
-						<span className="issue-meta-static">
-							{issueStatusLabel[currentIssue.status]}
-						</span>
+						<IssueStatusBadge
+							color={getProjectStatusColor(
+								projectStatuses,
+								currentIssue.status,
+							)}
+							label={getProjectStatusLabel(
+								projectStatuses,
+								currentIssue.status,
+							)}
+							status={currentIssue.status}
+						/>
 					)}
 				</div>
 			</div>

@@ -74,16 +74,28 @@ describe("buildIssueTree", () => {
 
 describe("buildGroupedIssues", () => {
 	it("groups by status using workflow order", () => {
-		const groups = buildGroupedIssues(issues, "status", new Map());
+		const groups = buildGroupedIssues(issues, "status", new Map(), [
+			{ key: "todo", name: "Ready", color: "#000000", position: 0 },
+			{ key: "in_review", name: "Review", color: "#8b5cf6", position: 1 },
+			{ key: "backlog", name: "Inbox", color: "#64748b", position: 2 },
+			{ key: "in_progress", name: "Doing", color: "#f59e0b", position: 3 },
+			{ key: "done", name: "Shipped", color: "#ffffff", position: 4 },
+		]);
 
 		expect(groups.map((group) => group.key)).toEqual([
-			"backlog",
 			"todo",
 			"in_review",
+			"backlog",
 			"done",
 		]);
+		expect(groups.map((group) => group.title)).toEqual([
+			"Todo",
+			"Review",
+			"Inbox",
+			"Done",
+		]);
 		expect(groups[1]?.tree.map((node) => node.issue._id)).toEqual([
-			"parent-todo",
+			"review-root",
 		]);
 		expect(groups[3]?.tree.map((node) => node.issue._id)).toEqual([
 			"child-done",
@@ -112,14 +124,27 @@ describe("buildGroupedIssues", () => {
 
 describe("buildKanbanColumns", () => {
 	it("returns every workflow column with filtered items and trees", () => {
-		const columns = buildKanbanColumns(issues);
+		const columns = buildKanbanColumns(issues, [
+			{ key: "in_progress", name: "Building", color: "#f59e0b", position: 0 },
+			{ key: "todo", name: "Planned", color: "#000000", position: 1 },
+			{ key: "backlog", name: "Inbox", color: "#64748b", position: 2 },
+			{ key: "in_review", name: "QA", color: "#8b5cf6", position: 3 },
+			{ key: "done", name: "Released", color: "#ffffff", position: 4 },
+		]);
 
 		expect(columns.map((column) => column.status)).toEqual([
-			"backlog",
 			"todo",
 			"in_progress",
+			"backlog",
 			"in_review",
 			"done",
+		]);
+		expect(columns.map((column) => column.title)).toEqual([
+			"Todo",
+			"Building",
+			"Inbox",
+			"QA",
+			"Done",
 		]);
 		expect(columns.find((column) => column.status === "todo")?.items).toEqual([
 			issues[0],

@@ -54,6 +54,7 @@ function IssueDetailPage() {
 		me,
 		openSubIssueForm,
 		projectId,
+		projectStatuses,
 		saveComment,
 		saveDescription,
 		setComment,
@@ -186,6 +187,7 @@ function IssueDetailPage() {
 					onStartDescriptionEdit={startDescriptionEdit}
 					onStartTitleEdit={startTitleEdit}
 					onSubmitTitle={submitTitleEdit}
+					projectStatuses={projectStatuses}
 					onTitleDraftChange={setTitleDraft}
 					parentIssue={issueData.parentIssue ?? null}
 					titleDraft={titleDraft}
@@ -202,6 +204,7 @@ function IssueDetailPage() {
 					onListChange={(value) => void changeList(value)}
 					onPriorityChange={(value) => void changePriority(value)}
 					onStatusChange={(value) => void changeStatus(value)}
+					projectStatuses={projectStatuses}
 				/>
 
 				<IssueDiscussionPanel
@@ -230,6 +233,7 @@ function IssueDetailPage() {
 				onSubmit={submitSubIssue}
 				open={subIssueFormOpen}
 				setDraft={setSubIssueForm}
+				statusOptions={projectStatuses}
 				submitLabel="Create sub-task"
 				title="Create sub-task"
 			/>

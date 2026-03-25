@@ -1,5 +1,10 @@
 import { query } from './_generated/server'
 import { getAccessibleProjectIds, requireCurrentUser } from './lib/auth'
+import {
+  getProjectStatusColor,
+  getProjectStatusLabel,
+  normalizeProject,
+} from './lib/projectStatuses'
 
 function sortByDueDateThenUpdated<
   TIssue extends { dueDate?: number; updatedAt: number },
@@ -35,7 +40,10 @@ export const overview = query({
       .filter((project) => !project.archived)
 
     const projectById = new Map(
-      visibleProjects.map((project) => [project._id, project]),
+      visibleProjects.map((project) => {
+        const normalizedProject = normalizeProject(project)
+        return [normalizedProject._id, normalizedProject]
+      }),
     )
 
     const assignedIssues = (
@@ -50,11 +58,14 @@ export const overview = query({
         const project = projectById.get(issue.projectId)
         return {
           ...issue,
+          statusColor: getProjectStatusColor(project, issue.status),
+          statusLabel: getProjectStatusLabel(project, issue.status),
           project: project
             ? {
                 _id: project._id,
                 key: project.key,
                 name: project.name,
+                statuses: project.statuses,
               }
             : null,
         }
@@ -64,9 +75,7 @@ export const overview = query({
       (issue) => issue.status !== 'done',
     )
     const focusIssues = activeAssignedIssues
-      .filter(
-        (issue) => issue.status === 'in_progress' || issue.status === 'in_review',
-      )
+      .filter((issue) => issue.status !== 'todo' && issue.status !== 'backlog')
       .sort(sortByDueDateThenUpdated)
     const overdueIssues = activeAssignedIssues
       .filter((issue) => issue.dueDate && issue.dueDate < now)

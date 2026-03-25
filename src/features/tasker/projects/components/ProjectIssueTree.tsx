@@ -6,12 +6,12 @@ import {
 	IssueStatusBadge,
 } from "#/features/tasker/components/IssueBadges";
 import { formatDate } from "#/features/tasker/format";
+import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
 import {
-	ISSUE_PRIORITIES,
-	ISSUE_STATUSES,
-	issuePriorityLabel,
-	issueStatusLabel,
-} from "#/features/tasker/model";
+	getProjectStatusColor,
+	getProjectStatusLabel,
+	type ProjectStatusDefinition,
+} from "#/features/tasker/projectStatuses";
 import { cn } from "#/lib/utils";
 
 type ProjectAssignableUser = {
@@ -32,7 +32,7 @@ type ProjectIssue = {
 	issueNumber: number;
 	parentIssueId?: string | null;
 	priority: (typeof ISSUE_PRIORITIES)[number];
-	status: (typeof ISSUE_STATUSES)[number];
+	status: ProjectStatusDefinition["key"];
 	title: string;
 };
 
@@ -141,11 +141,12 @@ type ProjectIssueListTreeProps = {
 	) => void;
 	onStatusChange: (
 		issue: ProjectIssue,
-		nextStatus: (typeof ISSUE_STATUSES)[number],
+		nextStatus: ProjectStatusDefinition["key"],
 	) => void;
 	onToggleSelection?: (issueId: string) => void;
 	selectedIssueIds?: Set<string>;
 	selectionEnabled?: boolean;
+	statusOptions: ProjectStatusDefinition[];
 };
 
 export function ProjectIssueListTree({
@@ -159,6 +160,7 @@ export function ProjectIssueListTree({
 	onToggleSelection,
 	selectedIssueIds,
 	selectionEnabled = false,
+	statusOptions,
 }: ProjectIssueListTreeProps) {
 	return (
 		<>
@@ -278,22 +280,36 @@ export function ProjectIssueListTree({
 										onChange={(nextStatus) =>
 											onStatusChange(
 												issue,
-												nextStatus as (typeof ISSUE_STATUSES)[number],
+												nextStatus as ProjectStatusDefinition["key"],
 											)
 										}
-										options={ISSUE_STATUSES.map((value) => ({
-											value,
-											label: issueStatusLabel[value],
+										options={statusOptions.map((status) => ({
+											value: status.key,
+											label: status.name,
 										}))}
 										className="issue-inline-select-full"
 									>
 										<span className="issue-row-badge-slot">
-											<IssueStatusBadge status={issue.status} />
+											<IssueStatusBadge
+												color={getProjectStatusColor(
+													statusOptions,
+													issue.status,
+												)}
+												status={issue.status}
+												label={getProjectStatusLabel(
+													statusOptions,
+													issue.status,
+												)}
+											/>
 										</span>
 									</InlineSelectTrigger>
 								) : (
 									<span className="issue-row-badge-slot">
-										<IssueStatusBadge status={issue.status} />
+										<IssueStatusBadge
+											color={getProjectStatusColor(statusOptions, issue.status)}
+											status={issue.status}
+											label={getProjectStatusLabel(statusOptions, issue.status)}
+										/>
 									</span>
 								)}
 							</div>
@@ -340,6 +356,7 @@ export function ProjectIssueListTree({
 									onToggleSelection={onToggleSelection}
 									selectedIssueIds={selectedIssueIds}
 									selectionEnabled={selectionEnabled}
+									statusOptions={statusOptions}
 								/>
 							</div>
 						) : null}

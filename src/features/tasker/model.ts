@@ -2,13 +2,13 @@ export const GLOBAL_ROLES = ["admin", "member", "viewer"] as const;
 export type GlobalRole = (typeof GLOBAL_ROLES)[number];
 
 export const ISSUE_STATUSES = [
-	"backlog",
 	"todo",
+	"backlog",
 	"in_progress",
 	"in_review",
 	"done",
-] as const;
-export type IssueStatus = (typeof ISSUE_STATUSES)[number];
+];
+export type IssueStatus = string;
 
 export const ISSUE_PRIORITIES = [
 	"none",
@@ -19,9 +19,9 @@ export const ISSUE_PRIORITIES = [
 ] as const;
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
 
-export const issueStatusLabel: Record<IssueStatus, string> = {
-	backlog: "Backlog",
+export const issueStatusLabel: Record<string, string> = {
 	todo: "Todo",
+	backlog: "Backlog",
 	in_progress: "In Progress",
 	in_review: "In Review",
 	done: "Done",

@@ -100,7 +100,11 @@ function DashboardPage() {
 									</p>
 								</div>
 								<div className="flex items-center gap-2">
-									<IssueStatusBadge status={issue.status} />
+									<IssueStatusBadge
+										color={issue.statusColor}
+										status={issue.status}
+										label={issue.statusLabel}
+									/>
 									<IssuePriorityBadge priority={issue.priority} />
 								</div>
 							</Link>
@@ -133,7 +137,11 @@ function DashboardPage() {
 										Due {formatDate(issue.dueDate)}
 									</p>
 								</div>
-								<IssueStatusBadge status={issue.status} />
+								<IssueStatusBadge
+									color={issue.statusColor}
+									status={issue.status}
+									label={issue.statusLabel}
+								/>
 							</Link>
 						))}
 						{!overview.overdueIssues.length ? (
@@ -232,7 +240,11 @@ function DashboardPage() {
 										#{issue.issueNumber}
 									</p>
 								</div>
-								<IssueStatusBadge status={issue.status} />
+								<IssueStatusBadge
+									color={issue.statusColor}
+									status={issue.status}
+									label={issue.statusLabel}
+								/>
 							</Link>
 						))}
 						{!overview.createdByMe.length ? (

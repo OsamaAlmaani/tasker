@@ -29,11 +29,13 @@ describe("projectSearchSchema", () => {
 });
 
 describe("parseStatusFilters", () => {
-	it("filters invalid values and keeps allowed statuses", () => {
+	it("keeps arbitrary non-empty status keys", () => {
 		expect(parseStatusFilters("todo, invalid ,done, todo,blocked")).toEqual([
 			"todo",
+			"invalid",
 			"done",
 			"todo",
+			"blocked",
 		]);
 	});
 
@@ -67,7 +69,7 @@ describe("normalizeProjectSearch", () => {
 			}),
 		).toEqual({
 			q: "sprint planning",
-			statuses: "todo,done",
+			statuses: "todo,done,invalid",
 		});
 	});
 

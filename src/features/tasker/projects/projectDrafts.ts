@@ -1,5 +1,10 @@
 import type { IssueDraft } from "#/features/tasker/issues/components/IssueDraftDialog";
 import type { ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
+import {
+	DEFAULT_PROJECT_STATUSES,
+	normalizeProjectStatuses,
+	type ProjectStatusDefinition,
+} from "#/features/tasker/projectStatuses";
 import type { ProjectSettingsForm } from "#/features/tasker/projects/components/ProjectSettingsCard";
 import { formatIssueInputDate } from "#/features/tasker/projects/issueGrouping";
 
@@ -10,6 +15,7 @@ type ProjectSettingsLike = {
 	description?: string | null;
 	icon?: string | null;
 	name?: string | null;
+	statuses?: ProjectStatusDefinition[] | null;
 };
 
 type ParentIssueLike = {
@@ -42,6 +48,9 @@ export function createProjectSettingsForm(
 		description: project?.description ?? "",
 		color: project?.color ?? "#4f46e5",
 		icon: project?.icon ?? "FolderKanban",
+		statuses: normalizeProjectStatuses(
+			project?.statuses ?? DEFAULT_PROJECT_STATUSES,
+		),
 		allowMemberInvites: project?.allowMemberInvites ?? true,
 		allowIssueDelete: project?.allowIssueDelete ?? true,
 	};

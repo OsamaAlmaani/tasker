@@ -3,6 +3,7 @@ import { type FormEvent, useMemo, useState } from "react";
 import type { IssueDraft } from "#/features/tasker/issues/components/IssueDraftDialog";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import type { ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
+import { normalizeProjectStatuses } from "#/features/tasker/projectStatuses";
 import {
 	commentFormSchema,
 	issueFormSchema,
@@ -124,6 +125,10 @@ export function useIssueDetailPage({
 	const projectId = issueData?.project._id;
 	const canDeleteIssue = Boolean(
 		canWrite && issueData?.project.allowIssueDelete,
+	);
+	const projectStatuses = useMemo(
+		() => normalizeProjectStatuses(issueData?.project.statuses),
+		[issueData?.project.statuses],
 	);
 
 	const childIssueRows = useMemo(
@@ -411,6 +416,7 @@ export function useIssueDetailPage({
 		closeSubIssueForm,
 		openSubIssueForm,
 		projectId,
+		projectStatuses,
 		saveComment,
 		saveDescription,
 		setComment,

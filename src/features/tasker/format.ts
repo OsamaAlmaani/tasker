@@ -33,8 +33,8 @@ export function formatRelative(timestamp: number) {
 	return diff < 0 ? `${absDays}d ago` : `in ${absDays}d`;
 }
 
-export function statusLabel(status: keyof typeof issueStatusLabel) {
-	return issueStatusLabel[status];
+export function statusLabel(status: string) {
+	return issueStatusLabel[status] ?? status;
 }
 
 export function priorityLabel(priority: keyof typeof issuePriorityLabel) {

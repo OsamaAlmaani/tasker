@@ -1,16 +1,18 @@
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
-import { ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
+import { ISSUE_PRIORITIES } from "#/features/tasker/model";
+import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 import { getClientErrorMessage } from "#/lib/utils";
 import type { Doc, Id } from "#convex/_generated/dataModel";
 
 type ImportedTask = {
 	title: string;
 	description?: string;
-	status?: (typeof ISSUE_STATUSES)[number];
+	status?: string;
 	priority?: (typeof ISSUE_PRIORITIES)[number];
 	labels?: string[] | string;
 	dueDate?: number | string;
 	listName?: string;
+	statusName?: string;
 };
 
 type ExportableIssue = Pick<
@@ -43,7 +45,7 @@ type CreateImportedIssueArgs = {
 	projectId: Id<"projects">;
 	title: string;
 	description?: string;
-	status?: (typeof ISSUE_STATUSES)[number];
+	status?: string;
 	priority?: (typeof ISSUE_PRIORITIES)[number];
 	dueDate?: number;
 	labels?: string[];
@@ -59,6 +61,7 @@ type UseProjectTaskImportExportOptions = {
 	issues: ExportableIssue[] | undefined;
 	project: ProjectSummary | undefined;
 	projectId: Id<"projects">;
+	projectStatuses: ProjectStatusDefinition[];
 };
 
 function extractImportTasks(payload: unknown): ImportedTask[] {
@@ -121,6 +124,7 @@ export function useProjectTaskImportExport({
 	issues,
 	project,
 	projectId,
+	projectStatuses,
 }: UseProjectTaskImportExportOptions) {
 	const [isImportExportMenuOpen, setIsImportExportMenuOpen] = useState(false);
 	const [isImportingTasks, setIsImportingTasks] = useState(false);
@@ -208,6 +212,9 @@ export function useProjectTaskImportExport({
 				title: issue.title,
 				description: issue.description,
 				status: issue.status,
+				statusName:
+					projectStatuses.find((status) => status.key === issue.status)?.name ??
+					issue.status,
 				priority: issue.priority,
 				labels: issue.labels,
 				dueDate: issue.dueDate,
@@ -261,7 +268,15 @@ export function useProjectTaskImportExport({
 					list._id,
 				]),
 			);
-			const allowedStatuses = new Set<string>(ISSUE_STATUSES);
+			const statusKeyByName = new Map(
+				projectStatuses.map((status) => [
+					status.name.trim().toLowerCase(),
+					status.key,
+				]),
+			);
+			const allowedStatuses = new Set(
+				projectStatuses.map((status) => status.key),
+			);
 			const allowedPriorities = new Set<string>(ISSUE_PRIORITIES);
 
 			let importedCount = 0;
@@ -277,7 +292,9 @@ export function useProjectTaskImportExport({
 				const status =
 					task.status && allowedStatuses.has(task.status)
 						? task.status
-						: undefined;
+						: task.statusName
+							? statusKeyByName.get(task.statusName.trim().toLowerCase())
+							: undefined;
 				const priority =
 					task.priority && allowedPriorities.has(task.priority)
 						? task.priority

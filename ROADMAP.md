@@ -55,6 +55,7 @@ Use this file to track feature progress. Check items off as they ship.
 
 - New projects start active with member invites enabled and task deletion enabled.
 - The default task workflow is `backlog -> todo -> in_progress -> in_review -> done`.
+- Each new project is seeded with `todo`, `backlog`, `in_progress`, `in_review`, and `done`. `todo` and `done` stay fixed and protected with built-in colors; all other project statuses can be renamed, recolored, added, deleted, and reordered.
 - The default project working view is task-first: list layout, grouped by list, sorted by recently updated.
 - The default personal working surfaces are `Dashboard`, `My Work`, and `Projects`.
 - `My Work` defaults to opinionated sections instead of a blank filter builder: `Focus`, `Due Soon`, `Overdue`, `Backlog & Todo`, and `Recently Completed`.
@@ -66,12 +67,13 @@ Use this file to track feature progress. Check items off as they ship.
 - [ ] Add notifications, an in-app inbox, and due date reminders for assignments, comments, status changes, and invites
 - [ ] Add per-user notification preferences
 - [ ] Add recurring tasks plus reusable task and project templates
-- [ ] Add bulk task actions for status, assignee, priority, list, archive, and delete
+- [x] Add bulk task actions for status, assignee, priority, and archive
+- [ ] Extend bulk task actions with list moves and delete
 - [ ] Add undo and recovery flows for destructive actions
 - [ ] Add a proper trash / restore flow for deleted tasks and projects if deletion remains part of the product
 
 Core workflow progress:
-- 2026-03-25: Added first-pass bulk task actions for status, priority, archive, and project-scoped assignee updates across `My Work` and project list views, backed by `convex/issues.bulkUpdate`. Bulk list moves and bulk delete remain open.
+- 2026-03-25: Added bulk task actions for status, priority, archive, and project-scoped assignee updates across `My Work` and project list views, backed by `convex/issues.bulkUpdate`.
 
 ## Planning
 
@@ -105,12 +107,17 @@ Personal productivity progress:
 
 ## Workflow Model
 
-- [ ] Add status model flexibility with custom workflows per project
+- [x] Add status model flexibility with custom workflows per project
 - [ ] Add custom labels management per project
 - [ ] Add custom task fields per project
 - [ ] Add checklist items inside tasks
 - [ ] Add task estimates and optional time tracking
 - [ ] Support deeper sub-task nesting if still needed after real usage
+
+Workflow model progress:
+- 2026-03-25: Added real project-owned status definitions backed by stable status keys on tasks. New projects are seeded with `todo`, `backlog`, `in_progress`, `in_review`, and `done`; `todo` and `done` are protected, while all other statuses can be added, renamed, reordered, and deleted per project.
+- 2026-03-25: Added transfer-on-delete workflow for project statuses so deleting a custom status first moves affected tasks into a replacement status before removing it from the project.
+- 2026-03-25: Added per-status colors for project workflows so custom statuses can be color-coded in project settings and those colors now flow through task badges/cards across project views, My Work, and the dashboard.
 
 ## Project and Permissions
 

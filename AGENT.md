@@ -133,6 +133,7 @@ Notable schema choices:
 - `issues.archived` exists separately from `deletedAt`.
 - Task search is backed by `issues.searchText` plus Convex `searchIndex`, though current query logic mainly filters in memory.
 - Project issue numbering is per project via `projectCounters.nextIssueNumber`.
+- `projects.statuses` stores the per-project workflow definitions, including display color. `todo` and `done` are protected fixed statuses with built-in colors; all other statuses are project-owned and can be added, renamed, recolored, reordered, or removed.
 - `users.myWorkDefaultView` and `users.myWorkLastView` persist the current user’s preferred preset view for the `My Work` page.
 
 ## Auth / Permission Model
@@ -180,6 +181,15 @@ Relevant code:
 - A child issue cannot be moved out of `done` while an ancestor is still `done`.
 - Both project and issue detail pages mirror this behavior in UI state before calling the backend.
 
+### Task workflow model
+
+- Every task must always have a project-owned status key.
+- `todo` and `done` are fixed protected workflow statuses and cannot be renamed or deleted.
+- `todo` and `done` keep their built-in colors; custom statuses own their single visible name and color.
+- New projects are seeded with `todo`, `backlog`, `in_progress`, `in_review`, and `done`.
+- Non-protected statuses are project-owned: they can be renamed, recolored, reordered, added, and deleted per project.
+- Deleting a custom status requires choosing a replacement status so existing tasks are transferred before the status is removed.
+
 ### Deletion behavior
 
 - Deleting an issue is a soft delete:
@@ -215,12 +225,13 @@ Invite flow is split intentionally:
 
 - New projects start active with member invites enabled and task deletion enabled.
 - The default task workflow is `backlog`, `todo`, `in_progress`, `in_review`, `done`.
+- Project settings now manage per-project statuses. `todo` and `done` stay fixed with their built-in colors, while the seeded intermediate statuses can be renamed, recolored, reordered, deleted, or supplemented with new custom statuses.
 - The default project working view is list layout, grouped by list, sorted by recently updated.
 - The default personal working surfaces are `Dashboard`, `My Work`, and `Projects`.
 - The `My Work` page is intentionally opinionated around assigned-task sections: `Focus`, `Due Soon`, `Overdue`, `Backlog & Todo`, and `Recently Completed`.
 - `My Work` uses route search state for preset views (`overview`, `focus`, `due_soon`, `overdue`, `backlog`, `completed`) instead of exposing a full custom filter builder as the default experience.
 - `My Work` also persists the user’s last selected preset view and supports pinning one preset as the default landing view.
-- Bulk task actions currently cover `status`, `priority`, `archive`, and project-scoped `assignee` updates. `My Work` intentionally omits bulk reassignment because selections can span multiple projects with different membership rules.
+- Bulk task actions currently cover `status`, `priority`, `archive`, and project-scoped `assignee` updates. `My Work` intentionally omits bulk reassignment because selections can span multiple projects with different membership rules. Bulk list moves and bulk delete remain separate follow-up work.
 - Permissions remain simple by default: `admin` has full access, `member` can write in accessible projects, and `viewer` is read-only.
 
 ## Frontend Structure Notes
@@ -238,6 +249,7 @@ Invite flow is split intentionally:
 - Place project route search schema and normalization helpers in `src/features/tasker/projects/projectSearch.ts` instead of redefining query-string helpers inside route files.
 - Place project issue tree/grouping derivation and task input-date helpers in `src/features/tasker/projects/issueGrouping.ts` instead of keeping that pure board logic inline in controller hooks.
 - Place project task-draft defaults, project settings form defaults, parent-task inheritance rules, and invite-result messaging in `src/features/tasker/projects/projectDrafts.ts` instead of keeping that pure form logic inline in controller hooks.
+- Place project workflow definition helpers in `src/features/tasker/projectStatuses.ts` and `convex/lib/projectStatuses.ts` instead of spreading status normalization and protected-status rules across routes, components, and Convex handlers.
 - Place the remaining project-page composition, dialogs, and project-view switching UI in `src/features/tasker/projects/components/ProjectDetailContent.tsx` so the route stays focused on params, search-state updates, and loading/not-found handling.
 - Place project task import/export state, menu behavior, and file parsing in `src/features/tasker/projects/useProjectTaskImportExport.ts` instead of keeping that workflow inline in route files.
 - Place project detail page queries, derived state, modal state, and mutation handlers in `src/features/tasker/projects/useProjectDetailPage.ts` so the route stays focused on search-state normalization and composition.

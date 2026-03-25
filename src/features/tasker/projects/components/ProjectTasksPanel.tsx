@@ -6,11 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { Input } from "#/components/ui/input";
 import { Select } from "#/components/ui/select";
 import { RemovableIssueStatusBadge } from "#/features/tasker/components/IssueBadges";
-import {
-	ISSUE_PRIORITIES,
-	ISSUE_STATUSES,
-	issueStatusLabel,
-} from "#/features/tasker/model";
+import { ISSUE_PRIORITIES } from "#/features/tasker/model";
+import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 import { cn } from "#/lib/utils";
 
 type ProjectIssueGroup = {
@@ -21,7 +18,7 @@ type ProjectIssueGroup = {
 };
 
 type KanbanColumn = {
-	status: (typeof ISSUE_STATUSES)[number];
+	status: ProjectStatusDefinition["key"];
 	title: string;
 	items: unknown[];
 	tree: unknown[];
@@ -37,7 +34,7 @@ type ProjectTasksPanelProps = {
 	assigneeId: string;
 	bulkActions?: ReactNode;
 	canWrite: boolean;
-	dragOverStatus: (typeof ISSUE_STATUSES)[number] | null;
+	dragOverStatus: ProjectStatusDefinition["key"] | null;
 	groupBy: string;
 	groupedIssues: ProjectIssueGroup[];
 	issueLayout: "list" | "kanban";
@@ -47,17 +44,17 @@ type ProjectTasksPanelProps = {
 	onClearStatuses: () => void;
 	onCreateTask: () => void;
 	onGroupByChange: (value: string) => void;
-	onKanbanColumnDragLeave: (status: (typeof ISSUE_STATUSES)[number]) => void;
+	onKanbanColumnDragLeave: (status: ProjectStatusDefinition["key"]) => void;
 	onKanbanColumnDragOver: (
 		event: DragEvent<HTMLElement>,
-		status: (typeof ISSUE_STATUSES)[number],
+		status: ProjectStatusDefinition["key"],
 	) => void;
 	onKanbanColumnDrop: (
 		event: DragEvent<HTMLElement>,
-		status: (typeof ISSUE_STATUSES)[number],
+		status: ProjectStatusDefinition["key"],
 	) => void;
 	onPriorityChange: (value: string) => void;
-	onRemoveStatus: (value: (typeof ISSUE_STATUSES)[number]) => void;
+	onRemoveStatus: (value: ProjectStatusDefinition["key"]) => void;
 	onSearchChange: (value: string) => void;
 	onSortChange: (value: string) => void;
 	onToggleLayout: (layout: "list" | "kanban") => void;
@@ -65,9 +62,10 @@ type ProjectTasksPanelProps = {
 	renderKanbanIssueNode: (node: unknown) => ReactNode;
 	renderListIssueNode: (node: unknown) => ReactNode;
 	search: string;
-	selectedStatuses: (typeof ISSUE_STATUSES)[number][];
+	selectedStatuses: ProjectStatusDefinition["key"][];
 	showEmptyState: boolean;
 	sortBy: string;
+	statusOptions: ProjectStatusDefinition[];
 	statusPicker: string;
 };
 
@@ -101,6 +99,7 @@ export function ProjectTasksPanel({
 	selectedStatuses,
 	showEmptyState,
 	sortBy,
+	statusOptions,
 	statusPicker,
 }: ProjectTasksPanelProps) {
 	return (
@@ -159,13 +158,13 @@ export function ProjectTasksPanel({
 						onChange={(event) => onAddStatusFilter(event.target.value)}
 					>
 						<option value="">Add status filter</option>
-						{ISSUE_STATUSES.map((value) => (
+						{statusOptions.map((status) => (
 							<option
-								key={value}
-								value={value}
-								disabled={selectedStatuses.includes(value)}
+								key={status.key}
+								value={status.key}
+								disabled={selectedStatuses.includes(status.key)}
 							>
-								{issueStatusLabel[value]}
+								{status.name}
 							</option>
 						))}
 					</Select>
@@ -216,6 +215,12 @@ export function ProjectTasksPanel({
 						{selectedStatuses.map((value) => (
 							<RemovableIssueStatusBadge
 								key={value}
+								color={
+									statusOptions.find((status) => status.key === value)?.color
+								}
+								label={
+									statusOptions.find((status) => status.key === value)?.name
+								}
 								status={value}
 								onRemove={() => onRemoveStatus(value)}
 							/>

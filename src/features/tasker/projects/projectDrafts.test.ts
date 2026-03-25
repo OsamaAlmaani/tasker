@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_PROJECT_STATUSES } from "#/features/tasker/projectStatuses";
 import {
 	applyParentIssueDraftDefaults,
 	createIssueDraft,
@@ -29,6 +30,7 @@ describe("createProjectSettingsForm", () => {
 			description: "",
 			color: "#4f46e5",
 			icon: "FolderKanban",
+			statuses: DEFAULT_PROJECT_STATUSES,
 			allowMemberInvites: true,
 			allowIssueDelete: true,
 		});
@@ -41,6 +43,13 @@ describe("createProjectSettingsForm", () => {
 				description: "Roadmap",
 				color: "#123456",
 				icon: "Rocket",
+				statuses: [
+					{ key: "todo", name: "Queued", color: "#000000", position: 0 },
+					{ key: "backlog", name: "Inbox", color: "#334155", position: 1 },
+					{ key: "in_progress", name: "Doing", color: "#f97316", position: 2 },
+					{ key: "in_review", name: "QA", color: "#c084fc", position: 3 },
+					{ key: "done", name: "Shipped", color: "#ffffff", position: 4 },
+				],
 				allowMemberInvites: false,
 				allowIssueDelete: false,
 			}),
@@ -49,6 +58,13 @@ describe("createProjectSettingsForm", () => {
 			description: "Roadmap",
 			color: "#123456",
 			icon: "Rocket",
+			statuses: [
+				{ key: "todo", name: "Todo", color: "#3b82f6", position: 0 },
+				{ key: "backlog", name: "Inbox", color: "#334155", position: 1 },
+				{ key: "in_progress", name: "Doing", color: "#f97316", position: 2 },
+				{ key: "in_review", name: "QA", color: "#c084fc", position: 3 },
+				{ key: "done", name: "Done", color: "#10b981", position: 4 },
+			],
 			allowMemberInvites: false,
 			allowIssueDelete: false,
 		});

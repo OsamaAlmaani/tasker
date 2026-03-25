@@ -112,7 +112,11 @@ function MyWorkSection({
 							</div>
 						</Link>
 						<div className="flex items-center gap-2">
-							<IssueStatusBadge status={issue.status} />
+							<IssueStatusBadge
+								color={issue.statusColor}
+								status={issue.status}
+								label={issue.statusLabel}
+							/>
 							<IssuePriorityBadge priority={issue.priority} />
 						</div>
 					</div>
@@ -301,6 +305,26 @@ function MyWorkPage() {
 		() => new Set(visibleIssues.map((issue) => issue._id)),
 		[visibleIssues],
 	);
+	const selectedIssues = useMemo(
+		() => visibleIssues.filter((issue) => selectedIssueIds.has(issue._id)),
+		[selectedIssueIds, visibleIssues],
+	);
+	const selectedProjectIds = useMemo(
+		() => [
+			...new Set(
+				selectedIssues
+					.map((issue) => issue.project?._id)
+					.filter((projectId): projectId is string => Boolean(projectId)),
+			),
+		],
+		[selectedIssues],
+	);
+	const selectedProjectStatusOptions =
+		selectedProjectIds.length === 1
+			? selectedIssues.find(
+					(issue) => issue.project?._id === selectedProjectIds[0],
+				)?.project?.statuses
+			: undefined;
 
 	useEffect(() => {
 		setSelectedIssueIds((current) => {
@@ -449,9 +473,14 @@ function MyWorkPage() {
 						selectedCount={selectedIssueIds.size}
 						isApplying={isApplyingBulkAction}
 						onClearSelection={() => setSelectedIssueIds(new Set())}
-						onStatusChange={(status) => void applyBulkAction({ status })}
+						onStatusChange={
+							selectedProjectStatusOptions
+								? (status) => void applyBulkAction({ status })
+								: undefined
+						}
 						onPriorityChange={(priority) => void applyBulkAction({ priority })}
 						onArchiveChange={(archived) => void applyBulkAction({ archived })}
+						statusOptions={selectedProjectStatusOptions}
 					/>
 				</section>
 			) : null}

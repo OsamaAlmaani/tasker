@@ -25,6 +25,7 @@ import {
 } from "#/features/tasker/projects/components/ProjectIssueTree";
 import { ProjectMembersDialog } from "#/features/tasker/projects/components/ProjectMembersDialog";
 import { ProjectSettingsCard } from "#/features/tasker/projects/components/ProjectSettingsCard";
+import { ProjectStatusDeleteDialog } from "#/features/tasker/projects/components/ProjectStatusDeleteDialog";
 import { ProjectTasksPanel } from "#/features/tasker/projects/components/ProjectTasksPanel";
 import {
 	type ProjectSearch,
@@ -117,6 +118,8 @@ export function ProjectDetailContent({
 		priority,
 		projectActivity,
 		projectForm,
+		projectSettingsError,
+		projectStatuses,
 		projectInvites,
 		projectView,
 		search,
@@ -136,12 +139,19 @@ export function ProjectDetailContent({
 		setMemberToRemove,
 		setProjectForm,
 		sortBy,
+		statusToDelete,
 		statusPicker,
 		statusUpdateError,
+		transferStatusKey,
+		setTransferStatusKey,
 		submitEmailInvite,
 		submitIssue,
 		submitProjectSettings,
 		syncProjectFormWithCurrentProject,
+		requestStatusDelete,
+		cancelStatusDelete,
+		confirmStatusDelete,
+		isDeletingStatus,
 		toggleImportExportMenu,
 		updateIssue,
 	} = page;
@@ -355,13 +365,22 @@ export function ProjectDetailContent({
 			{bulkActionError ? (
 				<p className="mb-4 text-sm text-[var(--danger)]">{bulkActionError}</p>
 			) : null}
+			{projectSettingsError ? (
+				<p className="mb-4 text-sm text-[var(--danger)]">
+					{projectSettingsError}
+				</p>
+			) : null}
 
 			<ProjectSettingsCard
 				archived={projectData.project.archived}
 				form={projectForm}
 				onArchiveClick={() => setIsArchiveConfirmOpen(true)}
+				onRequestDeleteStatus={requestStatusDelete}
 				onSubmit={submitProjectSettings}
 				open={editingProject}
+				persistedStatusKeys={
+					new Set(projectData.project.statuses.map((status) => status.key))
+				}
 				setForm={setProjectForm}
 			/>
 
@@ -374,8 +393,9 @@ export function ProjectDetailContent({
 							issueLayout === "list" && selectedIssueIds.size ? (
 								<IssueBulkActionsBar
 									assignableUsers={assignableUsers}
-									selectedCount={selectedIssueIds.size}
 									isApplying={isApplyingBulkAction}
+									selectedCount={selectedIssueIds.size}
+									statusOptions={projectStatuses}
 									onClearSelection={() => setSelectedIssueIds(new Set())}
 									onStatusChange={(status) => void applyBulkAction({ status })}
 									onPriorityChange={(priority) =>
@@ -499,12 +519,14 @@ export function ProjectDetailContent({
 								onToggleSelection={toggleIssueSelection}
 								selectedIssueIds={selectedIssueIds}
 								selectionEnabled={canWrite}
+								statusOptions={projectStatuses}
 							/>
 						)}
 						search={search}
 						selectedStatuses={selectedStatuses}
 						showEmptyState={Boolean(issues) && issues.length === 0}
 						sortBy={sortBy}
+						statusOptions={projectStatuses}
 						statusPicker={statusPicker}
 					/>
 				) : (
@@ -586,8 +608,23 @@ export function ProjectDetailContent({
 				open={createOpen}
 				parentIssueOptions={parentIssueOptions}
 				setDraft={setIssueForm}
+				statusOptions={projectStatuses}
 				submitLabel="Create task"
 				title="Create Task"
+			/>
+
+			<ProjectStatusDeleteDialog
+				description={projectSettingsError}
+				isDeleting={isDeletingStatus}
+				onCancel={cancelStatusDelete}
+				onConfirm={confirmStatusDelete}
+				onTransferStatusChange={setTransferStatusKey}
+				open={Boolean(statusToDelete)}
+				status={statusToDelete}
+				transferStatusKey={transferStatusKey}
+				transferStatusOptions={projectStatuses.filter(
+					(status) => status.key !== statusToDelete?.key,
+				)}
 			/>
 
 			<ConfirmDialog

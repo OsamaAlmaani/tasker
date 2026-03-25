@@ -1,7 +1,11 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import { type DragEvent, useMemo, useState } from "react";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
-import { type ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
+import type { ISSUE_PRIORITIES } from "#/features/tasker/model";
+import {
+	normalizeProjectStatuses,
+	type ProjectStatusDefinition,
+} from "#/features/tasker/projectStatuses";
 import {
 	buildGroupedIssues,
 	buildKanbanColumns,
@@ -85,12 +89,12 @@ export function useProjectDetailPage({
 	function addStatusFilter(nextStatus: string) {
 		if (
 			!nextStatus ||
-			!ISSUE_STATUSES.includes(nextStatus as (typeof ISSUE_STATUSES)[number])
+			!projectStatuses.some((status) => status.key === nextStatus)
 		) {
 			return;
 		}
 
-		const statusValue = nextStatus as (typeof ISSUE_STATUSES)[number];
+		const statusValue = nextStatus;
 		const nextStatuses = selectedStatuses.includes(statusValue)
 			? selectedStatuses
 			: [...selectedStatuses, statusValue];
@@ -109,6 +113,7 @@ export function useProjectDetailPage({
 	const createIssue = useMutation(api.issues.create);
 	const updateIssue = useMutation(api.issues.update);
 	const updateProject = useMutation(api.projects.update);
+	const deleteProjectStatus = useMutation(api.projects.deleteStatus);
 	const archiveProject = useMutation(api.projects.archive);
 	const addMember = useMutation(api.projects.addMember);
 	const removeMember = useMutation(api.projects.removeMember);
@@ -124,6 +129,13 @@ export function useProjectDetailPage({
 	const [projectForm, setProjectForm] = useState(() =>
 		createProjectSettingsForm(projectData?.project),
 	);
+	const [projectSettingsError, setProjectSettingsError] = useState<
+		string | null
+	>(null);
+	const [statusToDelete, setStatusToDelete] =
+		useState<ProjectStatusDefinition | null>(null);
+	const [transferStatusKey, setTransferStatusKey] = useState("");
+	const [isDeletingStatus, setIsDeletingStatus] = useState(false);
 	const [inviteSearch, setInviteSearch] = useState("");
 	const [inviteEmail, setInviteEmail] = useState("");
 	const [inviteMessage, setInviteMessage] = useState<string | null>(null);
@@ -146,9 +158,7 @@ export function useProjectDetailPage({
 	const [draggingIssueId, setDraggingIssueId] = useState<Id<"issues"> | null>(
 		null,
 	);
-	const [dragOverStatus, setDragOverStatus] = useState<
-		(typeof ISSUE_STATUSES)[number] | null
-	>(null);
+	const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
 
 	const issueLists = useQuery(
 		api.issueLists.listByProject,
@@ -184,6 +194,10 @@ export function useProjectDetailPage({
 	);
 
 	const canWrite = me?.globalRole === "admin" || me?.globalRole === "member";
+	const projectStatuses = useMemo(
+		() => normalizeProjectStatuses(projectData?.project.statuses),
+		[projectData?.project.statuses],
+	);
 
 	const memberRows = useMemo(
 		() => projectData?.membershipRows ?? [],
@@ -253,6 +267,7 @@ export function useProjectDetailPage({
 		issues: issues as ProjectIssueRow[] | undefined,
 		project: projectData?.project,
 		projectId,
+		projectStatuses,
 	});
 
 	const groupedIssues = useMemo(
@@ -261,13 +276,15 @@ export function useProjectDetailPage({
 				(issues ?? []) as ProjectIssueRow[],
 				groupBy,
 				issueListById,
+				projectStatuses,
 			),
-		[issues, issueListById, groupBy],
+		[issues, issueListById, groupBy, projectStatuses],
 	);
 
 	const kanbanColumns = useMemo(
-		() => buildKanbanColumns((issues ?? []) as ProjectIssueRow[]),
-		[issues],
+		() =>
+			buildKanbanColumns((issues ?? []) as ProjectIssueRow[], projectStatuses),
+		[issues, projectStatuses],
 	);
 
 	async function submitIssue(event: FormEvent<HTMLFormElement>) {
@@ -319,18 +336,26 @@ export function useProjectDetailPage({
 
 	async function submitProjectSettings(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
+		setProjectSettingsError(null);
 
-		await updateProject({
-			projectId,
-			name: projectForm.name,
-			description: projectForm.description,
-			color: projectForm.color,
-			icon: projectForm.icon,
-			allowMemberInvites: projectForm.allowMemberInvites,
-			allowIssueDelete: projectForm.allowIssueDelete,
-		});
+		try {
+			await updateProject({
+				projectId,
+				name: projectForm.name,
+				description: projectForm.description,
+				color: projectForm.color,
+				icon: projectForm.icon,
+				statuses: projectForm.statuses,
+				allowMemberInvites: projectForm.allowMemberInvites,
+				allowIssueDelete: projectForm.allowIssueDelete,
+			});
 
-		setEditingProject(false);
+			setEditingProject(false);
+		} catch (error) {
+			setProjectSettingsError(
+				getClientErrorMessage(error, "Failed to update project settings."),
+			);
+		}
 	}
 
 	async function submitEmailInvite(event: FormEvent<HTMLFormElement>) {
@@ -408,7 +433,56 @@ export function useProjectDetailPage({
 			return;
 		}
 
+		setProjectSettingsError(null);
 		setProjectForm(createProjectSettingsForm(projectData.project));
+	}
+
+	function requestStatusDelete(statusKey: string) {
+		const status = projectStatuses.find((item) => item.key === statusKey);
+		if (!status) {
+			return;
+		}
+
+		const fallbackTransferStatusKey =
+			projectStatuses.find((item) => item.key !== statusKey)?.key ?? "";
+		setProjectSettingsError(null);
+		setTransferStatusKey(fallbackTransferStatusKey);
+		setStatusToDelete(status);
+	}
+
+	function cancelStatusDelete() {
+		setStatusToDelete(null);
+		setTransferStatusKey("");
+		setProjectSettingsError(null);
+	}
+
+	async function confirmStatusDelete() {
+		if (!statusToDelete || !transferStatusKey) {
+			return;
+		}
+
+		setIsDeletingStatus(true);
+		setProjectSettingsError(null);
+		try {
+			await deleteProjectStatus({
+				projectId,
+				statusKey: statusToDelete.key,
+				transferToStatusKey: transferStatusKey,
+			});
+			setProjectForm((previous) => ({
+				...previous,
+				statuses: previous.statuses.filter(
+					(status) => status.key !== statusToDelete.key,
+				),
+			}));
+			cancelStatusDelete();
+		} catch (error) {
+			setProjectSettingsError(
+				getClientErrorMessage(error, "Failed to delete project status."),
+			);
+		} finally {
+			setIsDeletingStatus(false);
+		}
 	}
 
 	function handleKanbanDragStart(
@@ -436,7 +510,7 @@ export function useProjectDetailPage({
 
 	function handleKanbanColumnDragOver(
 		event: DragEvent<HTMLElement>,
-		status: (typeof ISSUE_STATUSES)[number],
+		status: string,
 	) {
 		if (!canWrite) {
 			return;
@@ -450,7 +524,7 @@ export function useProjectDetailPage({
 
 	function handleKanbanColumnDrop(
 		event: DragEvent<HTMLElement>,
-		nextStatus: (typeof ISSUE_STATUSES)[number],
+		nextStatus: string,
 	) {
 		if (!canWrite) {
 			return;
@@ -468,7 +542,7 @@ export function useProjectDetailPage({
 		try {
 			const parsed = JSON.parse(payload) as {
 				issueId?: string;
-				status?: (typeof ISSUE_STATUSES)[number];
+				status?: string;
 			};
 			if (!parsed.issueId || !parsed.status) {
 				handleKanbanDragEnd();
@@ -562,6 +636,8 @@ export function useProjectDetailPage({
 		projectActivity,
 		projectData,
 		projectForm,
+		projectSettingsError,
+		projectStatuses,
 		projectInvites,
 		projectIssueById,
 		projectView,
@@ -581,6 +657,9 @@ export function useProjectDetailPage({
 		setIsMembersModalOpen,
 		setMemberToRemove,
 		setProjectForm,
+		statusToDelete,
+		transferStatusKey,
+		setTransferStatusKey,
 		setStatusPicker,
 		setIssueForm,
 		sortBy,
@@ -590,6 +669,10 @@ export function useProjectDetailPage({
 		submitIssue,
 		submitProjectSettings,
 		syncProjectFormWithCurrentProject,
+		requestStatusDelete,
+		cancelStatusDelete,
+		confirmStatusDelete,
+		isDeletingStatus,
 		toggleImportExportMenu: importExport.toggleImportExportMenu,
 		updateIssue,
 		exportTasks: importExport.exportTasks,

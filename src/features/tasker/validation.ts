@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GLOBAL_ROLES, ISSUE_PRIORITIES, ISSUE_STATUSES } from "./model";
+import { GLOBAL_ROLES, ISSUE_PRIORITIES } from "./model";
 
 export const projectFormSchema = z.object({
 	name: z.string().trim().min(2, "Project name is required."),
@@ -18,7 +18,7 @@ export const projectFormSchema = z.object({
 export const issueFormSchema = z.object({
 	title: z.string().trim().min(2, "Task title is required."),
 	description: z.string().trim().optional(),
-	status: z.enum(ISSUE_STATUSES).default("todo"),
+	status: z.string().trim().min(1, "Status is required.").default("todo"),
 	priority: z.enum(ISSUE_PRIORITIES).default("none"),
 	assigneeId: z.string().trim().optional(),
 	listId: z.string().trim().optional(),

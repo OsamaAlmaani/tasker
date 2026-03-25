@@ -1,5 +1,10 @@
 import { query } from './_generated/server'
 import { getAccessibleProjectIds, requireCurrentUser } from './lib/auth'
+import {
+  getProjectStatusColor,
+  getProjectStatusLabel,
+  normalizeProject,
+} from './lib/projectStatuses'
 
 export const overview = query({
   args: {},
@@ -19,8 +24,10 @@ export const overview = query({
     const projects = accessibleProjects
       .filter((project): project is NonNullable<typeof project> => Boolean(project))
       .filter((project) => !project.archived)
+      .map((project) => normalizeProject(project))
 
     const projectIds = new Set(projects.map((project) => project._id))
+    const projectById = new Map(projects.map((project) => [project._id, project]))
 
     const myAssigned = (
       await ctx.db
@@ -30,6 +37,11 @@ export const overview = query({
     )
       .filter((issue) => !issue.deletedAt && !issue.archived)
       .filter((issue) => projectIds.has(issue.projectId))
+      .map((issue) => ({
+        ...issue,
+        statusColor: getProjectStatusColor(projectById.get(issue.projectId), issue.status),
+        statusLabel: getProjectStatusLabel(projectById.get(issue.projectId), issue.status),
+      }))
       .sort((a, b) => b.updatedAt - a.updatedAt)
 
     const createdByMe = (
@@ -40,6 +52,11 @@ export const overview = query({
     )
       .filter((issue) => !issue.deletedAt && !issue.archived)
       .filter((issue) => projectIds.has(issue.projectId))
+      .map((issue) => ({
+        ...issue,
+        statusColor: getProjectStatusColor(projectById.get(issue.projectId), issue.status),
+        statusLabel: getProjectStatusLabel(projectById.get(issue.projectId), issue.status),
+      }))
       .sort((a, b) => b.createdAt - a.createdAt)
 
     const projectIssues = []
@@ -57,6 +74,11 @@ export const overview = query({
 
     const overdueIssues = visibleIssues
       .filter((issue) => issue.dueDate && issue.dueDate < now && issue.status !== 'done')
+      .map((issue) => ({
+        ...issue,
+        statusColor: getProjectStatusColor(projectById.get(issue.projectId), issue.status),
+        statusLabel: getProjectStatusLabel(projectById.get(issue.projectId), issue.status),
+      }))
       .sort((a, b) => (a.dueDate ?? 0) - (b.dueDate ?? 0))
 
     const quickStats = {

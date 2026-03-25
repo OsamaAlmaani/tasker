@@ -11,6 +11,11 @@ import {
   requireProjectWriteAccess,
 } from './lib/auth'
 import { createActivity } from './lib/activity'
+import {
+  ensureProjectStatusExists,
+  normalizeProject,
+  normalizeProjectStatuses,
+} from './lib/projectStatuses'
 
 function buildSearchText(title: string, description?: string) {
   return `${title} ${description ?? ''}`.trim().toLowerCase()
@@ -314,6 +319,14 @@ async function applyIssueUpdate(
     now?: number
   },
 ) {
+  const project = await ctx.db.get(issue.projectId)
+  if (!project) {
+    throw new ConvexError({
+      code: 'NOT_FOUND',
+      message: 'Project not found.',
+    })
+  }
+
   const patch: Record<string, unknown> = {
     updatedAt: now,
   }
@@ -325,6 +338,13 @@ async function applyIssueUpdate(
     patch.description = changes.description.trim()
   }
   if (changes.status !== undefined) {
+    if (!ensureProjectStatusExists(project, changes.status)) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'This status does not belong to the current project.',
+      })
+    }
+
     if (changes.status === 'done') {
       const visibleDescendants = await getVisibleIssueDescendants(
         ctx,
@@ -640,6 +660,7 @@ export const getById = query({
     }
 
     const { project } = await requireProjectViewAccess(ctx, issue.projectId)
+    const normalizedProject = normalizeProject(project)
 
     const projectIssues = await ctx.db
       .query('issues')
@@ -677,7 +698,7 @@ export const getById = query({
 
     return {
       issue: decorateIssueWithProgress(issue, progressByIssueId),
-      project,
+      project: normalizedProject,
       assignee,
       reporter,
       parentIssue: parentIssue
@@ -702,7 +723,26 @@ export const create = mutation({
     dueDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId)
+    if (!project) {
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Project not found.',
+      })
+    }
     const { user } = await requireProjectWriteAccess(ctx, args.projectId)
+    const normalizedProjectStatuses = normalizeProjectStatuses(project.statuses)
+    const defaultStatusKey =
+      normalizedProjectStatuses.find((status) => status.key === 'todo')?.key ??
+      'todo'
+    const nextStatus = args.status ?? defaultStatusKey
+
+    if (!ensureProjectStatusExists(project, nextStatus)) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'This status does not belong to the current project.',
+      })
+    }
 
     if (args.assigneeId) {
       await ensureAssigneeAllowed(ctx, args.projectId, args.assigneeId)
@@ -754,7 +794,7 @@ export const create = mutation({
       searchText: buildSearchText(args.title, args.description),
       listId: args.listId,
       parentIssueId: args.parentIssueId,
-      status: args.status ?? 'todo',
+      status: nextStatus,
       priority: args.priority ?? 'none',
       assigneeId: args.assigneeId,
       reporterId: user._id,
@@ -764,7 +804,7 @@ export const create = mutation({
       archived: false,
       createdAt: now,
       updatedAt: now,
-      completedAt: args.status === 'done' ? now : undefined,
+      completedAt: nextStatus === 'done' ? now : undefined,
     })
 
     await ctx.db.patch(args.projectId, {

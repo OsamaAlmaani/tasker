@@ -4,19 +4,15 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Select } from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
-import {
-	ISSUE_PRIORITIES,
-	ISSUE_STATUSES,
-	issuePriorityLabel,
-	issueStatusLabel,
-} from "#/features/tasker/model";
+import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
+import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 
 export type IssueDraft = {
 	title: string;
 	description: string;
 	listId: string;
 	parentIssueId: string;
-	status: (typeof ISSUE_STATUSES)[number];
+	status: ProjectStatusDefinition["key"];
 	priority: (typeof ISSUE_PRIORITIES)[number];
 	assigneeId: string;
 	dueDate: string;
@@ -50,6 +46,7 @@ type IssueDraftDialogProps = {
 	open: boolean;
 	parentIssueOptions?: ParentIssueOption[];
 	setDraft: Dispatch<SetStateAction<IssueDraft>>;
+	statusOptions: ProjectStatusDefinition[];
 	submitLabel: string;
 	title: string;
 };
@@ -66,6 +63,7 @@ export function IssueDraftDialog({
 	open,
 	parentIssueOptions,
 	setDraft,
+	statusOptions,
 	submitLabel,
 	title,
 }: IssueDraftDialogProps) {
@@ -125,13 +123,13 @@ export function IssueDraftDialog({
 							onChange={(event) =>
 								setDraft((previous) => ({
 									...previous,
-									status: event.target.value as (typeof ISSUE_STATUSES)[number],
+									status: event.target.value as ProjectStatusDefinition["key"],
 								}))
 							}
 						>
-							{ISSUE_STATUSES.map((value) => (
-								<option key={value} value={value}>
-									{issueStatusLabel[value]}
+							{statusOptions.map((status) => (
+								<option key={status.key} value={status.key}>
+									{status.name}
 								</option>
 							))}
 						</Select>

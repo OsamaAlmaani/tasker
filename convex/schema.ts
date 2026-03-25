@@ -8,6 +8,7 @@ import {
   issuePriorityValidator,
   issueStatusValidator,
   myWorkViewValidator,
+  projectStatusValidator,
 } from './constants'
 
 export default defineSchema({
@@ -34,6 +35,7 @@ export default defineSchema({
     description: v.optional(v.string()),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
+    statuses: v.optional(v.array(projectStatusValidator)),
     createdBy: v.id('users'),
     archived: v.boolean(),
     allowMemberInvites: v.boolean(),

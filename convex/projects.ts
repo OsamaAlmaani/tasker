@@ -1,6 +1,10 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import {
+  DEFAULT_PROJECT_STATUSES,
+  projectStatusValidator,
+} from './constants'
+import {
   canWrite,
   getAccessibleProjectIds,
   requireCurrentUser,
@@ -9,6 +13,7 @@ import {
   requireProjectWriteAccess,
 } from './lib/auth'
 import { createActivity } from './lib/activity'
+import { normalizeProject, normalizeProjectStatuses } from './lib/projectStatuses'
 
 function normalizeProjectKey(key: string) {
   return key.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)
@@ -36,6 +41,7 @@ export const list = query({
       const projects = await ctx.db.query('projects').collect()
       return projects
         .filter((project) => args.includeArchived || !project.archived)
+        .map((project) => normalizeProject(project))
         .sort((a, b) => b.updatedAt - a.updatedAt)
     }
 
@@ -47,6 +53,7 @@ export const list = query({
     return projects
       .filter((project): project is NonNullable<typeof project> => Boolean(project))
       .filter((project) => args.includeArchived || !project.archived)
+      .map((project) => normalizeProject(project))
       .sort((a, b) => b.updatedAt - a.updatedAt)
   },
 })
@@ -73,6 +80,7 @@ export const sidebar = query({
 
     const visibleProjects = projects
       .filter((project) => args.includeArchived || !project.archived)
+      .map((project) => normalizeProject(project))
       .sort((a, b) => b.updatedAt - a.updatedAt)
 
     const rows = await Promise.all(
@@ -104,6 +112,7 @@ export const getById = query({
     }
 
     const { project, user } = await requireProjectViewAccess(ctx, args.projectId)
+    const normalizedProject = normalizeProject(project)
 
     const memberships = await ctx.db
       .query('projectMembers')
@@ -142,15 +151,16 @@ export const getById = query({
     )
 
     return {
-      project,
+      project: normalizedProject,
       issueCounts,
       members: uniqueUsers(members.map((item) => item.user)),
       membershipRows: members,
       canEdit: canWrite(user.globalRole),
       canManageMembers:
         user.globalRole === 'admin' ||
-        (user.globalRole === 'member' && project.allowMemberInvites),
-      canDeleteIssues: canWrite(user.globalRole) && project.allowIssueDelete,
+        (user.globalRole === 'member' && normalizedProject.allowMemberInvites),
+      canDeleteIssues:
+        canWrite(user.globalRole) && normalizedProject.allowIssueDelete,
     }
   },
 })
@@ -162,6 +172,7 @@ export const create = mutation({
     description: v.optional(v.string()),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
+    statuses: v.optional(v.array(projectStatusValidator)),
     allowMemberInvites: v.optional(v.boolean()),
     allowIssueDelete: v.optional(v.boolean()),
   },
@@ -203,6 +214,9 @@ export const create = mutation({
       description: args.description?.trim(),
       color: args.color?.trim(),
       icon: args.icon?.trim(),
+      statuses: normalizeProjectStatuses(
+        args.statuses ?? DEFAULT_PROJECT_STATUSES.map((status) => ({ ...status })),
+      ),
       createdBy: user._id,
       archived: false,
       allowMemberInvites: args.allowMemberInvites ?? true,
@@ -245,7 +259,8 @@ export const create = mutation({
       },
     })
 
-    return await ctx.db.get(projectId)
+    const project = await ctx.db.get(projectId)
+    return project ? normalizeProject(project) : null
   },
 })
 
@@ -256,11 +271,13 @@ export const update = mutation({
     description: v.optional(v.string()),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
+    statuses: v.optional(v.array(projectStatusValidator)),
     allowMemberInvites: v.optional(v.boolean()),
     allowIssueDelete: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { user, project } = await requireProjectWriteAccess(ctx, args.projectId)
+    const normalizedExistingProject = normalizeProject(project)
 
     const patch: Record<string, unknown> = {
       updatedAt: Date.now(),
@@ -277,6 +294,39 @@ export const update = mutation({
     }
     if (args.icon !== undefined) {
       patch.icon = args.icon.trim()
+    }
+    if (args.statuses !== undefined) {
+      const nextStatuses = normalizeProjectStatuses(args.statuses)
+      const removedStatusKeys = normalizedExistingProject.statuses
+        .map((status) => status.key)
+        .filter(
+          (key) =>
+            key !== 'todo' &&
+            key !== 'done' &&
+            !nextStatuses.some((status) => status.key === key),
+        )
+
+      if (removedStatusKeys.length) {
+        const projectIssues = await ctx.db
+          .query('issues')
+          .withIndex('by_projectId', (q) => q.eq('projectId', args.projectId))
+          .collect()
+        const inUseRemovedStatus = removedStatusKeys.find((key) =>
+          projectIssues.some(
+            (issue) => !issue.deletedAt && !issue.archived && issue.status === key,
+          ),
+        )
+
+        if (inUseRemovedStatus) {
+          throw new ConvexError({
+            code: 'VALIDATION_ERROR',
+            message:
+              'Move tasks out of a status before removing it from the workflow.',
+          })
+        }
+      }
+
+      patch.statuses = nextStatuses
     }
     if (args.allowMemberInvites !== undefined) {
       patch.allowMemberInvites = args.allowMemberInvites
@@ -300,7 +350,100 @@ export const update = mutation({
 
     return {
       before: project,
-      after: await ctx.db.get(args.projectId),
+      after: normalizeProject((await ctx.db.get(args.projectId))!),
+    }
+  },
+})
+
+export const deleteStatus = mutation({
+  args: {
+    projectId: v.id('projects'),
+    statusKey: v.string(),
+    transferToStatusKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { user, project } = await requireProjectWriteAccess(ctx, args.projectId)
+    const normalizedProject = normalizeProject(project)
+
+    if (args.statusKey === 'todo' || args.statusKey === 'done') {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'Todo and Done cannot be deleted.',
+      })
+    }
+
+    if (args.transferToStatusKey === args.statusKey) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'Choose a different status to transfer tasks into.',
+      })
+    }
+
+    const statusToDelete = normalizedProject.statuses.find(
+      (status) => status.key === args.statusKey,
+    )
+    const transferStatus = normalizedProject.statuses.find(
+      (status) => status.key === args.transferToStatusKey,
+    )
+
+    if (!statusToDelete) {
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Status not found in this project.',
+      })
+    }
+    if (!transferStatus) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'Transfer target is not part of this project workflow.',
+      })
+    }
+
+    const now = Date.now()
+    const issues = await ctx.db
+      .query('issues')
+      .withIndex('by_projectId', (q) => q.eq('projectId', args.projectId))
+      .collect()
+
+    const affectedIssues = issues.filter(
+      (issue) => !issue.deletedAt && issue.status === args.statusKey,
+    )
+
+    await Promise.all(
+      affectedIssues.map((issue) =>
+        ctx.db.patch(issue._id, {
+          status: args.transferToStatusKey,
+          completedAt: args.transferToStatusKey === 'done' ? now : undefined,
+          updatedAt: now,
+        }),
+      ),
+    )
+
+    await ctx.db.patch(args.projectId, {
+      statuses: normalizedProject.statuses.filter(
+        (status) => status.key !== args.statusKey,
+      ),
+      updatedAt: now,
+    })
+
+    await createActivity(ctx, {
+      actorId: user._id,
+      projectId: args.projectId,
+      entityType: 'project',
+      entityId: args.projectId,
+      action: 'project.updated',
+      metadata: {
+        deletedStatusKey: args.statusKey,
+        transferToStatusKey: args.transferToStatusKey,
+        transferredIssueCount: affectedIssues.length,
+      },
+    })
+
+    return {
+      deletedStatusKey: args.statusKey,
+      transferToStatusKey: args.transferToStatusKey,
+      transferredIssueCount: affectedIssues.length,
+      project: normalizeProject((await ctx.db.get(args.projectId))!),
     }
   },
 })

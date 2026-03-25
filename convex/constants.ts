@@ -2,11 +2,18 @@ import { v } from 'convex/values'
 
 export const GLOBAL_ROLES = ['admin', 'member', 'viewer'] as const
 export const ISSUE_STATUSES = [
-  'backlog',
   'todo',
+  'backlog',
   'in_progress',
   'in_review',
   'done',
+] as const
+export const DEFAULT_PROJECT_STATUSES = [
+  { key: 'todo', name: 'Todo', color: '#3b82f6', position: 0 },
+  { key: 'backlog', name: 'Backlog', color: '#64748b', position: 1 },
+  { key: 'in_progress', name: 'In Progress', color: '#f59e0b', position: 2 },
+  { key: 'in_review', name: 'In Review', color: '#8b5cf6', position: 3 },
+  { key: 'done', name: 'Done', color: '#10b981', position: 4 },
 ] as const
 export const ISSUE_PRIORITIES = [
   'none',
@@ -68,7 +75,13 @@ export const MY_WORK_VIEWS = [
 ] as const
 
 export type GlobalRole = (typeof GLOBAL_ROLES)[number]
-export type IssueStatus = (typeof ISSUE_STATUSES)[number]
+export type IssueStatus = string
+export type ProjectStatusDefinition = {
+  key: string
+  name: string
+  color: string
+  position: number
+}
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number]
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number]
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number]
@@ -81,13 +94,14 @@ export const globalRoleValidator = v.union(
   v.literal('viewer'),
 )
 
-export const issueStatusValidator = v.union(
-  v.literal('backlog'),
-  v.literal('todo'),
-  v.literal('in_progress'),
-  v.literal('in_review'),
-  v.literal('done'),
-)
+export const issueStatusValidator = v.string()
+
+export const projectStatusValidator = v.object({
+  key: v.string(),
+  name: v.string(),
+  color: v.string(),
+  position: v.number(),
+})
 
 export const issuePriorityValidator = v.union(
   v.literal('none'),

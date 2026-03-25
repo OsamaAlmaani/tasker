@@ -9,12 +9,11 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
+import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
 import {
-	ISSUE_PRIORITIES,
-	ISSUE_STATUSES,
-	issuePriorityLabel,
-	issueStatusLabel,
-} from "#/features/tasker/model";
+	DEFAULT_PROJECT_STATUSES,
+	type ProjectStatusDefinition,
+} from "#/features/tasker/projectStatuses";
 import { cn } from "#/lib/utils";
 
 type AssignableUserOption = {
@@ -29,11 +28,13 @@ type IssueBulkActionsBarProps = {
 	onAssigneeChange?: (assigneeId: string | null) => void;
 	onClearSelection: () => void;
 	onPriorityChange: (priority: (typeof ISSUE_PRIORITIES)[number]) => void;
-	onStatusChange: (status: (typeof ISSUE_STATUSES)[number]) => void;
+	onStatusChange?: (status: ProjectStatusDefinition["key"]) => void;
 	selectedCount: number;
+	statusOptions?: ProjectStatusDefinition[];
 };
 
 type BulkMenuOption = {
+	color?: string;
 	description?: string;
 	label: string;
 	value: string | null;
@@ -89,7 +90,12 @@ function BulkActionMenu({
 								"text-[var(--muted-text)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]",
 							)}
 						>
-							<span className="mt-0.5 h-2 w-2 rounded-full bg-[var(--accent)] opacity-70" />
+							<span
+								className="mt-0.5 h-2 w-2 rounded-full opacity-70"
+								style={{
+									backgroundColor: option.color ?? "var(--accent)",
+								}}
+							/>
 							<span className="min-w-0">
 								<span className="block text-sm font-medium text-[var(--text)]">
 									{option.label}
@@ -117,6 +123,7 @@ export function IssueBulkActionsBar({
 	onPriorityChange,
 	onStatusChange,
 	selectedCount,
+	statusOptions,
 }: IssueBulkActionsBarProps) {
 	const [openMenu, setOpenMenu] = useState<
 		"assignee" | "priority" | "status" | null
@@ -162,24 +169,29 @@ export function IssueBulkActionsBar({
 				{selectedCount} selected
 			</div>
 
-			<BulkActionMenu
-				icon={<ListChecks className="h-4 w-4" />}
-				isApplying={isApplying}
-				isOpen={openMenu === "status"}
-				label="Status"
-				onToggle={() =>
-					setOpenMenu((current) => (current === "status" ? null : "status"))
-				}
-				onSelect={(value) =>
-					handleAction(() =>
-						onStatusChange(value as (typeof ISSUE_STATUSES)[number]),
-					)
-				}
-				options={ISSUE_STATUSES.map((value) => ({
-					value,
-					label: issueStatusLabel[value],
-				}))}
-			/>
+			{onStatusChange ? (
+				<BulkActionMenu
+					icon={<ListChecks className="h-4 w-4" />}
+					isApplying={isApplying}
+					isOpen={openMenu === "status"}
+					label="Status"
+					onToggle={() =>
+						setOpenMenu((current) => (current === "status" ? null : "status"))
+					}
+					onSelect={(value) =>
+						handleAction(() =>
+							onStatusChange(value as ProjectStatusDefinition["key"]),
+						)
+					}
+					options={(statusOptions ?? DEFAULT_PROJECT_STATUSES).map(
+						(status) => ({
+							color: status.color,
+							value: status.key,
+							label: status.name,
+						}),
+					)}
+				/>
+			) : null}
 
 			<BulkActionMenu
 				icon={<Flag className="h-4 w-4" />}

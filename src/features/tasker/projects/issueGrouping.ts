@@ -1,8 +1,9 @@
+import type { IssueStatus } from "#/features/tasker/model";
 import {
-	ISSUE_STATUSES,
-	type IssueStatus,
-	issueStatusLabel,
-} from "#/features/tasker/model";
+	getProjectStatusLabel,
+	normalizeProjectStatuses,
+	type ProjectStatusDefinition,
+} from "#/features/tasker/projectStatuses";
 
 type TreeIssueLike = {
 	_id: string;
@@ -59,7 +60,12 @@ export function buildGroupedIssues<TIssue extends GroupableIssueLike>(
 	rows: TIssue[],
 	groupBy: "list" | "status",
 	issueListById: Map<string, IssueListLike>,
+	projectStatuses?: ProjectStatusDefinition[] | null,
 ) {
+	const normalizedStatuses = normalizeProjectStatuses(projectStatuses);
+	const statusOrder = new Map(
+		normalizedStatuses.map((status, index) => [status.key, index]),
+	);
 	const groups = new Map<
 		string,
 		{
@@ -78,7 +84,7 @@ export function buildGroupedIssues<TIssue extends GroupableIssueLike>(
 				: undefined;
 		const group = groups.get(key);
 		const statusPosition =
-			groupBy === "status" ? ISSUE_STATUSES.indexOf(issue.status) : -1;
+			groupBy === "status" ? (statusOrder.get(issue.status) ?? -1) : -1;
 
 		if (group) {
 			group.items.push(issue);
@@ -89,7 +95,7 @@ export function buildGroupedIssues<TIssue extends GroupableIssueLike>(
 			key,
 			title:
 				groupBy === "status"
-					? issueStatusLabel[issue.status]
+					? getProjectStatusLabel(normalizedStatuses, issue.status)
 					: (list?.name ?? "No List"),
 			position:
 				groupBy === "status"
@@ -114,13 +120,16 @@ export function buildGroupedIssues<TIssue extends GroupableIssueLike>(
 
 export function buildKanbanColumns<TIssue extends GroupableIssueLike>(
 	rows: TIssue[],
+	projectStatuses?: ProjectStatusDefinition[] | null,
 ) {
-	return ISSUE_STATUSES.map((status) => ({
-		status,
-		title: issueStatusLabel[status],
-		items: rows.filter((issue) => issue.status === status),
-	})).map((column) => ({
-		...column,
-		tree: buildIssueTree(column.items),
-	}));
+	return normalizeProjectStatuses(projectStatuses)
+		.map((status) => ({
+			status: status.key,
+			title: status.name,
+			items: rows.filter((issue) => issue.status === status.key),
+		}))
+		.map((column) => ({
+			...column,
+			tree: buildIssueTree(column.items),
+		}));
 }
