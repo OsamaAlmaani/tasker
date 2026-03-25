@@ -39,6 +39,7 @@ Use this file to track feature progress. Check items off as they ship.
 - 2026-03-25: Extracted issue detail orchestration to `src/features/tasker/issues/useIssueDetailPage.ts`, moving the issue route’s queries, mutation handlers, edit state, timeline derivation, and dialog state into a dedicated controller hook.
 - 2026-03-25: Extracted project route search schema/normalization to `src/features/tasker/projects/projectSearch.ts` and moved the remaining project-page composition into `src/features/tasker/projects/components/ProjectDetailContent.tsx`, leaving the route as a search-aware entry shell.
 - 2026-03-25: Added lean refactor coverage for `src/features/tasker/issues/hierarchy.ts` and `src/features/tasker/projects/projectSearch.ts`, plus a dedicated `vitest.config.ts` so `pnpm test` runs cleanly without inheriting the full app Vite plugin stack.
+- 2026-03-25: Extracted project issue tree/grouping helpers to `src/features/tasker/projects/issueGrouping.ts` and added Vitest coverage for tree building, grouped issue derivation, kanban column derivation, and input-date formatting.
 
 ## Product Direction
 

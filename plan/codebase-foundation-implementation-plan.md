@@ -52,3 +52,4 @@ Refactor oversized route files into maintainable feature modules while preservin
 - Latest extraction complete: issue detail page state, queries, and mutation handlers now live in `src/features/tasker/issues/useIssueDetailPage.ts`.
 - Latest extraction complete: project search schema/normalization now live in `src/features/tasker/projects/projectSearch.ts`, and the project route now composes `src/features/tasker/projects/components/ProjectDetailContent.tsx` as a route shell.
 - Latest stabilization step complete: lean Vitest coverage now exercises `src/features/tasker/issues/hierarchy.ts` and `src/features/tasker/projects/projectSearch.ts`, with dedicated config in `vitest.config.ts`.
+- Latest extraction complete: project issue tree/grouping and input-date helpers now live in `src/features/tasker/projects/issueGrouping.ts`, with matching Vitest coverage.

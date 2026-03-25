@@ -220,6 +220,7 @@ Invite flow is split intentionally:
 - Place issue overview, sub-task list, and metadata UI in `src/features/tasker/issues/components/IssueDetailPanels.tsx` and keep the issue route focused on local edit state and mutation callbacks.
 - Place issue detail page queries, derived state, edit state, dialog state, and mutation handlers in `src/features/tasker/issues/useIssueDetailPage.ts` so the route stays focused on params, back-navigation, and page composition.
 - Place project route search schema and normalization helpers in `src/features/tasker/projects/projectSearch.ts` instead of redefining query-string helpers inside route files.
+- Place project issue tree/grouping derivation and task input-date helpers in `src/features/tasker/projects/issueGrouping.ts` instead of keeping that pure board logic inline in controller hooks.
 - Place the remaining project-page composition, dialogs, and project-view switching UI in `src/features/tasker/projects/components/ProjectDetailContent.tsx` so the route stays focused on params, search-state updates, and loading/not-found handling.
 - Place project task import/export state, menu behavior, and file parsing in `src/features/tasker/projects/useProjectTaskImportExport.ts` instead of keeping that workflow inline in route files.
 - Place project detail page queries, derived state, modal state, and mutation handlers in `src/features/tasker/projects/useProjectDetailPage.ts` so the route stays focused on search-state normalization and composition.
@@ -303,6 +304,7 @@ Repo/tooling notes:
 
 - Current non-UI coverage is intentionally lean and focused on extracted pure modules:
   - [`src/features/tasker/issues/hierarchy.test.ts`](./src/features/tasker/issues/hierarchy.test.ts)
+  - [`src/features/tasker/projects/issueGrouping.test.ts`](./src/features/tasker/projects/issueGrouping.test.ts)
   - [`src/features/tasker/projects/projectSearch.test.ts`](./src/features/tasker/projects/projectSearch.test.ts)
 - `pnpm test` now passes with the dedicated [`vitest.config.ts`](./vitest.config.ts).
 - `pnpm check` is still the main routine static check and is currently clean.
