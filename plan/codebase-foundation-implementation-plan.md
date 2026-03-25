@@ -28,12 +28,12 @@ Refactor oversized route files into maintainable feature modules while preservin
   - [x] Extract the project task board/filter card into a dedicated project component.
   - [x] Extract the issue overview/sub-task and metadata panels into dedicated issue components.
   - [x] Extract project issue-tree renderers into dedicated project components.
-- [ ] Consolidate repeated project/task presentation patterns.
+- [x] Consolidate repeated project/task presentation patterns.
 
 ## Phase 3: Stabilization
 - [x] Add lean tests around extracted pure logic (non-UI heavy).
-- [ ] Document code organization conventions for future feature work.
-- [ ] Mark roadmap foundation items completed once route sizes are materially reduced.
+- [x] Document code organization conventions for future feature work.
+- [x] Mark roadmap foundation items completed once route sizes are materially reduced.
 
 ## Notes
 - Keep refactors incremental and behavior-preserving.
@@ -54,3 +54,4 @@ Refactor oversized route files into maintainable feature modules while preservin
 - Latest stabilization step complete: lean Vitest coverage now exercises `src/features/tasker/issues/hierarchy.ts` and `src/features/tasker/projects/projectSearch.ts`, with dedicated config in `vitest.config.ts`.
 - Latest extraction complete: project issue tree/grouping and input-date helpers now live in `src/features/tasker/projects/issueGrouping.ts`, with matching Vitest coverage.
 - Latest extraction complete: project draft/settings defaults and invite-result mapping now live in `src/features/tasker/projects/projectDrafts.ts`, further shrinking `useProjectDetailPage.ts` with matching Vitest coverage.
+- Foundation refactor wrap-up: both major routes now act as entry/composition shells (`75` lines for project detail, `264` lines for issue detail), extracted pure modules have direct coverage, and the remaining foundation roadmap items are marked complete.

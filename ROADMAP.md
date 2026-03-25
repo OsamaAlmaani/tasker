@@ -8,7 +8,7 @@ Use this file to track feature progress. Check items off as they ship.
 
 ## Highest Priority: Codebase Foundation
 
-- [ ] Refactor the codebase for maintainability before adding major new product surface area
+- [x] Refactor the codebase for maintainability before adding major new product surface area
 - [x] Break up [src/routes/\_app.projects.$projectId.tsx](/Users/osama/sources/private/tasker/src/routes/_app.projects.$projectId.tsx) into manageable feature modules
 - [x] Break up [src/routes/\_app.issues.$issueId.tsx](/Users/osama/sources/private/tasker/src/routes/_app.issues.$issueId.tsx) into manageable feature modules
 - [x] Reduce route files so they act as route entry points and composition shells, not feature dumping grounds
@@ -16,10 +16,10 @@ Use this file to track feature progress. Check items off as they ship.
 - [x] Extract project detail page state and mutations into focused hooks
 - [x] Extract issue detail page state and mutations into focused hooks
 - [x] Split large inline UI sections into dedicated components with clear ownership
-- [ ] Move repeated task/project presentation patterns into reusable components where it genuinely reduces duplication
+- [x] Move repeated task/project presentation patterns into reusable components where it genuinely reduces duplication
 - [x] Separate pure view logic from Convex wiring and mutation orchestration
 - [x] Consolidate route-specific helper functions into colocated modules or shared utilities where appropriate
-- [ ] Add tests around the refactor so behavior does not drift while files are being split, and keep test files, artifacts and related pieces well organized away from the main codebase to reduce bloat.
+- [x] Add tests around the refactor so behavior does not drift while files are being split, and keep test files, artifacts and related pieces well organized away from the main codebase to reduce bloat.
 - [x] Establish code organization rules and update AGENT.md file so new work extends the same structure instead of recreating large route files
 
 ### Foundation Progress Log
@@ -41,6 +41,7 @@ Use this file to track feature progress. Check items off as they ship.
 - 2026-03-25: Added lean refactor coverage for `src/features/tasker/issues/hierarchy.ts` and `src/features/tasker/projects/projectSearch.ts`, plus a dedicated `vitest.config.ts` so `pnpm test` runs cleanly without inheriting the full app Vite plugin stack.
 - 2026-03-25: Extracted project issue tree/grouping helpers to `src/features/tasker/projects/issueGrouping.ts` and added Vitest coverage for tree building, grouped issue derivation, kanban column derivation, and input-date formatting.
 - 2026-03-25: Extracted project draft/settings defaults and invite result messaging to `src/features/tasker/projects/projectDrafts.ts`, reducing controller-hook-only logic and adding direct Vitest coverage for those defaults and inheritance rules.
+- 2026-03-25: Wrapped the foundation refactor by reducing the project detail route to `75` lines and the issue detail route to `264` lines, with route-shell architecture, extracted feature modules, and passing `pnpm test`/`pnpm check`.
 
 ## Product Direction
 
