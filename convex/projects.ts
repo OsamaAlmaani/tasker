@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import {
   DEFAULT_PROJECT_STATUSES,
+  projectLabelValidator,
   projectStatusValidator,
 } from './constants'
 import {
@@ -13,6 +14,7 @@ import {
   requireProjectWriteAccess,
 } from './lib/auth'
 import { createActivity } from './lib/activity'
+import { normalizeProjectLabels } from './lib/projectLabels'
 import { normalizeProject, normalizeProjectStatuses } from './lib/projectStatuses'
 
 function normalizeProjectKey(key: string) {
@@ -172,6 +174,7 @@ export const create = mutation({
     description: v.optional(v.string()),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
+    labels: v.optional(v.array(projectLabelValidator)),
     statuses: v.optional(v.array(projectStatusValidator)),
     allowMemberInvites: v.optional(v.boolean()),
     allowIssueDelete: v.optional(v.boolean()),
@@ -214,6 +217,7 @@ export const create = mutation({
       description: args.description?.trim(),
       color: args.color?.trim(),
       icon: args.icon?.trim(),
+      labels: normalizeProjectLabels(args.labels),
       statuses: normalizeProjectStatuses(
         args.statuses ?? DEFAULT_PROJECT_STATUSES.map((status) => ({ ...status })),
       ),
@@ -271,6 +275,7 @@ export const update = mutation({
     description: v.optional(v.string()),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
+    labels: v.optional(v.array(projectLabelValidator)),
     statuses: v.optional(v.array(projectStatusValidator)),
     allowMemberInvites: v.optional(v.boolean()),
     allowIssueDelete: v.optional(v.boolean()),
@@ -294,6 +299,38 @@ export const update = mutation({
     }
     if (args.icon !== undefined) {
       patch.icon = args.icon.trim()
+    }
+    if (args.labels !== undefined) {
+      const nextLabels = normalizeProjectLabels(args.labels)
+      const removedLabelKeys = (normalizedExistingProject.labels ?? [])
+        .map((label) => label.key)
+        .filter((key) => !nextLabels.some((label) => label.key === key))
+
+      if (removedLabelKeys.length) {
+        const projectIssues = await ctx.db
+          .query('issues')
+          .withIndex('by_projectId', (q) => q.eq('projectId', args.projectId))
+          .collect()
+
+        await Promise.all(
+          projectIssues
+            .filter(
+              (issue) =>
+                !issue.deletedAt &&
+                issue.labels.some((label) => removedLabelKeys.includes(label)),
+            )
+            .map((issue) =>
+              ctx.db.patch(issue._id, {
+                labels: issue.labels.filter(
+                  (label) => !removedLabelKeys.includes(label),
+                ),
+                updatedAt: patch.updatedAt as number,
+              }),
+            ),
+        )
+      }
+
+      patch.labels = nextLabels
     }
     if (args.statuses !== undefined) {
       const nextStatuses = normalizeProjectStatuses(args.statuses)

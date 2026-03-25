@@ -7,9 +7,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { Input } from "#/components/ui/input";
 import { Select } from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
-import { IssueStatusBadge } from "#/features/tasker/components/IssueBadges";
+import {
+	IssueLabelBadge,
+	IssueStatusBadge,
+} from "#/features/tasker/components/IssueBadges";
+import { ProjectLabelSelector } from "#/features/tasker/components/ProjectLabelSelector";
 import { formatDate } from "#/features/tasker/format";
 import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
+import {
+	getProjectLabelColor,
+	getProjectLabelName,
+	type ProjectLabelDefinition,
+} from "#/features/tasker/projectLabels";
 import {
 	getProjectStatusColor,
 	getProjectStatusLabel,
@@ -350,9 +359,11 @@ type IssueMetadataPanelProps = {
 	issueLists?: IssueListOption[];
 	onAssigneeChange: (value: string) => void;
 	onDueDateChange: (value: string) => void;
+	onLabelsChange: (labels: string[]) => void;
 	onListChange: (value: string) => void;
 	onPriorityChange: (value: (typeof ISSUE_PRIORITIES)[number]) => void;
 	onStatusChange: (value: ProjectStatusDefinition["key"]) => void;
+	projectLabels: ProjectLabelDefinition[];
 	projectStatuses: ProjectStatusDefinition[];
 };
 
@@ -364,9 +375,11 @@ export function IssueMetadataPanel({
 	issueLists,
 	onAssigneeChange,
 	onDueDateChange,
+	onLabelsChange,
 	onListChange,
 	onPriorityChange,
 	onStatusChange,
+	projectLabels,
 	projectStatuses,
 }: IssueMetadataPanelProps) {
 	return (
@@ -509,12 +522,20 @@ export function IssueMetadataPanel({
 			<div className="issue-meta-row issue-meta-row-last">
 				<span className="issue-meta-label">Labels</span>
 				<div className="issue-meta-value">
-					{currentIssue.labels.length ? (
+					{canWrite ? (
+						<ProjectLabelSelector
+							labelOptions={projectLabels}
+							selectedLabelKeys={currentIssue.labels}
+							onChange={onLabelsChange}
+						/>
+					) : currentIssue.labels.length ? (
 						<div className="flex flex-wrap justify-end gap-1.5">
 							{currentIssue.labels.map((label) => (
-								<Badge key={label} className="issue-meta-tag">
-									{label}
-								</Badge>
+								<IssueLabelBadge
+									key={label}
+									color={getProjectLabelColor(projectLabels, label)}
+									label={getProjectLabelName(projectLabels, label)}
+								/>
 							))}
 						</div>
 					) : (

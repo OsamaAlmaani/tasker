@@ -4,7 +4,9 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Select } from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
+import { ProjectLabelSelector } from "#/features/tasker/components/ProjectLabelSelector";
 import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
+import type { ProjectLabelDefinition } from "#/features/tasker/projectLabels";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 
 export type IssueDraft = {
@@ -16,7 +18,7 @@ export type IssueDraft = {
 	priority: (typeof ISSUE_PRIORITIES)[number];
 	assigneeId: string;
 	dueDate: string;
-	labels: string;
+	labels: string[];
 };
 
 type IssueListOption = {
@@ -40,6 +42,7 @@ type IssueDraftDialogProps = {
 	draft: IssueDraft;
 	error?: string | null;
 	issueLists?: IssueListOption[];
+	labelOptions?: ProjectLabelDefinition[];
 	onClose: () => void;
 	onParentIssueChange?: (parentIssueId: string) => void;
 	onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
@@ -57,6 +60,7 @@ export function IssueDraftDialog({
 	draft,
 	error,
 	issueLists,
+	labelOptions,
 	onClose,
 	onParentIssueChange,
 	onSubmit,
@@ -231,14 +235,15 @@ export function IssueDraftDialog({
 							}
 						/>
 					</div>
-					<div className="md:col-span-2">
-						<Label>Labels (comma-separated)</Label>
-						<Input
-							value={draft.labels}
-							onChange={(event) =>
+					<div className="md:col-span-2 space-y-2">
+						<Label>Labels</Label>
+						<ProjectLabelSelector
+							labelOptions={labelOptions ?? []}
+							selectedLabelKeys={draft.labels}
+							onChange={(labels) =>
 								setDraft((previous) => ({
 									...previous,
-									labels: event.target.value,
+									labels,
 								}))
 							}
 						/>

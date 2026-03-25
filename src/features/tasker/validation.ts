@@ -24,7 +24,7 @@ export const issueFormSchema = z.object({
 	listId: z.string().trim().optional(),
 	parentIssueId: z.string().trim().optional(),
 	dueDate: z.string().trim().optional(),
-	labels: z.string().trim().optional(),
+	labels: z.array(z.string().trim()).default([]),
 });
 
 export const commentFormSchema = z.object({

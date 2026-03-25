@@ -108,7 +108,7 @@ Personal productivity progress:
 ## Workflow Model
 
 - [x] Add status model flexibility with custom workflows per project
-- [ ] Add custom labels management per project
+- [x] Add custom labels management per project
 - [ ] Add custom task fields per project
 - [ ] Add checklist items inside tasks
 - [ ] Add task estimates and optional time tracking
@@ -118,6 +118,8 @@ Workflow model progress:
 - 2026-03-25: Added real project-owned status definitions backed by stable status keys on tasks. New projects are seeded with `todo`, `backlog`, `in_progress`, `in_review`, and `done`; `todo` and `done` are protected, while all other statuses can be added, renamed, reordered, and deleted per project.
 - 2026-03-25: Added transfer-on-delete workflow for project statuses so deleting a custom status first moves affected tasks into a replacement status before removing it from the project.
 - 2026-03-25: Added per-status colors for project workflows so custom statuses can be color-coded in project settings and those colors now flow through task badges/cards across project views, My Work, and the dashboard.
+- 2026-03-25: Added project-owned labels with names and colors, label management in project settings, project-scoped label selection in task create/edit flows, and label badges in project and issue task surfaces.
+- 2026-03-25: Moved project settings into a modal so editing project details, workflow, and labels no longer pushes the task board down the page.
 
 ## Project and Permissions
 

@@ -106,3 +106,17 @@ export function IssuePriorityBadge({ priority }: { priority: IssuePriority }) {
 		</Badge>
 	);
 }
+
+export function IssueLabelBadge({
+	color,
+	label,
+}: {
+	color?: string;
+	label: string;
+}) {
+	return (
+		<Badge className={defaultStatusClass} style={getStatusBadgeStyle(color)}>
+			{label}
+		</Badge>
+	);
+}

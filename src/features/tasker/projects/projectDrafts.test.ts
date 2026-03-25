@@ -18,7 +18,7 @@ describe("createIssueDraft", () => {
 			priority: "none",
 			assigneeId: "",
 			dueDate: "",
-			labels: "",
+			labels: [],
 		});
 	});
 });
@@ -30,6 +30,7 @@ describe("createProjectSettingsForm", () => {
 			description: "",
 			color: "#4f46e5",
 			icon: "FolderKanban",
+			labels: [],
 			statuses: DEFAULT_PROJECT_STATUSES,
 			allowMemberInvites: true,
 			allowIssueDelete: true,
@@ -43,6 +44,14 @@ describe("createProjectSettingsForm", () => {
 				description: "Roadmap",
 				color: "#123456",
 				icon: "Rocket",
+				labels: [
+					{
+						key: "frontend",
+						name: "Frontend",
+						color: "#06b6d4",
+						position: 0,
+					},
+				],
 				statuses: [
 					{ key: "todo", name: "Queued", color: "#000000", position: 0 },
 					{ key: "backlog", name: "Inbox", color: "#334155", position: 1 },
@@ -58,6 +67,14 @@ describe("createProjectSettingsForm", () => {
 			description: "Roadmap",
 			color: "#123456",
 			icon: "Rocket",
+			labels: [
+				{
+					key: "frontend",
+					name: "Frontend",
+					color: "#06b6d4",
+					position: 0,
+				},
+			],
 			statuses: [
 				{ key: "todo", name: "Todo", color: "#3b82f6", position: 0 },
 				{ key: "backlog", name: "Inbox", color: "#334155", position: 1 },
@@ -111,7 +128,7 @@ describe("applyParentIssueDraftDefaults", () => {
 			priority: "high",
 			assigneeId: "user-1",
 			dueDate: "2026-03-25",
-			labels: "",
+			labels: [],
 		});
 	});
 
@@ -138,7 +155,7 @@ describe("applyParentIssueDraftDefaults", () => {
 			priority: "urgent",
 			assigneeId: "user-custom",
 			dueDate: "2026-04-01",
-			labels: "",
+			labels: [],
 		});
 	});
 });

@@ -1,5 +1,6 @@
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { ISSUE_PRIORITIES } from "#/features/tasker/model";
+import type { ProjectLabelDefinition } from "#/features/tasker/projectLabels";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 import { getClientErrorMessage } from "#/lib/utils";
 import type { Doc, Id } from "#convex/_generated/dataModel";
@@ -61,6 +62,7 @@ type UseProjectTaskImportExportOptions = {
 	issues: ExportableIssue[] | undefined;
 	project: ProjectSummary | undefined;
 	projectId: Id<"projects">;
+	projectLabels: ProjectLabelDefinition[];
 	projectStatuses: ProjectStatusDefinition[];
 };
 
@@ -124,6 +126,7 @@ export function useProjectTaskImportExport({
 	issues,
 	project,
 	projectId,
+	projectLabels,
 	projectStatuses,
 }: UseProjectTaskImportExportOptions) {
 	const [isImportExportMenuOpen, setIsImportExportMenuOpen] = useState(false);
@@ -216,7 +219,11 @@ export function useProjectTaskImportExport({
 					projectStatuses.find((status) => status.key === issue.status)?.name ??
 					issue.status,
 				priority: issue.priority,
-				labels: issue.labels,
+				labels: issue.labels.map(
+					(labelKey) =>
+						projectLabels.find((label) => label.key === labelKey)?.name ??
+						labelKey,
+				),
 				dueDate: issue.dueDate,
 				listName: issue.listId
 					? issueListById.get(issue.listId)?.name
@@ -278,6 +285,13 @@ export function useProjectTaskImportExport({
 				projectStatuses.map((status) => status.key),
 			);
 			const allowedPriorities = new Set<string>(ISSUE_PRIORITIES);
+			const labelKeyByName = new Map(
+				projectLabels.map((label) => [
+					label.name.trim().toLowerCase(),
+					label.key,
+				]),
+			);
+			const allowedLabelKeys = new Set(projectLabels.map((label) => label.key));
 
 			let importedCount = 0;
 			let skippedCount = 0;
@@ -303,6 +317,15 @@ export function useProjectTaskImportExport({
 				const listId = normalizedListName
 					? listIdByName.get(normalizedListName)
 					: undefined;
+				const labels =
+					normalizeTaskLabels(task.labels)?.flatMap((label) => {
+						if (allowedLabelKeys.has(label)) {
+							return [label];
+						}
+
+						const matchedKey = labelKeyByName.get(label.trim().toLowerCase());
+						return matchedKey ? [matchedKey] : [];
+					}) ?? [];
 
 				try {
 					await createIssue({
@@ -312,7 +335,7 @@ export function useProjectTaskImportExport({
 						status,
 						priority,
 						dueDate: normalizeTaskDueDate(task.dueDate),
-						labels: normalizeTaskLabels(task.labels),
+						labels,
 						listId,
 					});
 					importedCount += 1;

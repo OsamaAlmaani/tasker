@@ -82,6 +82,12 @@ export type ProjectStatusDefinition = {
   color: string
   position: number
 }
+export type ProjectLabelDefinition = {
+  key: string
+  name: string
+  color: string
+  position: number
+}
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number]
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number]
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number]
@@ -97,6 +103,13 @@ export const globalRoleValidator = v.union(
 export const issueStatusValidator = v.string()
 
 export const projectStatusValidator = v.object({
+  key: v.string(),
+  name: v.string(),
+  color: v.string(),
+  position: v.number(),
+})
+
+export const projectLabelValidator = v.object({
   key: v.string(),
   name: v.string(),
   color: v.string(),

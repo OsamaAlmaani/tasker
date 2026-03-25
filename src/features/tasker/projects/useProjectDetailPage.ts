@@ -2,6 +2,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { type DragEvent, useMemo, useState } from "react";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import type { ISSUE_PRIORITIES } from "#/features/tasker/model";
+import { normalizeProjectLabels } from "#/features/tasker/projectLabels";
 import {
 	normalizeProjectStatuses,
 	type ProjectStatusDefinition,
@@ -198,6 +199,10 @@ export function useProjectDetailPage({
 		() => normalizeProjectStatuses(projectData?.project.statuses),
 		[projectData?.project.statuses],
 	);
+	const projectLabels = useMemo(
+		() => normalizeProjectLabels(projectData?.project.labels),
+		[projectData?.project.labels],
+	);
 
 	const memberRows = useMemo(
 		() => projectData?.membershipRows ?? [],
@@ -267,6 +272,7 @@ export function useProjectDetailPage({
 		issues: issues as ProjectIssueRow[] | undefined,
 		project: projectData?.project,
 		projectId,
+		projectLabels,
 		projectStatuses,
 	});
 
@@ -318,12 +324,7 @@ export function useProjectDetailPage({
 				dueDate: parsed.data.dueDate
 					? new Date(parsed.data.dueDate).getTime()
 					: undefined,
-				labels: parsed.data.labels
-					? parsed.data.labels
-							.split(",")
-							.map((item) => item.trim())
-							.filter(Boolean)
-					: undefined,
+				labels: parsed.data.labels,
 			});
 			setIssueForm(createIssueDraft());
 			setCreateOpen(false);
@@ -345,6 +346,7 @@ export function useProjectDetailPage({
 				description: projectForm.description,
 				color: projectForm.color,
 				icon: projectForm.icon,
+				labels: projectForm.labels,
 				statuses: projectForm.statuses,
 				allowMemberInvites: projectForm.allowMemberInvites,
 				allowIssueDelete: projectForm.allowIssueDelete,
@@ -639,6 +641,7 @@ export function useProjectDetailPage({
 		projectSettingsError,
 		projectStatuses,
 		projectInvites,
+		projectLabels,
 		projectIssueById,
 		projectView,
 		search,

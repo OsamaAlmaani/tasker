@@ -118,6 +118,7 @@ export function ProjectDetailContent({
 		priority,
 		projectActivity,
 		projectForm,
+		projectLabels,
 		projectSettingsError,
 		projectStatuses,
 		projectInvites,
@@ -365,7 +366,7 @@ export function ProjectDetailContent({
 			{bulkActionError ? (
 				<p className="mb-4 text-sm text-[var(--danger)]">{bulkActionError}</p>
 			) : null}
-			{projectSettingsError ? (
+			{projectSettingsError && !editingProject ? (
 				<p className="mb-4 text-sm text-[var(--danger)]">
 					{projectSettingsError}
 				</p>
@@ -373,7 +374,9 @@ export function ProjectDetailContent({
 
 			<ProjectSettingsCard
 				archived={projectData.project.archived}
+				error={projectSettingsError}
 				form={projectForm}
+				onClose={() => setEditingProject(false)}
 				onArchiveClick={() => setIsArchiveConfirmOpen(true)}
 				onRequestDeleteStatus={requestStatusDelete}
 				onSubmit={submitProjectSettings}
@@ -519,6 +522,7 @@ export function ProjectDetailContent({
 								onToggleSelection={toggleIssueSelection}
 								selectedIssueIds={selectedIssueIds}
 								selectionEnabled={canWrite}
+								labelOptions={projectLabels}
 								statusOptions={projectStatuses}
 							/>
 						)}
@@ -608,6 +612,7 @@ export function ProjectDetailContent({
 				open={createOpen}
 				parentIssueOptions={parentIssueOptions}
 				setDraft={setIssueForm}
+				labelOptions={projectLabels}
 				statusOptions={projectStatuses}
 				submitLabel="Create task"
 				title="Create Task"

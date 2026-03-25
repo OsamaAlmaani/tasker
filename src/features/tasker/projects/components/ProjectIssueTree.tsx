@@ -2,11 +2,17 @@ import { Link } from "@tanstack/react-router";
 import type { DragEvent, ReactNode } from "react";
 import { Badge } from "#/components/ui/badge";
 import {
+	IssueLabelBadge,
 	IssuePriorityBadge,
 	IssueStatusBadge,
 } from "#/features/tasker/components/IssueBadges";
 import { formatDate } from "#/features/tasker/format";
 import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
+import {
+	getProjectLabelColor,
+	getProjectLabelName,
+	type ProjectLabelDefinition,
+} from "#/features/tasker/projectLabels";
 import {
 	getProjectStatusColor,
 	getProjectStatusLabel,
@@ -30,6 +36,7 @@ type ProjectIssue = {
 	dueDate?: number | null;
 	hasChildren: boolean;
 	issueNumber: number;
+	labels: string[];
 	parentIssueId?: string | null;
 	priority: (typeof ISSUE_PRIORITIES)[number];
 	status: ProjectStatusDefinition["key"];
@@ -133,6 +140,7 @@ type ProjectIssueListTreeProps = {
 	assignableUserById: Map<string, ProjectAssignableUser>;
 	assignableUsers?: ProjectAssignableUser[];
 	canWrite: boolean;
+	labelOptions: ProjectLabelDefinition[];
 	nodes: ProjectIssueTreeNode[];
 	onAssigneeChange: (issueId: string, nextAssigneeId: string) => void;
 	onPriorityChange: (
@@ -153,6 +161,7 @@ export function ProjectIssueListTree({
 	assignableUserById,
 	assignableUsers,
 	canWrite,
+	labelOptions,
 	nodes,
 	onAssigneeChange,
 	onPriorityChange,
@@ -218,6 +227,17 @@ export function ProjectIssueListTree({
 									<p className="m-0 truncate whitespace-nowrap text-xs text-[var(--muted-text)]">
 										{issue.description?.trim() || "No description"}
 									</p>
+									{issue.labels.length ? (
+										<div className="mt-1 flex flex-wrap items-center gap-1.5">
+											{issue.labels.map((label) => (
+												<IssueLabelBadge
+													key={label}
+													color={getProjectLabelColor(labelOptions, label)}
+													label={getProjectLabelName(labelOptions, label)}
+												/>
+											))}
+										</div>
+									) : null}
 									{progressLabel ? (
 										<div className="issue-progress-inline">
 											<div className="issue-progress-bar" aria-hidden="true">
@@ -356,6 +376,7 @@ export function ProjectIssueListTree({
 									onToggleSelection={onToggleSelection}
 									selectedIssueIds={selectedIssueIds}
 									selectionEnabled={selectionEnabled}
+									labelOptions={labelOptions}
 									statusOptions={statusOptions}
 								/>
 							</div>

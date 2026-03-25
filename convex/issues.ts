@@ -11,6 +11,7 @@ import {
   requireProjectWriteAccess,
 } from './lib/auth'
 import { createActivity } from './lib/activity'
+import { ensureProjectLabelsExist } from './lib/projectLabels'
 import {
   ensureProjectStatusExists,
   normalizeProject,
@@ -19,6 +20,10 @@ import {
 
 function buildSearchText(title: string, description?: string) {
   return `${title} ${description ?? ''}`.trim().toLowerCase()
+}
+
+function normalizeIssueLabels(labels: string[]) {
+  return [...new Set(labels.map((label) => label.trim()).filter(Boolean))]
 }
 
 type IssueUpdateChanges = {
@@ -422,7 +427,14 @@ async function applyIssueUpdate(
     patch.parentIssueId = changes.parentIssueId ?? undefined
   }
   if (changes.labels !== undefined) {
-    patch.labels = changes.labels.map((label) => label.trim()).filter(Boolean)
+    const nextLabels = normalizeIssueLabels(changes.labels)
+    if (!ensureProjectLabelsExist(project, nextLabels)) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'One or more labels do not belong to the current project.',
+      })
+    }
+    patch.labels = nextLabels
   }
   if (changes.dueDate !== undefined) {
     patch.dueDate = changes.dueDate ?? undefined
@@ -757,6 +769,13 @@ export const create = mutation({
         args.parentIssueId,
       )
     }
+    const nextLabels = normalizeIssueLabels(args.labels ?? [])
+    if (!ensureProjectLabelsExist(project, nextLabels)) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'One or more labels do not belong to the current project.',
+      })
+    }
 
     const now = Date.now()
     let counter = await ctx.db
@@ -799,7 +818,7 @@ export const create = mutation({
       assigneeId: args.assigneeId,
       reporterId: user._id,
       createdBy: user._id,
-      labels: (args.labels ?? []).map((label) => label.trim()).filter(Boolean),
+      labels: nextLabels,
       dueDate: args.dueDate,
       archived: false,
       createdAt: now,

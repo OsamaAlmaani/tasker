@@ -1,5 +1,6 @@
 import type { Doc } from '../_generated/dataModel'
 import { type ProjectStatusDefinition } from '../constants'
+import { normalizeProjectLabels } from './projectLabels'
 
 type LegacyProjectStatusDefinition = {
   key: string
@@ -153,6 +154,7 @@ export function getProjectStatus(
 export function normalizeProject<TProject extends Doc<'projects'>>(project: TProject) {
   return {
     ...project,
+    labels: normalizeProjectLabels(project.labels),
     statuses: normalizeProjectStatuses(project.statuses),
   }
 }

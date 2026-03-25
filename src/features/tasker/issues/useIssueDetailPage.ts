@@ -3,6 +3,7 @@ import { type FormEvent, useMemo, useState } from "react";
 import type { IssueDraft } from "#/features/tasker/issues/components/IssueDraftDialog";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import type { ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
+import { normalizeProjectLabels } from "#/features/tasker/projectLabels";
 import { normalizeProjectStatuses } from "#/features/tasker/projectStatuses";
 import {
 	commentFormSchema,
@@ -65,7 +66,7 @@ function createSubIssueDraft(parentIssue?: IssueDetailRow): IssueDraft {
 		dueDate: parentIssue?.dueDate
 			? new Date(parentIssue.dueDate).toISOString().slice(0, 10)
 			: "",
-		labels: "",
+		labels: parentIssue?.labels ?? [],
 	};
 }
 
@@ -129,6 +130,10 @@ export function useIssueDetailPage({
 	const projectStatuses = useMemo(
 		() => normalizeProjectStatuses(issueData?.project.statuses),
 		[issueData?.project.statuses],
+	);
+	const projectLabels = useMemo(
+		() => normalizeProjectLabels(issueData?.project.labels),
+		[issueData?.project.labels],
 	);
 
 	const childIssueRows = useMemo(
@@ -315,12 +320,7 @@ export function useIssueDetailPage({
 				dueDate: parsed.data.dueDate
 					? new Date(parsed.data.dueDate).getTime()
 					: undefined,
-				labels: parsed.data.labels
-					? parsed.data.labels
-							.split(",")
-							.map((item) => item.trim())
-							.filter(Boolean)
-					: undefined,
+				labels: parsed.data.labels,
 			});
 			setSubIssueForm(createSubIssueDraft(currentIssue));
 			setSubIssueFormOpen(false);
@@ -384,6 +384,13 @@ export function useIssueDetailPage({
 		await handleIssueStatusChange(currentIssue, value);
 	}
 
+	async function changeLabels(labels: string[]) {
+		await updateIssue({
+			issueId,
+			labels,
+		});
+	}
+
 	return {
 		assignableUsers,
 		canDeleteIssue,
@@ -394,6 +401,7 @@ export function useIssueDetailPage({
 		changeAssignee,
 		changeDueDate,
 		changeList,
+		changeLabels,
 		changePriority,
 		changeStatus,
 		childIssueRows,
@@ -416,6 +424,7 @@ export function useIssueDetailPage({
 		closeSubIssueForm,
 		openSubIssueForm,
 		projectId,
+		projectLabels,
 		projectStatuses,
 		saveComment,
 		saveDescription,
