@@ -31,7 +31,7 @@ Refactor oversized route files into maintainable feature modules while preservin
 - [ ] Consolidate repeated project/task presentation patterns.
 
 ## Phase 3: Stabilization
-- [ ] Add lean tests around extracted pure logic (non-UI heavy).
+- [x] Add lean tests around extracted pure logic (non-UI heavy).
 - [ ] Document code organization conventions for future feature work.
 - [ ] Mark roadmap foundation items completed once route sizes are materially reduced.
 
@@ -51,3 +51,4 @@ Refactor oversized route files into maintainable feature modules while preservin
 - Latest extraction complete: project detail page state, queries, and mutation handlers now live in `src/features/tasker/projects/useProjectDetailPage.ts`.
 - Latest extraction complete: issue detail page state, queries, and mutation handlers now live in `src/features/tasker/issues/useIssueDetailPage.ts`.
 - Latest extraction complete: project search schema/normalization now live in `src/features/tasker/projects/projectSearch.ts`, and the project route now composes `src/features/tasker/projects/components/ProjectDetailContent.tsx` as a route shell.
+- Latest stabilization step complete: lean Vitest coverage now exercises `src/features/tasker/issues/hierarchy.ts` and `src/features/tasker/projects/projectSearch.ts`, with dedicated config in `vitest.config.ts`.

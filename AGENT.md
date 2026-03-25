@@ -45,9 +45,10 @@ Expectations:
   - `pnpm check` -> `biome check`
   - `pnpm test` -> `vitest run`
 - Build stack uses Vite + TanStack Start + Nitro via [`vite.config.ts`](./vite.config.ts).
+- Tests use a dedicated [`vitest.config.ts`](./vitest.config.ts) with `vite-tsconfig-paths` and a `node` environment so pure-module tests do not inherit the full app plugin stack.
 - Verified during scan:
   - `pnpm check` passes.
-  - `pnpm test` currently fails because there are no test files.
+  - `pnpm test` passes.
 
 ## Required Env / Services
 
@@ -300,9 +301,11 @@ Repo/tooling notes:
 
 ## Testing / Quality Reality
 
-- There are currently no `*.test.*` or `*.spec.*` files in the repo.
-- `pnpm test` currently exits non-zero because Vitest finds no tests.
-- `pnpm check` is the main routine static check and is currently clean.
+- Current non-UI coverage is intentionally lean and focused on extracted pure modules:
+  - [`src/features/tasker/issues/hierarchy.test.ts`](./src/features/tasker/issues/hierarchy.test.ts)
+  - [`src/features/tasker/projects/projectSearch.test.ts`](./src/features/tasker/projects/projectSearch.test.ts)
+- `pnpm test` now passes with the dedicated [`vitest.config.ts`](./vitest.config.ts).
+- `pnpm check` is still the main routine static check and is currently clean.
 
 When making changes, prefer:
 
