@@ -7,23 +7,15 @@ import {
 	issueStatusLabel,
 } from "#/features/tasker/model";
 import type { ProjectSettingsForm } from "#/features/tasker/projects/components/ProjectSettingsCard";
+import {
+	type ProjectSearch,
+	parseStatusFilters,
+} from "#/features/tasker/projects/projectSearch";
 import { useProjectTaskImportExport } from "#/features/tasker/projects/useProjectTaskImportExport";
 import { issueFormSchema } from "#/features/tasker/validation";
 import { getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Doc, Id } from "#convex/_generated/dataModel";
-
-type ProjectSearch = {
-	list?: string;
-	q?: string;
-	statuses?: string;
-	priority?: (typeof ISSUE_PRIORITIES)[number];
-	assignee?: string;
-	groupBy?: "list" | "status";
-	view?: "issues" | "activity";
-	sort?: "updated_desc" | "created_desc" | "priority_desc" | "due_asc";
-	layout?: "list" | "kanban";
-};
 
 export type ProjectIssueRow = Doc<"issues"> & {
 	childIssueCount: number;
@@ -79,20 +71,6 @@ function buildIssueTree(rows: ProjectIssueRow[]): IssueTreeNode[] {
 	}
 
 	return roots;
-}
-
-function parseStatusFilters(raw?: string): (typeof ISSUE_STATUSES)[number][] {
-	if (!raw) {
-		return [];
-	}
-
-	const allowed = new Set<string>(ISSUE_STATUSES);
-	return raw
-		.split(",")
-		.map((value) => value.trim())
-		.filter((value): value is (typeof ISSUE_STATUSES)[number] =>
-			allowed.has(value),
-		);
 }
 
 type UseProjectDetailPageOptions = {
@@ -762,3 +740,5 @@ export function useProjectDetailPage({
 		exportTasks: importExport.exportTasks,
 	};
 }
+
+export type ProjectDetailPageState = ReturnType<typeof useProjectDetailPage>;

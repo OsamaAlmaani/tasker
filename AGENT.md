@@ -218,6 +218,8 @@ Invite flow is split intentionally:
 - Place issue discussion/activity rendering and comment editing UI in `src/features/tasker/issues/components/IssueDiscussionPanel.tsx` instead of keeping that block inline in the issue route.
 - Place issue overview, sub-task list, and metadata UI in `src/features/tasker/issues/components/IssueDetailPanels.tsx` and keep the issue route focused on local edit state and mutation callbacks.
 - Place issue detail page queries, derived state, edit state, dialog state, and mutation handlers in `src/features/tasker/issues/useIssueDetailPage.ts` so the route stays focused on params, back-navigation, and page composition.
+- Place project route search schema and normalization helpers in `src/features/tasker/projects/projectSearch.ts` instead of redefining query-string helpers inside route files.
+- Place the remaining project-page composition, dialogs, and project-view switching UI in `src/features/tasker/projects/components/ProjectDetailContent.tsx` so the route stays focused on params, search-state updates, and loading/not-found handling.
 - Place project task import/export state, menu behavior, and file parsing in `src/features/tasker/projects/useProjectTaskImportExport.ts` instead of keeping that workflow inline in route files.
 - Place project detail page queries, derived state, modal state, and mutation handlers in `src/features/tasker/projects/useProjectDetailPage.ts` so the route stays focused on search-state normalization and composition.
 - Place project members/invite modal UI in `src/features/tasker/projects/components/` and keep the route focused on modal state plus mutation wiring.
@@ -244,14 +246,14 @@ This file is large and stateful. If changing shell behavior, isolate edits caref
 
 ### Project detail route
 
-[`src/routes/_app.projects.$projectId.tsx`](./src/routes/_app.projects.$projectId.tsx) is now mostly a composition shell plus URL-search normalization and still owns:
+[`src/routes/_app.projects.$projectId.tsx`](./src/routes/_app.projects.$projectId.tsx) is now a route shell that owns:
 
 - URL-backed filters and view state
-- route composition for extracted project feature modules
-- back-and-forth coordination with the project detail controller hook
-- a smaller amount of drag-and-drop and page-level shell behavior
+- search updates and normalization for the project page
+- loading/not-found route handling
+- handoff to the project detail controller hook and `ProjectDetailContent.tsx`
 
-Most project detail state, mutations, dialogs, and derived collections now live in `src/features/tasker/projects/useProjectDetailPage.ts` and related feature components.
+Most project detail state, mutations, dialogs, and derived collections now live in `src/features/tasker/projects/useProjectDetailPage.ts`; most project-page composition now lives in `src/features/tasker/projects/components/ProjectDetailContent.tsx`; and shared project search helpers now live in `src/features/tasker/projects/projectSearch.ts`.
 
 ### Issue detail route
 

@@ -9,18 +9,18 @@ Use this file to track feature progress. Check items off as they ship.
 ## Highest Priority: Codebase Foundation
 
 - [ ] Refactor the codebase for maintainability before adding major new product surface area
-- [ ] Break up [src/routes/\_app.projects.$projectId.tsx](/Users/osama/sources/private/tasker/src/routes/_app.projects.$projectId.tsx) into manageable feature modules
-- [ ] Break up [src/routes/\_app.issues.$issueId.tsx](/Users/osama/sources/private/tasker/src/routes/_app.issues.$issueId.tsx) into manageable feature modules
-- [ ] Reduce route files so they act as route entry points and composition shells, not feature dumping grounds
-- [ ] Define a clear structure for route-level data loading, feature hooks, feature components, dialogs, forms, and utilities
+- [x] Break up [src/routes/\_app.projects.$projectId.tsx](/Users/osama/sources/private/tasker/src/routes/_app.projects.$projectId.tsx) into manageable feature modules
+- [x] Break up [src/routes/\_app.issues.$issueId.tsx](/Users/osama/sources/private/tasker/src/routes/_app.issues.$issueId.tsx) into manageable feature modules
+- [x] Reduce route files so they act as route entry points and composition shells, not feature dumping grounds
+- [x] Define a clear structure for route-level data loading, feature hooks, feature components, dialogs, forms, and utilities
 - [x] Extract project detail page state and mutations into focused hooks
 - [x] Extract issue detail page state and mutations into focused hooks
-- [ ] Split large inline UI sections into dedicated components with clear ownership
+- [x] Split large inline UI sections into dedicated components with clear ownership
 - [ ] Move repeated task/project presentation patterns into reusable components where it genuinely reduces duplication
-- [ ] Separate pure view logic from Convex wiring and mutation orchestration
+- [x] Separate pure view logic from Convex wiring and mutation orchestration
 - [x] Consolidate route-specific helper functions into colocated modules or shared utilities where appropriate
 - [ ] Add tests around the refactor so behavior does not drift while files are being split, and keep test files, artifacts and related pieces well organized away from the main codebase to reduce bloat.
-- [ ] Establish code organization rules and update AGENT.md file so new work extends the same structure instead of recreating large route files
+- [x] Establish code organization rules and update AGENT.md file so new work extends the same structure instead of recreating large route files
 
 ### Foundation Progress Log
 
@@ -37,6 +37,7 @@ Use this file to track feature progress. Check items off as they ship.
 - 2026-03-25: Extracted recursive project issue-tree rendering to `src/features/tasker/projects/components/ProjectIssueTree.tsx`, removing inline task row/card renderers and their helper controls from the project route.
 - 2026-03-25: Extracted project detail orchestration to `src/features/tasker/projects/useProjectDetailPage.ts`, moving the project route’s queries, mutation handlers, modal state, and derived collections into a dedicated controller hook.
 - 2026-03-25: Extracted issue detail orchestration to `src/features/tasker/issues/useIssueDetailPage.ts`, moving the issue route’s queries, mutation handlers, edit state, timeline derivation, and dialog state into a dedicated controller hook.
+- 2026-03-25: Extracted project route search schema/normalization to `src/features/tasker/projects/projectSearch.ts` and moved the remaining project-page composition into `src/features/tasker/projects/components/ProjectDetailContent.tsx`, leaving the route as a search-aware entry shell.
 
 ## Product Direction
 
