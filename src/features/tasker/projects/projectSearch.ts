@@ -10,8 +10,10 @@ const ISSUE_SORT_OPTIONS = [
 const ISSUE_GROUP_OPTIONS = ["list", "status"] as const;
 const PROJECT_VIEW_OPTIONS = ["issues", "activity"] as const;
 const ISSUE_LAYOUT_OPTIONS = ["list", "kanban"] as const;
+const ISSUE_ARCHIVE_OPTIONS = ["active", "archived"] as const;
 
 export const projectSearchSchema = z.object({
+	archive: z.enum(ISSUE_ARCHIVE_OPTIONS).optional(),
 	list: z.string().optional(),
 	q: z.string().optional(),
 	statuses: z.string().optional(),
@@ -48,6 +50,9 @@ export function normalizeProjectSearch(search: ProjectSearch): ProjectSearch {
 	const next = { ...search };
 	next.statuses = serializeStatusFilters(parseStatusFilters(next.statuses));
 
+	if (next.archive === "active" || !next.archive) {
+		delete next.archive;
+	}
 	next.q = next.q?.trim();
 	if (!next.q) {
 		delete next.q;

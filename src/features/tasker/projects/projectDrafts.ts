@@ -1,6 +1,10 @@
 import type { IssueDraft } from "#/features/tasker/issues/components/IssueDraftDialog";
 import type { ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
 import {
+	normalizeProjectCustomFields,
+	type ProjectCustomFieldDefinition,
+} from "#/features/tasker/projectCustomFields";
+import {
 	normalizeProjectLabels,
 	type ProjectLabelDefinition,
 } from "#/features/tasker/projectLabels";
@@ -16,6 +20,7 @@ type ProjectSettingsLike = {
 	allowIssueDelete?: boolean | null;
 	allowMemberInvites?: boolean | null;
 	color?: string | null;
+	customFields?: ProjectCustomFieldDefinition[] | null;
 	description?: string | null;
 	icon?: string | null;
 	labels?: ProjectLabelDefinition[] | null;
@@ -41,6 +46,7 @@ export function createIssueDraft(): IssueDraft {
 		priority: "none",
 		assigneeId: "",
 		dueDate: "",
+		customFieldValues: {},
 		labels: [],
 	};
 }
@@ -53,6 +59,7 @@ export function createProjectSettingsForm(
 		description: project?.description ?? "",
 		color: project?.color ?? "#4f46e5",
 		icon: project?.icon ?? "FolderKanban",
+		customFields: normalizeProjectCustomFields(project?.customFields),
 		labels: normalizeProjectLabels(project?.labels),
 		statuses: normalizeProjectStatuses(
 			project?.statuses ?? DEFAULT_PROJECT_STATUSES,

@@ -9,6 +9,7 @@ import {
 describe("projectSearchSchema", () => {
 	it("accepts valid project search params", () => {
 		const parsed = projectSearchSchema.parse({
+			archive: "archived",
 			groupBy: "status",
 			layout: "kanban",
 			priority: "high",
@@ -18,6 +19,7 @@ describe("projectSearchSchema", () => {
 		});
 
 		expect(parsed).toEqual({
+			archive: "archived",
 			groupBy: "status",
 			layout: "kanban",
 			priority: "high",
@@ -58,6 +60,7 @@ describe("normalizeProjectSearch", () => {
 	it("trims query text, removes defaults, and normalizes statuses", () => {
 		expect(
 			normalizeProjectSearch({
+				archive: "active",
 				assignee: "",
 				groupBy: "list",
 				layout: "list",
@@ -76,6 +79,7 @@ describe("normalizeProjectSearch", () => {
 	it("keeps explicit non-default filters and view options", () => {
 		expect(
 			normalizeProjectSearch({
+				archive: "archived",
 				assignee: "user_123",
 				groupBy: "status",
 				layout: "kanban",
@@ -86,6 +90,7 @@ describe("normalizeProjectSearch", () => {
 				view: "activity",
 			}),
 		).toEqual({
+			archive: "archived",
 			assignee: "user_123",
 			groupBy: "status",
 			layout: "kanban",

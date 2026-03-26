@@ -24,6 +24,7 @@ export const issueFormSchema = z.object({
 	listId: z.string().trim().optional(),
 	parentIssueId: z.string().trim().optional(),
 	dueDate: z.string().trim().optional(),
+	customFieldValues: z.record(z.union([z.string(), z.boolean()])).default({}),
 	labels: z.array(z.string().trim()).default([]),
 });
 

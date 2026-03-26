@@ -4,8 +4,13 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Select } from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
+import { ProjectCustomFieldInput } from "#/features/tasker/components/ProjectCustomFieldInput";
 import { ProjectLabelSelector } from "#/features/tasker/components/ProjectLabelSelector";
 import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
+import type {
+	ProjectCustomFieldDefinition,
+	ProjectCustomFieldDraftValue,
+} from "#/features/tasker/projectCustomFields";
 import type { ProjectLabelDefinition } from "#/features/tasker/projectLabels";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 
@@ -18,6 +23,7 @@ export type IssueDraft = {
 	priority: (typeof ISSUE_PRIORITIES)[number];
 	assigneeId: string;
 	dueDate: string;
+	customFieldValues: Record<string, ProjectCustomFieldDraftValue>;
 	labels: string[];
 };
 
@@ -41,6 +47,7 @@ type IssueDraftDialogProps = {
 	dialogLabel: string;
 	draft: IssueDraft;
 	error?: string | null;
+	fieldOptions?: ProjectCustomFieldDefinition[];
 	issueLists?: IssueListOption[];
 	labelOptions?: ProjectLabelDefinition[];
 	onClose: () => void;
@@ -59,6 +66,7 @@ export function IssueDraftDialog({
 	dialogLabel,
 	draft,
 	error,
+	fieldOptions,
 	issueLists,
 	labelOptions,
 	onClose,
@@ -235,6 +243,24 @@ export function IssueDraftDialog({
 							}
 						/>
 					</div>
+					{(fieldOptions ?? []).map((field) => (
+						<div key={field.key}>
+							<Label>{field.name}</Label>
+							<ProjectCustomFieldInput
+								field={field}
+								value={draft.customFieldValues[field.key]}
+								onChange={(value) =>
+									setDraft((previous) => ({
+										...previous,
+										customFieldValues: {
+											...previous.customFieldValues,
+											[field.key]: value,
+										},
+									}))
+								}
+							/>
+						</div>
+					))}
 					<div className="md:col-span-2 space-y-2">
 						<Label>Labels</Label>
 						<ProjectLabelSelector

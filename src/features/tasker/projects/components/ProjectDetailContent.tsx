@@ -60,6 +60,8 @@ export function ProjectDetailContent({
 	const {
 		addMember,
 		addStatusFilter,
+		archive,
+		archivedIssueCount,
 		assignableUserById,
 		assignableUsers,
 		assigneeId,
@@ -117,6 +119,7 @@ export function ProjectDetailContent({
 		parentIssueOptions,
 		priority,
 		projectActivity,
+		projectCustomFields,
 		projectForm,
 		projectLabels,
 		projectSettingsError,
@@ -162,11 +165,14 @@ export function ProjectDetailContent({
 	const [bulkActionError, setBulkActionError] = useState<string | null>(null);
 	const [isApplyingBulkAction, setIsApplyingBulkAction] = useState(false);
 	const visibleIssueIds = useMemo(
-		() => new Set((issues ?? []).map((issue) => issue._id)),
+		() => new Set<string>((issues ?? []).map((issue) => issue._id)),
 		[issues],
 	);
 	const projectIssueById = useMemo(
-		() => new Map((allProjectIssues ?? []).map((issue) => [issue._id, issue])),
+		() =>
+			new Map<string, ProjectIssueRow>(
+				(allProjectIssues ?? []).map((issue) => [issue._id, issue]),
+			),
 		[allProjectIssues],
 	);
 
@@ -211,7 +217,7 @@ export function ProjectDetailContent({
 
 		if (changes.status && changes.status !== "done") {
 			for (const issueId of selectedIssueIds) {
-				const issue = projectIssueById.get(issueId as Id<"issues">);
+				const issue = projectIssueById.get(issueId);
 				if (!issue) {
 					continue;
 				}
@@ -331,10 +337,7 @@ export function ProjectDetailContent({
 										role="menuitem"
 										className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
 										disabled={!issues}
-										onClick={() => {
-											setIsImportExportMenuOpen(false);
-											exportTasks();
-										}}
+										onClick={exportTasks}
 									>
 										<Download className="h-4 w-4" />
 										Export tasks
@@ -390,6 +393,8 @@ export function ProjectDetailContent({
 			<div className="space-y-4">
 				{projectView === "issues" ? (
 					<ProjectTasksPanel
+						archiveState={archive}
+						archivedCount={archivedIssueCount}
 						assignableUsers={assignableUsers}
 						assigneeId={assigneeId}
 						bulkActions={
@@ -423,6 +428,14 @@ export function ProjectDetailContent({
 						issueLayout={issueLayout}
 						kanbanColumns={kanbanColumns}
 						onAddStatusFilter={addStatusFilter}
+						onArchiveStateChange={(value) =>
+							updateProjectSearch(
+								{
+									archive: value,
+								},
+								{ replace: true },
+							)
+						}
 						onAssigneeChange={(value) =>
 							updateProjectSearch(
 								{ assignee: value || undefined },
@@ -612,6 +625,7 @@ export function ProjectDetailContent({
 				open={createOpen}
 				parentIssueOptions={parentIssueOptions}
 				setDraft={setIssueForm}
+				fieldOptions={projectCustomFields}
 				labelOptions={projectLabels}
 				statusOptions={projectStatuses}
 				submitLabel="Create task"

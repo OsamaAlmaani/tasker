@@ -3,6 +3,11 @@ import { type FormEvent, useMemo, useState } from "react";
 import type { IssueDraft } from "#/features/tasker/issues/components/IssueDraftDialog";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import type { ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
+import {
+	buildIssueCustomFieldSubmission,
+	normalizeIssueCustomFieldDraftValues,
+	normalizeProjectCustomFields,
+} from "#/features/tasker/projectCustomFields";
 import { normalizeProjectLabels } from "#/features/tasker/projectLabels";
 import { normalizeProjectStatuses } from "#/features/tasker/projectStatuses";
 import {
@@ -53,7 +58,10 @@ type UseIssueDetailPageOptions = {
 	) => void | Promise<void>;
 };
 
-function createSubIssueDraft(parentIssue?: IssueDetailRow): IssueDraft {
+function createSubIssueDraft(
+	parentIssue?: IssueDetailRow,
+	projectCustomFields?: ReturnType<typeof normalizeProjectCustomFields>,
+): IssueDraft {
 	return {
 		title: "",
 		description: "",
@@ -66,6 +74,10 @@ function createSubIssueDraft(parentIssue?: IssueDetailRow): IssueDraft {
 		dueDate: parentIssue?.dueDate
 			? new Date(parentIssue.dueDate).toISOString().slice(0, 10)
 			: "",
+		customFieldValues: normalizeIssueCustomFieldDraftValues(
+			projectCustomFields,
+			parentIssue?.customFieldValues,
+		),
 		labels: parentIssue?.labels ?? [],
 	};
 }
@@ -119,7 +131,7 @@ export function useIssueDetailPage({
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 	const [subIssueFormOpen, setSubIssueFormOpen] = useState(false);
 	const [subIssueError, setSubIssueError] = useState<string | null>(null);
-	const [subIssueForm, setSubIssueForm] = useState(createSubIssueDraft);
+	const [subIssueForm, setSubIssueForm] = useState(() => createSubIssueDraft());
 
 	const canWrite = me?.globalRole === "admin" || me?.globalRole === "member";
 	const currentIssue = issueData?.issue as IssueDetailRow | undefined;
@@ -130,6 +142,10 @@ export function useIssueDetailPage({
 	const projectStatuses = useMemo(
 		() => normalizeProjectStatuses(issueData?.project.statuses),
 		[issueData?.project.statuses],
+	);
+	const projectCustomFields = useMemo(
+		() => normalizeProjectCustomFields(issueData?.project.customFields),
+		[issueData?.project.customFields],
 	);
 	const projectLabels = useMemo(
 		() => normalizeProjectLabels(issueData?.project.labels),
@@ -276,13 +292,13 @@ export function useIssueDetailPage({
 
 	function openSubIssueForm() {
 		setSubIssueError(null);
-		setSubIssueForm(createSubIssueDraft(currentIssue));
+		setSubIssueForm(createSubIssueDraft(currentIssue, projectCustomFields));
 		setSubIssueFormOpen(true);
 	}
 
 	function closeSubIssueForm() {
 		setSubIssueError(null);
-		setSubIssueForm(createSubIssueDraft(currentIssue));
+		setSubIssueForm(createSubIssueDraft(currentIssue, projectCustomFields));
 		setSubIssueFormOpen(false);
 	}
 
@@ -320,9 +336,13 @@ export function useIssueDetailPage({
 				dueDate: parsed.data.dueDate
 					? new Date(parsed.data.dueDate).getTime()
 					: undefined,
+				customFieldValues: buildIssueCustomFieldSubmission(
+					projectCustomFields,
+					parsed.data.customFieldValues,
+				),
 				labels: parsed.data.labels,
 			});
-			setSubIssueForm(createSubIssueDraft(currentIssue));
+			setSubIssueForm(createSubIssueDraft(currentIssue, projectCustomFields));
 			setSubIssueFormOpen(false);
 		} catch (error) {
 			setSubIssueError(
@@ -391,6 +411,18 @@ export function useIssueDetailPage({
 		});
 	}
 
+	async function changeCustomFieldValues(
+		customFieldValues: Record<string, string | boolean>,
+	) {
+		await updateIssue({
+			issueId,
+			customFieldValues: buildIssueCustomFieldSubmission(
+				projectCustomFields,
+				customFieldValues,
+			),
+		});
+	}
+
 	return {
 		assignableUsers,
 		canDeleteIssue,
@@ -400,6 +432,7 @@ export function useIssueDetailPage({
 		cancelTitleEdit,
 		changeAssignee,
 		changeDueDate,
+		changeCustomFieldValues,
 		changeList,
 		changeLabels,
 		changePriority,
@@ -424,6 +457,7 @@ export function useIssueDetailPage({
 		closeSubIssueForm,
 		openSubIssueForm,
 		projectId,
+		projectCustomFields,
 		projectLabels,
 		projectStatuses,
 		saveComment,

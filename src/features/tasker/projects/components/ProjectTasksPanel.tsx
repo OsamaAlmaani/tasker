@@ -30,6 +30,8 @@ type AssignableUserOption = {
 };
 
 type ProjectTasksPanelProps = {
+	archiveState: "active" | "archived";
+	archivedCount: number;
 	assignableUsers?: AssignableUserOption[];
 	assigneeId: string;
 	bulkActions?: ReactNode;
@@ -40,6 +42,7 @@ type ProjectTasksPanelProps = {
 	issueLayout: "list" | "kanban";
 	kanbanColumns: KanbanColumn[];
 	onAddStatusFilter: (value: string) => void;
+	onArchiveStateChange: (value: "active" | "archived") => void;
 	onAssigneeChange: (value: string) => void;
 	onClearStatuses: () => void;
 	onCreateTask: () => void;
@@ -70,6 +73,8 @@ type ProjectTasksPanelProps = {
 };
 
 export function ProjectTasksPanel({
+	archiveState,
+	archivedCount,
 	assignableUsers,
 	assigneeId,
 	bulkActions,
@@ -80,6 +85,7 @@ export function ProjectTasksPanel({
 	issueLayout,
 	kanbanColumns,
 	onAddStatusFilter,
+	onArchiveStateChange,
 	onAssigneeChange,
 	onClearStatuses,
 	onCreateTask,
@@ -102,6 +108,8 @@ export function ProjectTasksPanel({
 	statusOptions,
 	statusPicker,
 }: ProjectTasksPanelProps) {
+	const isArchivedView = archiveState === "archived";
+
 	return (
 		<Card>
 			<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
@@ -115,31 +123,59 @@ export function ProjectTasksPanel({
 			</CardHeader>
 			<CardContent>
 				<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+					<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+						{isArchivedView ? null : (
+							<div className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-1">
+								<Button
+									type="button"
+									size="sm"
+									variant={issueLayout === "list" ? "secondary" : "ghost"}
+									className="h-7 px-3"
+									onClick={() => onToggleLayout("list")}
+								>
+									List
+								</Button>
+								<Button
+									type="button"
+									size="sm"
+									variant={issueLayout === "kanban" ? "secondary" : "ghost"}
+									className="h-7 px-3"
+									onClick={() => onToggleLayout("kanban")}
+								>
+									Kanban
+								</Button>
+							</div>
+						)}
+						{isArchivedView ? (
+							<p className="m-0 text-xs text-[var(--muted-text)]">
+								Viewing archived tasks. Select tasks to unarchive them.
+							</p>
+						) : issueLayout === "kanban" ? (
+							<p className="m-0 text-xs text-[var(--muted-text)]">
+								Drag cards between status columns to update status.
+							</p>
+						) : null}
+					</div>
 					<div className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-1">
 						<Button
 							type="button"
 							size="sm"
-							variant={issueLayout === "list" ? "secondary" : "ghost"}
+							variant={archiveState === "active" ? "secondary" : "ghost"}
 							className="h-7 px-3"
-							onClick={() => onToggleLayout("list")}
+							onClick={() => onArchiveStateChange("active")}
 						>
-							List
+							Active
 						</Button>
 						<Button
 							type="button"
 							size="sm"
-							variant={issueLayout === "kanban" ? "secondary" : "ghost"}
+							variant={archiveState === "archived" ? "secondary" : "ghost"}
 							className="h-7 px-3"
-							onClick={() => onToggleLayout("kanban")}
+							onClick={() => onArchiveStateChange("archived")}
 						>
-							Kanban
+							Archived ({archivedCount})
 						</Button>
 					</div>
-					{issueLayout === "kanban" ? (
-						<p className="m-0 text-xs text-[var(--muted-text)]">
-							Drag cards between status columns to update status.
-						</p>
-					) : null}
 				</div>
 
 				<div
@@ -260,7 +296,9 @@ export function ProjectTasksPanel({
 						))}
 						{showEmptyState ? (
 							<p className="m-0 text-sm text-[var(--muted-text)]">
-								No tasks found.
+								{isArchivedView
+									? "No archived tasks found."
+									: "No tasks found."}
 							</p>
 						) : null}
 					</div>

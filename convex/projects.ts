@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import {
   DEFAULT_PROJECT_STATUSES,
+  projectCustomFieldValidator,
   projectLabelValidator,
   projectStatusValidator,
 } from './constants'
@@ -14,6 +15,10 @@ import {
   requireProjectWriteAccess,
 } from './lib/auth'
 import { createActivity } from './lib/activity'
+import {
+  normalizeIssueCustomFieldValues,
+  normalizeProjectCustomFields,
+} from './lib/projectCustomFields'
 import { normalizeProjectLabels } from './lib/projectLabels'
 import { normalizeProject, normalizeProjectStatuses } from './lib/projectStatuses'
 
@@ -174,6 +179,7 @@ export const create = mutation({
     description: v.optional(v.string()),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
+    customFields: v.optional(v.array(projectCustomFieldValidator)),
     labels: v.optional(v.array(projectLabelValidator)),
     statuses: v.optional(v.array(projectStatusValidator)),
     allowMemberInvites: v.optional(v.boolean()),
@@ -217,6 +223,7 @@ export const create = mutation({
       description: args.description?.trim(),
       color: args.color?.trim(),
       icon: args.icon?.trim(),
+      customFields: normalizeProjectCustomFields(args.customFields),
       labels: normalizeProjectLabels(args.labels),
       statuses: normalizeProjectStatuses(
         args.statuses ?? DEFAULT_PROJECT_STATUSES.map((status) => ({ ...status })),
@@ -275,6 +282,7 @@ export const update = mutation({
     description: v.optional(v.string()),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
+    customFields: v.optional(v.array(projectCustomFieldValidator)),
     labels: v.optional(v.array(projectLabelValidator)),
     statuses: v.optional(v.array(projectStatusValidator)),
     allowMemberInvites: v.optional(v.boolean()),
@@ -283,9 +291,10 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const { user, project } = await requireProjectWriteAccess(ctx, args.projectId)
     const normalizedExistingProject = normalizeProject(project)
+    const now = Date.now()
 
     const patch: Record<string, unknown> = {
-      updatedAt: Date.now(),
+      updatedAt: now,
     }
 
     if (args.name !== undefined) {
@@ -300,6 +309,31 @@ export const update = mutation({
     if (args.icon !== undefined) {
       patch.icon = args.icon.trim()
     }
+    if (args.customFields !== undefined) {
+      const nextCustomFields = normalizeProjectCustomFields(args.customFields)
+      const projectIssues = await ctx.db
+        .query('issues')
+        .withIndex('by_projectId', (q) => q.eq('projectId', args.projectId))
+        .collect()
+
+      for (const issue of projectIssues) {
+        const nextValues = normalizeIssueCustomFieldValues(
+          nextCustomFields,
+          issue.customFieldValues,
+          { strict: false },
+        )
+        const currentValues = issue.customFieldValues ?? {}
+        if (JSON.stringify(currentValues) !== JSON.stringify(nextValues)) {
+          await ctx.db.patch(issue._id, {
+            customFieldValues: nextValues,
+            updatedAt: now,
+          })
+        }
+      }
+
+      patch.customFields = nextCustomFields
+    }
+
     if (args.labels !== undefined) {
       const nextLabels = normalizeProjectLabels(args.labels)
       const removedLabelKeys = (normalizedExistingProject.labels ?? [])

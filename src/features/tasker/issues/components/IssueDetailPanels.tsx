@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Pencil, Plus } from "lucide-react";
-import type { FormEvent } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
@@ -11,9 +11,16 @@ import {
 	IssueLabelBadge,
 	IssueStatusBadge,
 } from "#/features/tasker/components/IssueBadges";
+import { ProjectCustomFieldInput } from "#/features/tasker/components/ProjectCustomFieldInput";
 import { ProjectLabelSelector } from "#/features/tasker/components/ProjectLabelSelector";
 import { formatDate } from "#/features/tasker/format";
 import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
+import {
+	formatProjectCustomFieldValue,
+	normalizeIssueCustomFieldDraftValues,
+	type ProjectCustomFieldDefinition,
+	type ProjectCustomFieldDraftValue,
+} from "#/features/tasker/projectCustomFields";
 import {
 	getProjectLabelColor,
 	getProjectLabelName,
@@ -36,6 +43,7 @@ type IssueLike = {
 	hasChildren: boolean;
 	issueNumber: number;
 	labels: string[];
+	customFieldValues?: Record<string, string | number | boolean>;
 	listId?: string | null;
 	parentIssueId?: string | null;
 	priority: (typeof ISSUE_PRIORITIES)[number];
@@ -358,11 +366,15 @@ type IssueMetadataPanelProps = {
 	currentIssue: IssueLike;
 	issueLists?: IssueListOption[];
 	onAssigneeChange: (value: string) => void;
+	onCustomFieldValuesChange: (
+		values: Record<string, ProjectCustomFieldDraftValue>,
+	) => void;
 	onDueDateChange: (value: string) => void;
 	onLabelsChange: (labels: string[]) => void;
 	onListChange: (value: string) => void;
 	onPriorityChange: (value: (typeof ISSUE_PRIORITIES)[number]) => void;
 	onStatusChange: (value: ProjectStatusDefinition["key"]) => void;
+	projectCustomFields: ProjectCustomFieldDefinition[];
 	projectLabels: ProjectLabelDefinition[];
 	projectStatuses: ProjectStatusDefinition[];
 };
@@ -374,14 +386,58 @@ export function IssueMetadataPanel({
 	currentIssue,
 	issueLists,
 	onAssigneeChange,
+	onCustomFieldValuesChange,
 	onDueDateChange,
 	onLabelsChange,
 	onListChange,
 	onPriorityChange,
 	onStatusChange,
+	projectCustomFields,
 	projectLabels,
 	projectStatuses,
 }: IssueMetadataPanelProps) {
+	const customFieldDraftValues = useMemo(
+		() =>
+			normalizeIssueCustomFieldDraftValues(
+				projectCustomFields,
+				currentIssue.customFieldValues,
+			),
+		[projectCustomFields, currentIssue.customFieldValues],
+	);
+	const [editingCustomFieldValues, setEditingCustomFieldValues] = useState(
+		customFieldDraftValues,
+	);
+	const [editingTextCustomFieldKey, setEditingTextCustomFieldKey] = useState<
+		string | null
+	>(null);
+
+	useEffect(() => {
+		setEditingCustomFieldValues(customFieldDraftValues);
+	}, [customFieldDraftValues]);
+
+	function updateCustomFieldValue(
+		field: ProjectCustomFieldDefinition,
+		value: ProjectCustomFieldDraftValue,
+	) {
+		const nextValues = {
+			...editingCustomFieldValues,
+			[field.key]: value,
+		};
+		setEditingCustomFieldValues(nextValues);
+		if (field.type === "checkbox" || field.type === "select") {
+			void onCustomFieldValuesChange(nextValues);
+		}
+	}
+
+	function saveCustomFieldValues() {
+		void onCustomFieldValuesChange(editingCustomFieldValues);
+	}
+
+	function saveAndCloseTextCustomField() {
+		void onCustomFieldValuesChange(editingCustomFieldValues);
+		setEditingTextCustomFieldKey(null);
+	}
+
 	return (
 		<aside className="issue-detail-settings issue-meta-panel">
 			<div className="issue-meta-row">
@@ -519,7 +575,9 @@ export function IssueMetadataPanel({
 				</div>
 			</div>
 
-			<div className="issue-meta-row issue-meta-row-last">
+			<div
+				className={`issue-meta-row${projectCustomFields.length ? "" : " issue-meta-row-last"}`}
+			>
 				<span className="issue-meta-label">Labels</span>
 				<div className="issue-meta-value">
 					{canWrite ? (
@@ -543,6 +601,67 @@ export function IssueMetadataPanel({
 					)}
 				</div>
 			</div>
+
+			{projectCustomFields.map((field, index) => (
+				<div
+					key={field.key}
+					className={`issue-meta-row${index === projectCustomFields.length - 1 ? " issue-meta-row-last" : ""}`}
+				>
+					<span className="issue-meta-label">{field.name}</span>
+					<div className="issue-meta-value">
+						{canWrite && field.type === "text" ? (
+							editingTextCustomFieldKey === field.key ||
+							!editingCustomFieldValues[field.key] ? (
+								<Textarea
+									autoFocus={editingTextCustomFieldKey === field.key}
+									className="max-w-[260px] text-left"
+									rows={4}
+									value={
+										typeof editingCustomFieldValues[field.key] === "string"
+											? editingCustomFieldValues[field.key]
+											: ""
+									}
+									placeholder={`Add ${field.name.toLowerCase()}`}
+									onBlur={saveAndCloseTextCustomField}
+									onChange={(event) =>
+										updateCustomFieldValue(field, event.target.value)
+									}
+								/>
+							) : (
+								<button
+									type="button"
+									className="max-w-[260px] cursor-text border-0 bg-transparent p-0 whitespace-pre-wrap text-left text-[0.96rem] text-[var(--text)]"
+									onClick={() => setEditingTextCustomFieldKey(field.key)}
+								>
+									{editingCustomFieldValues[field.key]}
+								</button>
+							)
+						) : canWrite ? (
+							<ProjectCustomFieldInput
+								className="issue-meta-control"
+								field={field}
+								value={
+									editingCustomFieldValues[field.key] as
+										| ProjectCustomFieldDraftValue
+										| undefined
+								}
+								onBlur={saveCustomFieldValues}
+								onChange={(value) => updateCustomFieldValue(field, value)}
+							/>
+						) : (
+							<span className="issue-meta-static">
+								{formatProjectCustomFieldValue(
+									field,
+									currentIssue.customFieldValues?.[field.key] as
+										| string
+										| boolean
+										| undefined,
+								)}
+							</span>
+						)}
+					</div>
+				</div>
+			))}
 		</aside>
 	);
 }

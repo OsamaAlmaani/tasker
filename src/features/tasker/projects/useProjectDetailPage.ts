@@ -1,7 +1,11 @@
 import { useAction, useMutation, useQuery } from "convex/react";
-import { type DragEvent, useMemo, useState } from "react";
+import { type DragEvent, type FormEvent, useMemo, useState } from "react";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import type { ISSUE_PRIORITIES } from "#/features/tasker/model";
+import {
+	buildIssueCustomFieldSubmission,
+	normalizeProjectCustomFields,
+} from "#/features/tasker/projectCustomFields";
 import { normalizeProjectLabels } from "#/features/tasker/projectLabels";
 import {
 	normalizeProjectStatuses,
@@ -57,15 +61,18 @@ export function useProjectDetailPage({
 		() => parseStatusFilters(routeSearch.statuses),
 		[routeSearch.statuses],
 	);
+	const archive = routeSearch.archive ?? "active";
+	const isArchivedView = archive === "archived";
 	const priority = routeSearch.priority ?? "";
 	const assigneeId = routeSearch.assignee ?? "";
 	const listFilter = routeSearch.list ?? "all";
 	const groupBy = routeSearch.groupBy ?? "list";
 	const projectView = routeSearch.view ?? "issues";
 	const sortBy = routeSearch.sort ?? "updated_desc";
-	const issueLayout = routeSearch.layout ?? "list";
+	const savedIssueLayout = routeSearch.layout ?? "list";
+	const issueLayout = isArchivedView ? "list" : savedIssueLayout;
 
-	const issues = useQuery(
+	const issueResults = useQuery(
 		api.issues.listByProject,
 		projectData
 			? {
@@ -82,9 +89,17 @@ export function useProjectDetailPage({
 							: listFilter === "none"
 								? null
 								: (listFilter as Id<"issueLists">),
+					includeArchived: isArchivedView || undefined,
 					sortBy,
 				}
 			: "skip",
+	);
+	const issues = useMemo(
+		() =>
+			(issueResults ?? []).filter((issue) =>
+				isArchivedView ? issue.archived : !issue.archived,
+			),
+		[issueResults, isArchivedView],
 	);
 
 	function addStatusFilter(nextStatus: string) {
@@ -170,6 +185,7 @@ export function useProjectDetailPage({
 		projectData
 			? {
 					projectId,
+					includeArchived: true,
 					sortBy: "created_desc",
 				}
 			: "skip",
@@ -198,6 +214,10 @@ export function useProjectDetailPage({
 	const projectStatuses = useMemo(
 		() => normalizeProjectStatuses(projectData?.project.statuses),
 		[projectData?.project.statuses],
+	);
+	const projectCustomFields = useMemo(
+		() => normalizeProjectCustomFields(projectData?.project.customFields),
+		[projectData?.project.customFields],
 	);
 	const projectLabels = useMemo(
 		() => normalizeProjectLabels(projectData?.project.labels),
@@ -232,12 +252,16 @@ export function useProjectDetailPage({
 	const parentIssueOptions = useMemo(
 		() =>
 			[...(allProjectIssues ?? [])]
-				.filter((issue) => !issue.parentIssueId)
+				.filter((issue) => !issue.parentIssueId && !issue.archived)
 				.sort((left, right) => left.issueNumber - right.issueNumber)
 				.map((issue) => ({
 					value: issue._id,
 					label: `#${issue.issueNumber} ${issue.title}`,
 				})),
+		[allProjectIssues],
+	);
+	const archivedIssueCount = useMemo(
+		() => (allProjectIssues ?? []).filter((issue) => issue.archived).length,
 		[allProjectIssues],
 	);
 
@@ -258,6 +282,7 @@ export function useProjectDetailPage({
 		createIssue,
 		filters: {
 			assigneeId,
+			archive,
 			groupBy,
 			layout: issueLayout,
 			list: listFilter,
@@ -324,6 +349,10 @@ export function useProjectDetailPage({
 				dueDate: parsed.data.dueDate
 					? new Date(parsed.data.dueDate).getTime()
 					: undefined,
+				customFieldValues: buildIssueCustomFieldSubmission(
+					projectCustomFields,
+					parsed.data.customFieldValues,
+				),
 				labels: parsed.data.labels,
 			});
 			setIssueForm(createIssueDraft());
@@ -346,6 +375,7 @@ export function useProjectDetailPage({
 				description: projectForm.description,
 				color: projectForm.color,
 				icon: projectForm.icon,
+				customFields: projectForm.customFields,
 				labels: projectForm.labels,
 				statuses: projectForm.statuses,
 				allowMemberInvites: projectForm.allowMemberInvites,
@@ -489,7 +519,7 @@ export function useProjectDetailPage({
 
 	function handleKanbanDragStart(
 		event: DragEvent<HTMLElement>,
-		issue: Doc<"issues">,
+		issue: Pick<ProjectIssueRow, "_id" | "status">,
 	) {
 		if (!canWrite) {
 			return;
@@ -567,7 +597,7 @@ export function useProjectDetailPage({
 
 	function handleParentIssueChange(nextParentIssueId: string) {
 		const parentIssue = nextParentIssueId
-			? projectIssueById.get(nextParentIssueId as Id<"issues">)
+			? (projectIssueById.get(nextParentIssueId as Id<"issues">) ?? null)
 			: null;
 
 		setIssueForm((prev) =>
@@ -579,6 +609,8 @@ export function useProjectDetailPage({
 		addMember,
 		addStatusFilter,
 		allProjectIssues,
+		archive,
+		archivedIssueCount,
 		assignableUserById,
 		assignableUsers,
 		assigneeId,
@@ -612,6 +644,7 @@ export function useProjectDetailPage({
 		inviteMessage,
 		inviteSearch,
 		inviteToRevoke,
+		isArchivedView,
 		isArchiveConfirmOpen,
 		isCompletingIssueTree,
 		isImportExportMenuOpen: importExport.isImportExportMenuOpen,
@@ -639,6 +672,7 @@ export function useProjectDetailPage({
 		projectData,
 		projectForm,
 		projectSettingsError,
+		projectCustomFields,
 		projectStatuses,
 		projectInvites,
 		projectLabels,

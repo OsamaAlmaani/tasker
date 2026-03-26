@@ -30,6 +30,7 @@ function IssueDetailPage() {
 		cancelDescriptionEdit,
 		cancelTitleEdit,
 		changeAssignee,
+		changeCustomFieldValues,
 		changeDueDate,
 		changeLabels,
 		changeList,
@@ -54,6 +55,7 @@ function IssueDetailPage() {
 		issueLists,
 		me,
 		openSubIssueForm,
+		projectCustomFields,
 		projectId,
 		projectLabels,
 		projectStatuses,
@@ -202,11 +204,15 @@ function IssueDetailPage() {
 					currentIssue={currentIssue}
 					issueLists={issueLists}
 					onAssigneeChange={(value) => void changeAssignee(value)}
+					onCustomFieldValuesChange={(values) =>
+						void changeCustomFieldValues(values)
+					}
 					onDueDateChange={(value) => void changeDueDate(value)}
 					onLabelsChange={(labels) => void changeLabels(labels)}
 					onListChange={(value) => void changeList(value)}
 					onPriorityChange={(value) => void changePriority(value)}
 					onStatusChange={(value) => void changeStatus(value)}
+					projectCustomFields={projectCustomFields}
 					projectLabels={projectLabels}
 					projectStatuses={projectStatuses}
 				/>
@@ -237,6 +243,7 @@ function IssueDetailPage() {
 				onSubmit={submitSubIssue}
 				open={subIssueFormOpen}
 				setDraft={setSubIssueForm}
+				fieldOptions={projectCustomFields}
 				labelOptions={projectLabels}
 				statusOptions={projectStatuses}
 				submitLabel="Create sub-task"

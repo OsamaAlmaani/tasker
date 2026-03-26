@@ -4,12 +4,20 @@ import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
+import { Select } from "#/components/ui/select";
 import { Switch } from "#/components/ui/switch";
 import { Textarea } from "#/components/ui/textarea";
 import {
 	IssueLabelBadge,
 	IssueStatusBadge,
 } from "#/features/tasker/components/IssueBadges";
+import {
+	appendProjectCustomField,
+	moveProjectCustomField,
+	type ProjectCustomFieldDefinition,
+	type ProjectCustomFieldType,
+	removeProjectCustomField,
+} from "#/features/tasker/projectCustomFields";
 import {
 	appendProjectLabel,
 	type ProjectLabelDefinition,
@@ -28,6 +36,7 @@ export type ProjectSettingsForm = {
 	description: string;
 	color: string;
 	icon: string;
+	customFields: ProjectCustomFieldDefinition[];
 	labels: ProjectLabelDefinition[];
 	statuses: ProjectStatusDefinition[];
 	allowMemberInvites: boolean;
@@ -142,6 +151,89 @@ export function ProjectSettingsCard({
 		setForm((previous) => ({
 			...previous,
 			labels: removeProjectLabel(previous.labels, key),
+		}));
+	}
+
+	function updateCustomFieldName(
+		key: ProjectCustomFieldDefinition["key"],
+		name: string,
+	) {
+		setForm((previous) => ({
+			...previous,
+			customFields: previous.customFields.map((field) =>
+				field.key === key ? { ...field, name } : field,
+			),
+		}));
+	}
+
+	function updateCustomFieldType(
+		key: ProjectCustomFieldDefinition["key"],
+		type: ProjectCustomFieldType,
+	) {
+		setForm((previous) => ({
+			...previous,
+			customFields: previous.customFields.map((field) =>
+				field.key === key
+					? {
+							...field,
+							type,
+							options:
+								type === "select"
+									? field.options?.length
+										? field.options
+										: ["Option 1", "Option 2"]
+									: undefined,
+						}
+					: field,
+			),
+		}));
+	}
+
+	function updateCustomFieldOptions(
+		key: ProjectCustomFieldDefinition["key"],
+		optionsValue: string,
+	) {
+		setForm((previous) => ({
+			...previous,
+			customFields: previous.customFields.map((field) =>
+				field.key === key
+					? {
+							...field,
+							options: optionsValue
+								.split(",")
+								.map((option) => option.trim())
+								.filter(Boolean),
+						}
+					: field,
+			),
+		}));
+	}
+
+	function moveCustomField(
+		key: ProjectCustomFieldDefinition["key"],
+		direction: "up" | "down",
+	) {
+		setForm((previous) => ({
+			...previous,
+			customFields: moveProjectCustomField(
+				previous.customFields,
+				key,
+				direction,
+			),
+		}));
+	}
+
+	function addCustomField(type: ProjectCustomFieldType = "text") {
+		setForm((previous) => ({
+			...previous,
+			customFields: appendProjectCustomField(previous.customFields, type),
+		}));
+	}
+
+	function deleteCustomField(key: string) {
+		setForm((previous) => ({
+			...previous,
+			customFields: removeProjectCustomField(previous.customFields, key),
 		}));
 	}
 
@@ -360,6 +452,103 @@ export function ProjectSettingsCard({
 								<Button type="button" variant="secondary" onClick={addLabel}>
 									<Plus className="mr-2 h-4 w-4" />
 									Add label
+								</Button>
+							</div>
+						</div>
+						<div className="md:col-span-2 space-y-3 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
+							<div className="space-y-1">
+								<Label>Custom Fields</Label>
+								<p className="m-0 text-sm text-[var(--muted-text)]">
+									Define reusable project-specific task fields such as
+									environment, QA owner, severity, or sprint.
+								</p>
+							</div>
+							<div className="space-y-2">
+								{form.customFields.map((field, index) => (
+									<div
+										key={field.key}
+										className="grid gap-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 md:grid-cols-[minmax(0,1fr)_140px_auto]"
+									>
+										<div className="space-y-2">
+											<Input
+												value={field.name}
+												onChange={(event) =>
+													updateCustomFieldName(field.key, event.target.value)
+												}
+											/>
+											{field.type === "select" ? (
+												<Input
+													value={(field.options ?? []).join(", ")}
+													placeholder="Option 1, Option 2"
+													onChange={(event) =>
+														updateCustomFieldOptions(
+															field.key,
+															event.target.value,
+														)
+													}
+												/>
+											) : null}
+										</div>
+										<Select
+											value={field.type}
+											onChange={(event) =>
+												updateCustomFieldType(
+													field.key,
+													event.target.value as ProjectCustomFieldType,
+												)
+											}
+										>
+											<option value="text">Text</option>
+											<option value="number">Number</option>
+											<option value="date">Date</option>
+											<option value="checkbox">Checkbox</option>
+											<option value="select">Select</option>
+										</Select>
+										<div className="flex items-center gap-1">
+											<Button
+												type="button"
+												size="sm"
+												variant="ghost"
+												className="h-8 w-8 p-0"
+												disabled={index === 0}
+												onClick={() => moveCustomField(field.key, "up")}
+												aria-label={`Move ${field.name} up`}
+											>
+												<ArrowUp className="h-4 w-4" />
+											</Button>
+											<Button
+												type="button"
+												size="sm"
+												variant="ghost"
+												className="h-8 w-8 p-0"
+												disabled={index >= form.customFields.length - 1}
+												onClick={() => moveCustomField(field.key, "down")}
+												aria-label={`Move ${field.name} down`}
+											>
+												<ArrowDown className="h-4 w-4" />
+											</Button>
+											<Button
+												type="button"
+												size="sm"
+												variant="ghost"
+												className="h-8 w-8 p-0 text-[var(--danger)]"
+												onClick={() => deleteCustomField(field.key)}
+												aria-label={`Delete ${field.name}`}
+											>
+												<Trash2 className="h-4 w-4" />
+											</Button>
+										</div>
+									</div>
+								))}
+							</div>
+							<div>
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={() => addCustomField()}
+								>
+									<Plus className="mr-2 h-4 w-4" />
+									Add custom field
 								</Button>
 							</div>
 						</div>

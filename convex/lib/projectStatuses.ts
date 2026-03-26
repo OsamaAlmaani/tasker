@@ -1,16 +1,10 @@
 import type { Doc } from '../_generated/dataModel'
 import { type ProjectStatusDefinition } from '../constants'
+import { normalizeProjectCustomFields } from './projectCustomFields'
 import { normalizeProjectLabels } from './projectLabels'
 
-type LegacyProjectStatusDefinition = {
-  key: string
-  name: string
-  color: string
-  position: number
-}
-
 type ProjectLike = {
-  statuses?: Array<ProjectStatusDefinition | LegacyProjectStatusDefinition> | null
+  statuses?: ProjectStatusDefinition[] | null
 }
 
 export const DEFAULT_PROJECT_STATUSES: ProjectStatusDefinition[] = [
@@ -92,7 +86,7 @@ function dedupeCustomStatuses(
 }
 
 export function normalizeProjectStatuses(
-  statuses?: Array<ProjectStatusDefinition | LegacyProjectStatusDefinition> | null,
+  statuses?: ProjectStatusDefinition[] | null,
 ): ProjectStatusDefinition[] {
   const incoming = statuses ?? []
   const customStatuses = dedupeCustomStatuses(
@@ -154,6 +148,7 @@ export function getProjectStatus(
 export function normalizeProject<TProject extends Doc<'projects'>>(project: TProject) {
   return {
     ...project,
+    customFields: normalizeProjectCustomFields(project.customFields),
     labels: normalizeProjectLabels(project.labels),
     statuses: normalizeProjectStatuses(project.statuses),
   }

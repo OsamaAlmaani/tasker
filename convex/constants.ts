@@ -15,6 +15,13 @@ export const DEFAULT_PROJECT_STATUSES = [
   { key: 'in_review', name: 'In Review', color: '#8b5cf6', position: 3 },
   { key: 'done', name: 'Done', color: '#10b981', position: 4 },
 ] as const
+export const PROJECT_CUSTOM_FIELD_TYPES = [
+  'text',
+  'number',
+  'date',
+  'checkbox',
+  'select',
+] as const
 export const ISSUE_PRIORITIES = [
   'none',
   'low',
@@ -88,6 +95,14 @@ export type ProjectLabelDefinition = {
   color: string
   position: number
 }
+export type ProjectCustomFieldType = (typeof PROJECT_CUSTOM_FIELD_TYPES)[number]
+export type ProjectCustomFieldDefinition = {
+  key: string
+  name: string
+  type: ProjectCustomFieldType
+  position: number
+  options?: string[]
+}
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number]
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number]
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number]
@@ -115,6 +130,26 @@ export const projectLabelValidator = v.object({
   color: v.string(),
   position: v.number(),
 })
+
+export const projectCustomFieldValidator = v.object({
+  key: v.string(),
+  name: v.string(),
+  type: v.union(
+    v.literal('text'),
+    v.literal('number'),
+    v.literal('date'),
+    v.literal('checkbox'),
+    v.literal('select'),
+  ),
+  position: v.number(),
+  options: v.optional(v.array(v.string())),
+})
+
+export const issueCustomFieldValueValidator = v.union(
+  v.string(),
+  v.number(),
+  v.boolean(),
+)
 
 export const issuePriorityValidator = v.union(
   v.literal('none'),

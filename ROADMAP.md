@@ -109,7 +109,7 @@ Personal productivity progress:
 
 - [x] Add status model flexibility with custom workflows per project
 - [x] Add custom labels management per project
-- [ ] Add custom task fields per project
+- [x] Add custom task fields per project
 - [ ] Add checklist items inside tasks
 - [ ] Add task estimates and optional time tracking
 - [ ] Support deeper sub-task nesting if still needed after real usage
@@ -120,6 +120,7 @@ Workflow model progress:
 - 2026-03-25: Added per-status colors for project workflows so custom statuses can be color-coded in project settings and those colors now flow through task badges/cards across project views, My Work, and the dashboard.
 - 2026-03-25: Added project-owned labels with names and colors, label management in project settings, project-scoped label selection in task create/edit flows, and label badges in project and issue task surfaces.
 - 2026-03-25: Moved project settings into a modal so editing project details, workflow, and labels no longer pushes the task board down the page.
+- 2026-03-26: Added first-pass project-owned custom task fields with `text`, `number`, `date`, `checkbox`, and `select` types, managed from project settings and editable from task create/edit and issue detail surfaces.
 
 ## Project and Permissions
 

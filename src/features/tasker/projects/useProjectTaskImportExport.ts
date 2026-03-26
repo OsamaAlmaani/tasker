@@ -1,5 +1,5 @@
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
-import { ISSUE_PRIORITIES } from "#/features/tasker/model";
+import { ISSUE_PRIORITIES, type ISSUE_STATUSES } from "#/features/tasker/model";
 import type { ProjectLabelDefinition } from "#/features/tasker/projectLabels";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 import { getClientErrorMessage } from "#/lib/utils";
@@ -31,6 +31,7 @@ type IssueListSummary = Pick<Doc<"issueLists">, "_id" | "name">;
 type ProjectSummary = Pick<Doc<"projects">, "_id" | "key" | "name">;
 
 type TaskFilters = {
+	archive?: string;
 	search?: string;
 	statuses?: (typeof ISSUE_STATUSES)[number][];
 	priority?: string;
@@ -186,6 +187,8 @@ export function useProjectTaskImportExport({
 			return;
 		}
 
+		setIsImportExportMenuOpen(false);
+
 		const taskRows = issues ?? [];
 		const payload = {
 			version: 1,
@@ -196,6 +199,7 @@ export function useProjectTaskImportExport({
 				name: project.name,
 			},
 			filters: {
+				archive: filters.archive || undefined,
 				search: filters.search || undefined,
 				statuses: filters.statuses?.length ? filters.statuses : undefined,
 				priority: filters.priority || undefined,

@@ -11,6 +11,10 @@ import {
   requireProjectWriteAccess,
 } from './lib/auth'
 import { createActivity } from './lib/activity'
+import {
+  ensureProjectCustomFieldsExist,
+  normalizeIssueCustomFieldValues,
+} from './lib/projectCustomFields'
 import { ensureProjectLabelsExist } from './lib/projectLabels'
 import {
   ensureProjectStatusExists,
@@ -36,6 +40,7 @@ type IssueUpdateChanges = {
   parentIssueId?: Id<'issues'> | null
   cascadeDescendantsToDone?: boolean
   labels?: string[]
+  customFieldValues?: Record<string, string | number | boolean>
   dueDate?: number | null
   archived?: boolean
 }
@@ -436,6 +441,35 @@ async function applyIssueUpdate(
     }
     patch.labels = nextLabels
   }
+
+  if (changes.customFieldValues !== undefined) {
+    if (
+      !ensureProjectCustomFieldsExist(
+        project,
+        Object.keys(changes.customFieldValues),
+      )
+    ) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'One or more custom fields do not belong to the current project.',
+      })
+    }
+
+    try {
+      patch.customFieldValues = normalizeIssueCustomFieldValues(
+        project.customFields,
+        changes.customFieldValues,
+      )
+    } catch (error) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'One or more custom field values are invalid.',
+      })
+    }
+  }
   if (changes.dueDate !== undefined) {
     patch.dueDate = changes.dueDate ?? undefined
   }
@@ -732,6 +766,9 @@ export const create = mutation({
     listId: v.optional(v.id('issueLists')),
     parentIssueId: v.optional(v.id('issues')),
     labels: v.optional(v.array(v.string())),
+    customFieldValues: v.optional(
+      v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
+    ),
     dueDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -777,6 +814,36 @@ export const create = mutation({
       })
     }
 
+    const nextCustomFieldValues = (() => {
+      if (!args.customFieldValues) {
+        return {}
+      }
+
+      if (
+        !ensureProjectCustomFieldsExist(project, Object.keys(args.customFieldValues))
+      ) {
+        throw new ConvexError({
+          code: 'VALIDATION_ERROR',
+          message: 'One or more custom fields do not belong to the current project.',
+        })
+      }
+
+      try {
+        return normalizeIssueCustomFieldValues(
+          project.customFields,
+          args.customFieldValues,
+        )
+      } catch (error) {
+        throw new ConvexError({
+          code: 'VALIDATION_ERROR',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'One or more custom field values are invalid.',
+        })
+      }
+    })()
+
     const now = Date.now()
     let counter = await ctx.db
       .query('projectCounters')
@@ -819,6 +886,7 @@ export const create = mutation({
       reporterId: user._id,
       createdBy: user._id,
       labels: nextLabels,
+      customFieldValues: nextCustomFieldValues,
       dueDate: args.dueDate,
       archived: false,
       createdAt: now,
@@ -860,6 +928,9 @@ export const update = mutation({
     parentIssueId: v.optional(v.union(v.id('issues'), v.null())),
     cascadeDescendantsToDone: v.optional(v.boolean()),
     labels: v.optional(v.array(v.string())),
+    customFieldValues: v.optional(
+      v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
+    ),
     dueDate: v.optional(v.union(v.number(), v.null())),
     archived: v.optional(v.boolean()),
   },

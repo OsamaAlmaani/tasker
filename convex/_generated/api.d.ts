@@ -18,6 +18,7 @@ import type * as issueLists from "../issueLists.js";
 import type * as issues from "../issues.js";
 import type * as lib_activity from "../lib/activity.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_projectCustomFields from "../lib/projectCustomFields.js";
 import type * as lib_projectLabels from "../lib/projectLabels.js";
 import type * as lib_projectStatuses from "../lib/projectStatuses.js";
 import type * as myWork from "../myWork.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   issues: typeof issues;
   "lib/activity": typeof lib_activity;
   "lib/auth": typeof lib_auth;
+  "lib/projectCustomFields": typeof lib_projectCustomFields;
   "lib/projectLabels": typeof lib_projectLabels;
   "lib/projectStatuses": typeof lib_projectStatuses;
   myWork: typeof myWork;

@@ -8,8 +8,10 @@ import {
   issuePriorityValidator,
   issueStatusValidator,
   myWorkViewValidator,
+  projectCustomFieldValidator,
   projectLabelValidator,
   projectStatusValidator,
+  issueCustomFieldValueValidator,
 } from './constants'
 
 export default defineSchema({
@@ -36,6 +38,7 @@ export default defineSchema({
     description: v.optional(v.string()),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
+    customFields: v.optional(v.array(projectCustomFieldValidator)),
     labels: v.optional(v.array(projectLabelValidator)),
     statuses: v.optional(v.array(projectStatusValidator)),
     createdBy: v.id('users'),
@@ -90,6 +93,7 @@ export default defineSchema({
     reporterId: v.id('users'),
     createdBy: v.id('users'),
     labels: v.array(v.string()),
+    customFieldValues: v.optional(v.record(v.string(), issueCustomFieldValueValidator)),
     dueDate: v.optional(v.number()),
     archived: v.boolean(),
     deletedAt: v.optional(v.number()),
