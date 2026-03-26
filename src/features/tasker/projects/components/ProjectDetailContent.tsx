@@ -166,6 +166,42 @@ export function ProjectDetailContent({
 	);
 	const [bulkActionError, setBulkActionError] = useState<string | null>(null);
 	const [isApplyingBulkAction, setIsApplyingBulkAction] = useState(false);
+	const hasActiveTaskFilters = Boolean(
+		search || selectedStatuses.length || priority || assigneeId,
+	);
+	const selectedListName =
+		listFilter === "all"
+			? ""
+			: listFilter === "none"
+				? "No list"
+				: ((issueLists ?? []).find((list) => list._id === listFilter)?.name ??
+					"");
+	const emptyStateTitle =
+		archive === "archived"
+			? hasActiveTaskFilters
+				? "No archived tasks match these filters"
+				: "No archived tasks yet"
+			: hasActiveTaskFilters
+				? "No tasks match these filters"
+				: selectedListName
+					? `No tasks in ${selectedListName} yet`
+					: "No tasks yet";
+	const emptyStateDescription =
+		archive === "archived"
+			? hasActiveTaskFilters
+				? "Try clearing one or more filters to browse archived work."
+				: "Archived tasks will appear here after you archive them."
+			: hasActiveTaskFilters
+				? selectedListName
+					? `Nothing matches the current filters in ${selectedListName}.`
+					: "Try clearing one or more filters to see more tasks."
+				: selectedListName
+					? canWrite
+						? `Create the first task in ${selectedListName}.`
+						: `This list does not have any tasks yet.`
+					: canWrite
+						? "Create your first task to start tracking work in this project."
+						: "This project does not have any tasks yet.";
 	const visibleIssueIds = useMemo(
 		() => new Set<string>((issues ?? []).map((issue) => issue._id)),
 		[issues],
@@ -425,6 +461,43 @@ export function ProjectDetailContent({
 						}
 						canWrite={canWrite}
 						dragOverStatus={dragOverStatus}
+						emptyStateAction={
+							hasActiveTaskFilters ? (
+								<Button
+									type="button"
+									size="sm"
+									variant="ghost"
+									onClick={() =>
+										updateProjectSearch(
+											{
+												assignee: undefined,
+												priority: undefined,
+												q: undefined,
+												statuses: undefined,
+											},
+											{ replace: true },
+										)
+									}
+								>
+									Clear filters
+								</Button>
+							) : canWrite && archive !== "archived" ? (
+								<Button
+									type="button"
+									size="sm"
+									variant="secondary"
+									onClick={() => {
+										setCreateError(null);
+										setIssueForm(createIssueDraft());
+										setCreateOpen(true);
+									}}
+								>
+									Create first task
+								</Button>
+							) : null
+						}
+						emptyStateDescription={emptyStateDescription}
+						emptyStateTitle={emptyStateTitle}
 						groupBy={groupBy}
 						groupedIssues={groupedIssues}
 						issueLayout={issueLayout}

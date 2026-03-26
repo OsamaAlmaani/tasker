@@ -37,6 +37,9 @@ type ProjectTasksPanelProps = {
 	bulkActions?: ReactNode;
 	canWrite: boolean;
 	dragOverStatus: ProjectStatusDefinition["key"] | null;
+	emptyStateAction?: ReactNode;
+	emptyStateDescription: string;
+	emptyStateTitle: string;
 	groupBy: string;
 	groupedIssues: ProjectIssueGroup[];
 	issueLayout: "list" | "kanban";
@@ -80,6 +83,9 @@ export function ProjectTasksPanel({
 	bulkActions,
 	canWrite,
 	dragOverStatus,
+	emptyStateAction,
+	emptyStateDescription,
+	emptyStateTitle,
 	groupBy,
 	groupedIssues,
 	issueLayout,
@@ -273,7 +279,21 @@ export function ProjectTasksPanel({
 				) : null}
 				{bulkActions ? <div className="mb-3">{bulkActions}</div> : null}
 
-				{issueLayout === "list" ? (
+				{showEmptyState ? (
+					<div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface-muted)] px-4 py-8 text-center">
+						<p className="m-0 text-base font-semibold text-[var(--text)]">
+							{emptyStateTitle}
+						</p>
+						<p className="m-0 mt-2 text-sm text-[var(--muted-text)]">
+							{emptyStateDescription}
+						</p>
+						{emptyStateAction ? (
+							<div className="mt-4 flex items-center justify-center">
+								{emptyStateAction}
+							</div>
+						) : null}
+					</div>
+				) : issueLayout === "list" ? (
 					<div className="space-y-4">
 						{groupedIssues.map((group) => (
 							<div key={group.key} className="space-y-2">
@@ -294,13 +314,6 @@ export function ProjectTasksPanel({
 								})}
 							</div>
 						))}
-						{showEmptyState ? (
-							<p className="m-0 text-sm text-[var(--muted-text)]">
-								{isArchivedView
-									? "No archived tasks found."
-									: "No tasks found."}
-							</p>
-						) : null}
 					</div>
 				) : (
 					<div className="kanban-board">

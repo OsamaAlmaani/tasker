@@ -404,6 +404,14 @@ export function IssueMetadataPanel({
 			),
 		[projectCustomFields, currentIssue.customFieldValues],
 	);
+	const currentDueDateValue = useMemo(
+		() =>
+			currentIssue.dueDate
+				? new Date(currentIssue.dueDate).toISOString().slice(0, 10)
+				: "",
+		[currentIssue.dueDate],
+	);
+	const [dueDateDraft, setDueDateDraft] = useState(currentDueDateValue);
 	const [editingCustomFieldValues, setEditingCustomFieldValues] = useState(
 		customFieldDraftValues,
 	);
@@ -414,6 +422,10 @@ export function IssueMetadataPanel({
 	useEffect(() => {
 		setEditingCustomFieldValues(customFieldDraftValues);
 	}, [customFieldDraftValues]);
+
+	useEffect(() => {
+		setDueDateDraft(currentDueDateValue);
+	}, [currentDueDateValue]);
 
 	function updateCustomFieldValue(
 		field: ProjectCustomFieldDefinition,
@@ -558,12 +570,9 @@ export function IssueMetadataPanel({
 						<Input
 							className="issue-meta-control"
 							type="date"
-							value={
-								currentIssue.dueDate
-									? new Date(currentIssue.dueDate).toISOString().slice(0, 10)
-									: ""
-							}
-							onChange={(event) => onDueDateChange(event.target.value)}
+							value={dueDateDraft}
+							onBlur={() => onDueDateChange(dueDateDraft)}
+							onChange={(event) => setDueDateDraft(event.target.value)}
 						/>
 					) : (
 						<span className="issue-meta-static">
