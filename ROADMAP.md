@@ -110,6 +110,9 @@ Personal productivity progress:
 - [x] Add status model flexibility with custom workflows per project
 - [x] Add custom labels management per project
 - [x] Add custom task fields per project
+- [ ] Add project-task filtering by custom fields
+- [ ] Show key custom fields on task rows and cards
+- [ ] Extend import/export for project custom fields
 - [ ] Add checklist items inside tasks
 - [ ] Add task estimates and optional time tracking
 - [ ] Support deeper sub-task nesting if still needed after real usage

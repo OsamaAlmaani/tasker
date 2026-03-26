@@ -3,6 +3,7 @@ import { DEFAULT_PROJECT_STATUSES } from "#/features/tasker/projectStatuses";
 import {
 	applyParentIssueDraftDefaults,
 	createIssueDraft,
+	createIssueDraftWithOverrides,
 	createProjectSettingsForm,
 	getProjectInviteResultMessage,
 } from "#/features/tasker/projects/projectDrafts";
@@ -13,6 +14,25 @@ describe("createIssueDraft", () => {
 			title: "",
 			description: "",
 			listId: "",
+			parentIssueId: "",
+			status: "todo",
+			priority: "none",
+			assigneeId: "",
+			dueDate: "",
+			customFieldValues: {},
+			labels: [],
+		});
+	});
+
+	it("allows selected defaults to prefill the task draft", () => {
+		expect(
+			createIssueDraftWithOverrides({
+				listId: "list-123",
+			}),
+		).toEqual({
+			title: "",
+			description: "",
+			listId: "list-123",
 			parentIssueId: "",
 			status: "todo",
 			priority: "none",

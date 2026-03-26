@@ -717,4 +717,7 @@ export function useProjectDetailPage({
 }
 
 export type ProjectDetailPageState = ReturnType<typeof useProjectDetailPage>;
-export { createIssueDraft } from "#/features/tasker/projects/projectDrafts";
+export {
+	createIssueDraft,
+	createIssueDraftWithOverrides,
+} from "#/features/tasker/projects/projectDrafts";

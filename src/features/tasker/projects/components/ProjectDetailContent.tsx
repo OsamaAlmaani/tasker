@@ -33,6 +33,7 @@ import {
 } from "#/features/tasker/projects/projectSearch";
 import {
 	createIssueDraft,
+	createIssueDraftWithOverrides,
 	type ProjectDetailPageState,
 	type ProjectIssueRow,
 } from "#/features/tasker/projects/useProjectDetailPage";
@@ -112,6 +113,7 @@ export function ProjectDetailContent({
 		issues,
 		kanbanColumns,
 		allProjectIssues,
+		listFilter,
 		memberRows,
 		memberToRemove,
 		membersForStack,
@@ -447,7 +449,14 @@ export function ProjectDetailContent({
 						}
 						onCreateTask={() => {
 							setCreateError(null);
-							setIssueForm(createIssueDraft());
+							setIssueForm(
+								createIssueDraftWithOverrides({
+									listId:
+										listFilter !== "all" && listFilter !== "none"
+											? listFilter
+											: "",
+								}),
+							);
 							setCreateOpen(true);
 						}}
 						onGroupByChange={(value) =>

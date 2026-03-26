@@ -37,6 +37,12 @@ type ParentIssueLike = {
 };
 
 export function createIssueDraft(): IssueDraft {
+	return createIssueDraftWithOverrides();
+}
+
+export function createIssueDraftWithOverrides(
+	overrides: Partial<IssueDraft> = {},
+): IssueDraft {
 	return {
 		title: "",
 		description: "",
@@ -48,6 +54,7 @@ export function createIssueDraft(): IssueDraft {
 		dueDate: "",
 		customFieldValues: {},
 		labels: [],
+		...overrides,
 	};
 }
 
