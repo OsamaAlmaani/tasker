@@ -90,6 +90,7 @@ Main route files:
 - [`src/routes/_app.projects.index.tsx`](./src/routes/_app.projects.index.tsx): project list + project creation
 - [`src/routes/_app.projects.$projectId.tsx`](./src/routes/_app.projects.$projectId.tsx): project detail, task list/kanban, filters, members, invites, import/export, project settings
 - [`src/routes/_app.issues.$issueId.tsx`](./src/routes/_app.issues.$issueId.tsx): issue detail, sub-tasks, comments, activity
+  - issue detail also owns inline checklist editing for task-local checklist items
 - [`src/routes/_app.admin.users.tsx`](./src/routes/_app.admin.users.tsx): admin-only user management
 - [`src/routes/_app.settings.tsx`](./src/routes/_app.settings.tsx): profile + demo seed action
 
@@ -137,6 +138,7 @@ Notable schema choices:
 - `projects.statuses` stores the per-project workflow definitions, including display color. `todo` and `done` are protected fixed statuses with built-in colors; all other statuses are project-owned and can be added, renamed, recolored, reordered, or removed.
 - `projects.labels` stores project-owned label definitions, including display color and order.
 - `issues.customFieldValues` stores task values keyed by the owning project’s custom field keys.
+- `issues.checklistItems` stores ordered per-task checklist items with completion state.
 - `issues.labels` stores project label keys, not freeform label strings.
 - `users.myWorkDefaultView` and `users.myWorkLastView` persist the current user’s preferred preset view for the `My Work` page.
 
@@ -198,6 +200,8 @@ Relevant code:
 - Task custom-field values must reference keys from the owning project’s `projects.customFields` definitions.
 - Project labels are also project-owned: they can be added, renamed, recolored, and deleted per project.
 - Task labels must reference keys from the owning project’s `projects.labels` definitions; freeform labels are no longer valid.
+- Checklist items are task-local, flat, and ordered; they are edited inline on the issue detail page.
+- Checklist progress is surfaced separately from sub-task progress on project list and Kanban cards.
 
 ### Deletion behavior
 

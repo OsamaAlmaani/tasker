@@ -2,7 +2,12 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
-import { issuePriorityValidator, issueStatusValidator } from './constants'
+import {
+  issueChecklistItemValidator,
+  issuePriorityValidator,
+  issueStatusValidator,
+  type IssueChecklistItem,
+} from './constants'
 import {
   requireIssueViewAccess,
   requireIssueWriteAccess,
@@ -16,6 +21,10 @@ import {
   normalizeIssueCustomFieldValues,
 } from './lib/projectCustomFields'
 import { ensureProjectLabelsExist } from './lib/projectLabels'
+import {
+  getIssueChecklistProgress,
+  normalizeIssueChecklistItems,
+} from './lib/issueChecklists'
 import {
   ensureProjectStatusExists,
   normalizeProject,
@@ -40,6 +49,7 @@ type IssueUpdateChanges = {
   parentIssueId?: Id<'issues'> | null
   cascadeDescendantsToDone?: boolean
   labels?: string[]
+  checklistItems?: IssueChecklistItem[]
   customFieldValues?: Record<string, string | number | boolean>
   dueDate?: number | null
   archived?: boolean
@@ -50,6 +60,11 @@ type IssueProgress = {
   completedChildIssueCount: number
   childCompletionRate: number
   hasChildren: boolean
+  checklistItems: IssueChecklistItem[]
+  checklistItemCount: number
+  completedChecklistItemCount: number
+  checklistCompletionRate: number
+  hasChecklist: boolean
 }
 
 function buildIssueProgressMap(issues: Doc<'issues'>[]) {
@@ -79,6 +94,7 @@ function buildIssueProgressMap(issues: Doc<'issues'>[]) {
         ? completedChildIssueCount / childIssues.length
         : 0,
       hasChildren: childIssues.length > 0,
+      ...getIssueChecklistProgress(issue.checklistItems),
     })
   }
 
@@ -96,6 +112,7 @@ function decorateIssueWithProgress(
       completedChildIssueCount: 0,
       childCompletionRate: 0,
       hasChildren: false,
+      ...getIssueChecklistProgress(issue.checklistItems),
     }),
   }
 }
@@ -441,6 +458,9 @@ async function applyIssueUpdate(
     }
     patch.labels = nextLabels
   }
+  if (changes.checklistItems !== undefined) {
+    patch.checklistItems = normalizeIssueChecklistItems(changes.checklistItems)
+  }
 
   if (changes.customFieldValues !== undefined) {
     if (
@@ -765,10 +785,11 @@ export const create = mutation({
     assigneeId: v.optional(v.id('users')),
     listId: v.optional(v.id('issueLists')),
     parentIssueId: v.optional(v.id('issues')),
-    labels: v.optional(v.array(v.string())),
-    customFieldValues: v.optional(
-      v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
-    ),
+      labels: v.optional(v.array(v.string())),
+      checklistItems: v.optional(v.array(issueChecklistItemValidator)),
+      customFieldValues: v.optional(
+        v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
+      ),
     dueDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -886,6 +907,7 @@ export const create = mutation({
       reporterId: user._id,
       createdBy: user._id,
       labels: nextLabels,
+      checklistItems: [],
       customFieldValues: nextCustomFieldValues,
       dueDate: args.dueDate,
       archived: false,
@@ -928,6 +950,7 @@ export const update = mutation({
     parentIssueId: v.optional(v.union(v.id('issues'), v.null())),
     cascadeDescendantsToDone: v.optional(v.boolean()),
     labels: v.optional(v.array(v.string())),
+    checklistItems: v.optional(v.array(issueChecklistItemValidator)),
     customFieldValues: v.optional(
       v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
     ),

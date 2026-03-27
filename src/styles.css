@@ -1723,6 +1723,55 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
   padding-bottom: 14px;
 }
 
+.issue-checklist-list {
+  display: grid;
+  gap: 10px;
+}
+
+.issue-checklist-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.issue-checklist-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.issue-checklist-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.issue-checklist-input,
+.issue-checklist-static {
+  min-width: 0;
+}
+
+.issue-checklist-input {
+  height: 34px;
+}
+
+.issue-checklist-static {
+  font-size: 0.96rem;
+  color: var(--text);
+}
+
+.issue-checklist-input-completed {
+  color: var(--muted-text);
+  text-decoration: line-through;
+}
+
+.issue-checklist-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .issue-overview-toolbar {
   display: flex;
   align-items: center;

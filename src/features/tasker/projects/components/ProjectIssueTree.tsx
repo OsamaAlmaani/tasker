@@ -7,6 +7,11 @@ import {
 	IssueStatusBadge,
 } from "#/features/tasker/components/IssueBadges";
 import { formatDate } from "#/features/tasker/format";
+import {
+	formatChecklistProgress,
+	type IssueChecklistItem,
+	roundChecklistCompletionRate,
+} from "#/features/tasker/issues/checklists";
 import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
 import {
 	getProjectLabelColor,
@@ -35,7 +40,12 @@ type ProjectIssue = {
 	description?: string | null;
 	dueDate?: number | null;
 	hasChildren: boolean;
+	hasChecklist: boolean;
 	issueNumber: number;
+	checklistItems?: IssueChecklistItem[];
+	checklistItemCount: number;
+	checklistCompletionRate: number;
+	completedChecklistItemCount: number;
 	labels: string[];
 	parentIssueId?: string | null;
 	priority: (typeof ISSUE_PRIORITIES)[number];
@@ -180,6 +190,8 @@ export function ProjectIssueListTree({
 					: null;
 				const progressLabel = formatChildProgress(issue);
 				const completionRate = roundCompletionRate(issue);
+				const checklistProgressLabel = formatChecklistProgress(issue);
+				const checklistCompletionRate = roundChecklistCompletionRate(issue);
 
 				return (
 					<div
@@ -248,6 +260,22 @@ export function ProjectIssueListTree({
 											</div>
 											<span className="issue-progress-text">
 												{progressLabel} ({completionRate}%)
+											</span>
+										</div>
+									) : null}
+									{checklistProgressLabel ? (
+										<div className="issue-progress-inline">
+											<div className="issue-progress-bar" aria-hidden="true">
+												<div
+													className="issue-progress-bar-fill"
+													style={{
+														width: `${checklistCompletionRate}%`,
+													}}
+												/>
+											</div>
+											<span className="issue-progress-text">
+												Checklist {checklistProgressLabel} (
+												{checklistCompletionRate}%)
 											</span>
 										</div>
 									) : null}
@@ -414,6 +442,8 @@ export function ProjectIssueKanbanTree({
 					: null;
 				const progressLabel = formatChildProgress(issue);
 				const completionRate = roundCompletionRate(issue);
+				const checklistProgressLabel = formatChecklistProgress(issue);
+				const checklistCompletionRate = roundChecklistCompletionRate(issue);
 
 				return (
 					<div
@@ -456,6 +486,12 @@ export function ProjectIssueKanbanTree({
 											{progressLabel} ({completionRate}%)
 										</Badge>
 									) : null}
+									{checklistProgressLabel ? (
+										<Badge className="issue-progress-badge">
+											Checklist {checklistProgressLabel} (
+											{checklistCompletionRate}%)
+										</Badge>
+									) : null}
 								</div>
 								{progressLabel ? (
 									<div className="issue-progress-inline mt-2">
@@ -463,6 +499,16 @@ export function ProjectIssueKanbanTree({
 											<div
 												className="issue-progress-bar-fill"
 												style={{ width: `${completionRate}%` }}
+											/>
+										</div>
+									</div>
+								) : null}
+								{checklistProgressLabel ? (
+									<div className="issue-progress-inline mt-2">
+										<div className="issue-progress-bar" aria-hidden="true">
+											<div
+												className="issue-progress-bar-fill"
+												style={{ width: `${checklistCompletionRate}%` }}
 											/>
 										</div>
 									</div>

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Pencil, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -14,6 +14,13 @@ import {
 import { ProjectCustomFieldInput } from "#/features/tasker/components/ProjectCustomFieldInput";
 import { ProjectLabelSelector } from "#/features/tasker/components/ProjectLabelSelector";
 import { formatDate } from "#/features/tasker/format";
+import {
+	createIssueChecklistItem,
+	formatChecklistProgress,
+	type IssueChecklistItem,
+	normalizeIssueChecklistItems,
+	roundChecklistCompletionRate,
+} from "#/features/tasker/issues/checklists";
 import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
 import {
 	formatProjectCustomFieldValue,
@@ -41,7 +48,12 @@ type IssueLike = {
 	description?: string | null;
 	dueDate?: number | null;
 	hasChildren: boolean;
+	hasChecklist: boolean;
 	issueNumber: number;
+	checklistItems?: IssueChecklistItem[];
+	checklistItemCount: number;
+	checklistCompletionRate: number;
+	completedChecklistItemCount: number;
 	labels: string[];
 	customFieldValues?: Record<string, string | number | boolean>;
 	listId?: string | null;
@@ -92,6 +104,7 @@ type IssueOverviewPanelProps = {
 	descriptionDraft: string;
 	editingDescription: boolean;
 	editingTitle: boolean;
+	onChecklistItemsChange: (items: IssueChecklistItem[]) => void;
 	onCancelDescriptionEdit: () => void;
 	onCancelTitleEdit: () => void;
 	onDescriptionDraftChange: (value: string) => void;
@@ -113,6 +126,7 @@ export function IssueOverviewPanel({
 	descriptionDraft,
 	editingDescription,
 	editingTitle,
+	onChecklistItemsChange,
 	onCancelDescriptionEdit,
 	onCancelTitleEdit,
 	onDescriptionDraftChange,
@@ -276,6 +290,12 @@ export function IssueOverviewPanel({
 				)}
 			</section>
 
+			<IssueChecklistSection
+				canWrite={canWrite}
+				currentIssue={currentIssue}
+				onChecklistItemsChange={onChecklistItemsChange}
+			/>
+
 			{!currentIssue.parentIssueId ? (
 				<Card className="issue-subissues-card">
 					<CardHeader className="pb-2">
@@ -356,6 +376,214 @@ export function IssueOverviewPanel({
 				</Card>
 			) : null}
 		</div>
+	);
+}
+
+function IssueChecklistSection({
+	canWrite,
+	currentIssue,
+	onChecklistItemsChange,
+}: {
+	canWrite: boolean;
+	currentIssue: IssueLike;
+	onChecklistItemsChange: (items: IssueChecklistItem[]) => void;
+}) {
+	const normalizedChecklistItems = useMemo(
+		() => normalizeIssueChecklistItems(currentIssue.checklistItems),
+		[currentIssue.checklistItems],
+	);
+	const [editingChecklistItems, setEditingChecklistItems] = useState(
+		normalizedChecklistItems,
+	);
+	const [autofocusChecklistItemId, setAutofocusChecklistItemId] = useState<
+		string | null
+	>(null);
+	const checklistProgressLabel = formatChecklistProgress({
+		checklistItems: editingChecklistItems,
+	});
+	const checklistCompletionRate = roundChecklistCompletionRate({
+		checklistItems: editingChecklistItems,
+	});
+
+	useEffect(() => {
+		setEditingChecklistItems(normalizedChecklistItems);
+	}, [normalizedChecklistItems]);
+
+	function persistChecklistItems(nextItems: IssueChecklistItem[]) {
+		const normalizedItems = normalizeIssueChecklistItems(nextItems);
+		setEditingChecklistItems(normalizedItems);
+		void onChecklistItemsChange(normalizedItems);
+	}
+
+	function addChecklistItem() {
+		const nextItem = createIssueChecklistItem(editingChecklistItems.length);
+		setEditingChecklistItems([...editingChecklistItems, nextItem]);
+		setAutofocusChecklistItemId(nextItem.id);
+	}
+
+	function updateChecklistItemText(itemId: string, text: string) {
+		setEditingChecklistItems((current) =>
+			current.map((item) => (item.id === itemId ? { ...item, text } : item)),
+		);
+	}
+
+	function toggleChecklistItem(itemId: string) {
+		const nextItems = editingChecklistItems.map((item) =>
+			item.id === itemId ? { ...item, completed: !item.completed } : item,
+		);
+		persistChecklistItems(nextItems);
+	}
+
+	function moveChecklistItem(itemId: string, direction: "up" | "down") {
+		const currentIndex = editingChecklistItems.findIndex(
+			(item) => item.id === itemId,
+		);
+		if (currentIndex === -1) {
+			return;
+		}
+
+		const targetIndex =
+			direction === "up" ? currentIndex - 1 : currentIndex + 1;
+		if (targetIndex < 0 || targetIndex >= editingChecklistItems.length) {
+			return;
+		}
+
+		const nextItems = [...editingChecklistItems];
+		const [movedItem] = nextItems.splice(currentIndex, 1);
+		nextItems.splice(targetIndex, 0, movedItem);
+		persistChecklistItems(nextItems);
+	}
+
+	function deleteChecklistItem(itemId: string) {
+		persistChecklistItems(
+			editingChecklistItems.filter((item) => item.id !== itemId),
+		);
+	}
+
+	if (!canWrite && !normalizedChecklistItems.length) {
+		return null;
+	}
+
+	return (
+		<section className="issue-overview-block">
+			<div className="issue-overview-toolbar">
+				<div className="flex items-center gap-3">
+					<span className="issue-overview-kicker">Checklist</span>
+					{checklistProgressLabel ? (
+						<Badge className="issue-progress-badge">
+							{checklistProgressLabel} ({checklistCompletionRate}%)
+						</Badge>
+					) : null}
+				</div>
+				{canWrite ? (
+					<Button
+						type="button"
+						size="sm"
+						variant="ghost"
+						className="h-8 px-2"
+						onClick={addChecklistItem}
+					>
+						<Plus className="mr-1.5 h-3.5 w-3.5" />
+						Add item
+					</Button>
+				) : null}
+			</div>
+
+			{checklistProgressLabel ? (
+				<div className="issue-progress-panel mb-3">
+					<div className="flex items-center justify-between gap-3">
+						<span className="issue-progress-text">Checklist progress</span>
+						<span className="issue-progress-text">
+							{checklistProgressLabel} ({checklistCompletionRate}%)
+						</span>
+					</div>
+					<div className="issue-progress-bar" aria-hidden="true">
+						<div
+							className="issue-progress-bar-fill"
+							style={{ width: `${checklistCompletionRate}%` }}
+						/>
+					</div>
+				</div>
+			) : null}
+
+			{editingChecklistItems.length ? (
+				<div className="issue-checklist-list">
+					{editingChecklistItems.map((item, index) => (
+						<div key={item.id} className="issue-checklist-item">
+							<label className="issue-checklist-toggle">
+								<input
+									type="checkbox"
+									checked={item.completed}
+									disabled={!canWrite}
+									onChange={() => toggleChecklistItem(item.id)}
+								/>
+							</label>
+							{canWrite ? (
+								<Input
+									autoFocus={autofocusChecklistItemId === item.id}
+									className={`issue-checklist-input${item.completed ? " issue-checklist-input-completed" : ""}`}
+									value={item.text}
+									placeholder="Checklist item"
+									onBlur={() => {
+										setAutofocusChecklistItemId(null);
+										persistChecklistItems(editingChecklistItems);
+									}}
+									onChange={(event) =>
+										updateChecklistItemText(item.id, event.target.value)
+									}
+								/>
+							) : (
+								<span
+									className={`issue-checklist-static${item.completed ? " issue-checklist-input-completed" : ""}`}
+								>
+									{item.text}
+								</span>
+							)}
+							{canWrite ? (
+								<div className="issue-checklist-actions">
+									<Button
+										type="button"
+										size="sm"
+										variant="ghost"
+										className="h-8 w-8 p-0"
+										disabled={index === 0}
+										aria-label="Move checklist item up"
+										onClick={() => moveChecklistItem(item.id, "up")}
+									>
+										<ArrowUp className="h-3.5 w-3.5" />
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										variant="ghost"
+										className="h-8 w-8 p-0"
+										disabled={index === editingChecklistItems.length - 1}
+										aria-label="Move checklist item down"
+										onClick={() => moveChecklistItem(item.id, "down")}
+									>
+										<ArrowDown className="h-3.5 w-3.5" />
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										variant="ghost"
+										className="h-8 w-8 p-0 text-[var(--danger)] hover:text-[var(--danger)]"
+										aria-label="Delete checklist item"
+										onClick={() => deleteChecklistItem(item.id)}
+									>
+										<Trash2 className="h-3.5 w-3.5" />
+									</Button>
+								</div>
+							) : null}
+						</div>
+					))}
+				</div>
+			) : (
+				<p className="m-0 text-sm text-[var(--muted-text)]">
+					No checklist items yet.
+				</p>
+			)}
+		</section>
 	);
 }
 

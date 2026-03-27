@@ -103,6 +103,12 @@ export type ProjectCustomFieldDefinition = {
   position: number
   options?: string[]
 }
+export type IssueChecklistItem = {
+  id: string
+  text: string
+  completed: boolean
+  position: number
+}
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number]
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number]
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number]
@@ -150,6 +156,13 @@ export const issueCustomFieldValueValidator = v.union(
   v.number(),
   v.boolean(),
 )
+
+export const issueChecklistItemValidator = v.object({
+  id: v.string(),
+  text: v.string(),
+  completed: v.boolean(),
+  position: v.number(),
+})
 
 export const issuePriorityValidator = v.union(
   v.literal('none'),

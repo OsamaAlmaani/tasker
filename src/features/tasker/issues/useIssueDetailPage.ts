@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "convex/react";
 import { type FormEvent, useMemo, useState } from "react";
+import type { IssueChecklistItem } from "#/features/tasker/issues/checklists";
 import type { IssueDraft } from "#/features/tasker/issues/components/IssueDraftDialog";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import type { ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
@@ -43,6 +44,11 @@ export type IssueDetailRow = Doc<"issues"> & {
 	completedChildIssueCount: number;
 	childCompletionRate: number;
 	hasChildren: boolean;
+	checklistItems: IssueChecklistItem[];
+	checklistItemCount: number;
+	completedChecklistItemCount: number;
+	checklistCompletionRate: number;
+	hasChecklist: boolean;
 };
 
 type ChildIssueRow = {
@@ -423,6 +429,13 @@ export function useIssueDetailPage({
 		});
 	}
 
+	async function changeChecklistItems(checklistItems: IssueChecklistItem[]) {
+		await updateIssue({
+			issueId,
+			checklistItems,
+		});
+	}
+
 	return {
 		assignableUsers,
 		canDeleteIssue,
@@ -431,6 +444,7 @@ export function useIssueDetailPage({
 		cancelDescriptionEdit,
 		cancelTitleEdit,
 		changeAssignee,
+		changeChecklistItems,
 		changeDueDate,
 		changeCustomFieldValues,
 		changeList,

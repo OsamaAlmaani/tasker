@@ -30,6 +30,7 @@ function IssueDetailPage() {
 		cancelDescriptionEdit,
 		cancelTitleEdit,
 		changeAssignee,
+		changeChecklistItems,
 		changeCustomFieldValues,
 		changeDueDate,
 		changeLabels,
@@ -183,6 +184,7 @@ function IssueDetailPage() {
 					descriptionDraft={descriptionDraft}
 					editingDescription={editingDescription}
 					editingTitle={editingTitle}
+					onChecklistItemsChange={(items) => void changeChecklistItems(items)}
 					onCancelDescriptionEdit={cancelDescriptionEdit}
 					onCancelTitleEdit={cancelTitleEdit}
 					onDescriptionDraftChange={setDescriptionDraft}

@@ -1,5 +1,6 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import { type DragEvent, type FormEvent, useMemo, useState } from "react";
+import type { IssueChecklistItem } from "#/features/tasker/issues/checklists";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import type { ISSUE_PRIORITIES } from "#/features/tasker/model";
 import {
@@ -36,6 +37,11 @@ export type ProjectIssueRow = Doc<"issues"> & {
 	completedChildIssueCount: number;
 	childCompletionRate: number;
 	hasChildren: boolean;
+	checklistItems: IssueChecklistItem[];
+	checklistItemCount: number;
+	completedChecklistItemCount: number;
+	checklistCompletionRate: number;
+	hasChecklist: boolean;
 };
 
 type UseProjectDetailPageOptions = {

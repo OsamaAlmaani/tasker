@@ -113,7 +113,7 @@ Personal productivity progress:
 - [ ] Add project-task filtering by custom fields
 - [ ] Show key custom fields on task rows and cards
 - [ ] Extend import/export for project custom fields
-- [ ] Add checklist items inside tasks
+- [x] Add checklist items inside tasks
 - [ ] Add task estimates and optional time tracking
 - [ ] Support deeper sub-task nesting if still needed after real usage
 
@@ -124,6 +124,7 @@ Workflow model progress:
 - 2026-03-25: Added project-owned labels with names and colors, label management in project settings, project-scoped label selection in task create/edit flows, and label badges in project and issue task surfaces.
 - 2026-03-25: Moved project settings into a modal so editing project details, workflow, and labels no longer pushes the task board down the page.
 - 2026-03-26: Added first-pass project-owned custom task fields with `text`, `number`, `date`, `checkbox`, and `select` types, managed from project settings and editable from task create/edit and issue detail surfaces.
+- 2026-03-26: Added per-task checklist items with add, rename, complete, reorder, and delete flows in issue detail, plus checklist progress badges/bars on project list and Kanban task cards.
 
 ## Project and Permissions
 
