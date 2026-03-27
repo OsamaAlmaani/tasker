@@ -174,6 +174,7 @@ These are easy to miss and should be preserved unless intentionally changed.
 - Only top-level issues can have sub-issues.
 - An issue that already has visible children cannot be converted into a child issue.
 - Cycles are explicitly rejected.
+- Sub-tasks inherit their parent task’s list and do not choose their own list independently.
 - Effective result: one-level sub-task hierarchy is enforced.
 
 Relevant code:

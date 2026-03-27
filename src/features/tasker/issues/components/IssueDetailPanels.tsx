@@ -683,7 +683,7 @@ export function IssueMetadataPanel({
 			<div className="issue-meta-row">
 				<span className="issue-meta-label">List</span>
 				<div className="issue-meta-value">
-					{canWrite ? (
+					{canWrite && !currentIssue.parentIssueId ? (
 						<Select
 							className="issue-meta-control"
 							value={currentIssue.listId ?? ""}

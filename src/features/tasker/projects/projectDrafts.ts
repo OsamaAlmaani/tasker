@@ -99,8 +99,7 @@ export function applyParentIssueDraftDefaults(
 	return {
 		...draft,
 		parentIssueId: nextParentIssueId,
-		listId:
-			draft.listId || !parentIssue?.listId ? draft.listId : parentIssue.listId,
+		listId: parentIssue ? (parentIssue.listId ?? "") : draft.listId,
 		status:
 			draft.status === "todo" && parentIssue
 				? parentIssue.status

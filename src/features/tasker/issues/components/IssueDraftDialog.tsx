@@ -166,8 +166,9 @@ export function IssueDraftDialog({
 						</Select>
 					</div>
 					<div>
-						<Label>List</Label>
+						<Label>{draft.parentIssueId ? "List (Inherited)" : "List"}</Label>
 						<Select
+							disabled={Boolean(draft.parentIssueId)}
 							value={draft.listId}
 							onChange={(event) =>
 								setDraft((previous) => ({
@@ -183,6 +184,11 @@ export function IssueDraftDialog({
 								</option>
 							))}
 						</Select>
+						{draft.parentIssueId ? (
+							<p className="mt-1 mb-0 text-xs text-[var(--muted-text)]">
+								Sub-tasks always use their parent task&apos;s list.
+							</p>
+						) : null}
 					</div>
 					{parentIssueOptions ? (
 						<div>

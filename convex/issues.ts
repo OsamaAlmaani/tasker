@@ -357,6 +357,10 @@ async function applyIssueUpdate(
   const patch: Record<string, unknown> = {
     updatedAt: now,
   }
+  let nextParentIssue:
+    | Doc<'issues'>
+    | null
+    | undefined = changes.parentIssueId !== undefined ? null : undefined
 
   if (changes.title !== undefined) {
     patch.title = changes.title.trim()
@@ -431,20 +435,34 @@ async function applyIssueUpdate(
     patch.assigneeId = changes.assigneeId ?? undefined
   }
   if (changes.listId !== undefined) {
-    if (changes.listId) {
+    if (issue.parentIssueId) {
+      const parentIssue = await ensureParentIssueBelongsToProject(
+        ctx,
+        issue.projectId,
+        issue.parentIssueId,
+      )
+
+      if (changes.listId !== parentIssue.listId) {
+        throw new ConvexError({
+          code: 'VALIDATION_ERROR',
+          message: 'Sub-tasks always inherit their parent task list.',
+        })
+      }
+    } else if (changes.listId) {
       await ensureIssueListBelongsToProject(ctx, issue.projectId, changes.listId)
     }
     patch.listId = changes.listId ?? undefined
   }
   if (changes.parentIssueId !== undefined) {
     if (changes.parentIssueId) {
-      await ensureParentIssueBelongsToProject(
+      nextParentIssue = await ensureParentIssueBelongsToProject(
         ctx,
         issue.projectId,
         changes.parentIssueId,
       )
       await ensureNoIssueCycle(ctx, issue._id, changes.parentIssueId)
       await ensureIssueCanBecomeChild(ctx, issue)
+      patch.listId = nextParentIssue.listId
     }
     patch.parentIssueId = changes.parentIssueId ?? undefined
   }
@@ -503,6 +521,27 @@ async function applyIssueUpdate(
   patch.searchText = buildSearchText(nextTitle, nextDescription)
 
   await ctx.db.patch(issue._id, patch)
+
+  const nextListId =
+    (patch.listId as Id<'issueLists'> | undefined) ?? issue.listId ?? undefined
+  if (nextListId !== issue.listId) {
+    const descendantIds = await collectIssueDescendants(ctx, issue.projectId, issue._id)
+    const descendantIssues = (
+      await Promise.all(descendantIds.map((issueId) => ctx.db.get(issueId)))
+    ).filter((descendant): descendant is Doc<'issues'> => Boolean(descendant))
+
+    await Promise.all(
+      descendantIssues
+        .filter((descendant) => descendant._id !== issue._id && !descendant.deletedAt)
+        .map((descendant) =>
+          ctx.db.patch(descendant._id, {
+            listId: nextListId,
+            updatedAt: now,
+          }),
+        ),
+    )
+  }
+
   await ctx.db.patch(issue.projectId, {
     updatedAt: now,
   })
@@ -817,15 +856,15 @@ export const create = mutation({
     if (args.assigneeId) {
       await ensureAssigneeAllowed(ctx, args.projectId, args.assigneeId)
     }
-    if (args.listId) {
-      await ensureIssueListBelongsToProject(ctx, args.projectId, args.listId)
-    }
+    let parentIssue: Doc<'issues'> | null = null
     if (args.parentIssueId) {
-      await ensureParentIssueBelongsToProject(
+      parentIssue = await ensureParentIssueBelongsToProject(
         ctx,
         args.projectId,
         args.parentIssueId,
       )
+    } else if (args.listId) {
+      await ensureIssueListBelongsToProject(ctx, args.projectId, args.listId)
     }
     const nextLabels = normalizeIssueLabels(args.labels ?? [])
     if (!ensureProjectLabelsExist(project, nextLabels)) {
@@ -899,7 +938,7 @@ export const create = mutation({
       title: args.title.trim(),
       description: args.description?.trim(),
       searchText: buildSearchText(args.title, args.description),
-      listId: args.listId,
+      listId: parentIssue?.listId ?? args.listId,
       parentIssueId: args.parentIssueId,
       status: nextStatus,
       priority: args.priority ?? 'none',

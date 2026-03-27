@@ -133,7 +133,7 @@ describe("getProjectInviteResultMessage", () => {
 });
 
 describe("applyParentIssueDraftDefaults", () => {
-	it("inherits parent defaults only when the draft fields are blank/default", () => {
+	it("inherits the parent list and other blank/default values", () => {
 		const next = applyParentIssueDraftDefaults(createIssueDraft(), "parent-1", {
 			listId: "list-1",
 			status: "in_progress",
@@ -154,6 +154,26 @@ describe("applyParentIssueDraftDefaults", () => {
 			customFieldValues: {},
 			labels: [],
 		});
+	});
+
+	it("overrides an explicit draft list when a parent is selected", () => {
+		const next = applyParentIssueDraftDefaults(
+			{
+				...createIssueDraft(),
+				listId: "list-custom",
+			},
+			"parent-1",
+			{
+				listId: "list-parent",
+				status: "todo",
+				priority: "none",
+				assigneeId: null,
+				dueDate: null,
+			},
+		);
+
+		expect(next.listId).toBe("list-parent");
+		expect(next.parentIssueId).toBe("parent-1");
 	});
 
 	it("preserves explicit draft values and handles removed parent selection", () => {
