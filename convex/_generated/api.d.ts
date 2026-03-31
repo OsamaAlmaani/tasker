@@ -24,6 +24,7 @@ import type * as lib_projectLabels from "../lib/projectLabels.js";
 import type * as lib_projectStatuses from "../lib/projectStatuses.js";
 import type * as myWork from "../myWork.js";
 import type * as projects from "../projects.js";
+import type * as userNotes from "../userNotes.js";
 import type * as users from "../users.js";
 
 import type {
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   "lib/projectStatuses": typeof lib_projectStatuses;
   myWork: typeof myWork;
   projects: typeof projects;
+  userNotes: typeof userNotes;
   users: typeof users;
 }>;
 

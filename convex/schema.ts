@@ -33,6 +33,19 @@ export default defineSchema({
     .index('by_globalRole', ['globalRole'])
     .index('by_isActive', ['isActive']),
 
+  userNotes: defineTable({
+    ownerId: v.id('users'),
+    title: v.string(),
+    body: v.string(),
+    excerpt: v.string(),
+    searchText: v.string(),
+    pinned: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_ownerId', ['ownerId'])
+    .index('by_ownerId_updatedAt', ['ownerId', 'updatedAt']),
+
   projects: defineTable({
     name: v.string(),
     key: v.string(),

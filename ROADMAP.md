@@ -89,12 +89,13 @@ Core workflow progress:
 - [ ] Add saved filters and saved views
 - [ ] Add personal bookmarks / pinning
 - [ ] Add private notes on tasks
-- [ ] Add private user notes that are not tied to any specific project
+- [x] Add private user notes that are not tied to any specific project
 - [ ] Add focus mode for working through assigned tasks
 
 Personal productivity progress:
 - 2026-03-25: Added first-pass route-backed `My Work` saved views for `Overview`, `Focus`, `Due Soon`, `Overdue`, `Backlog`, and `Completed`. Full user-defined saved filters/views remain open.
 - 2026-03-25: Persisted `My Work` last-view and default-view preferences on the user record so preset views survive navigation and can be pinned as a personal default. Full user-defined saved filters/views remain open.
+- 2026-03-31: Added private global personal notes with a topbar modal launcher, a dedicated `/notes` page, card-based note browsing, autosaving rich editing, and a single-surface writing workspace with internal pane scrolling.
 
 ## Collaboration
 

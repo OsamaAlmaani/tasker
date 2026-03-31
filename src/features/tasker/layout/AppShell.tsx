@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import {
 	CircleDot,
 	Command,
+	FileText,
 	FolderKanban,
 	Home,
 	ListChecks,
@@ -21,6 +22,10 @@ import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { Select } from "#/components/ui/select";
+import {
+	PersonalNotesWorkspace,
+	type PersonalNotesWorkspaceHandle,
+} from "#/features/tasker/notes/PersonalNotesWorkspace";
 import { getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
@@ -30,12 +35,17 @@ const navItems = [
 	{ to: "/dashboard", label: "Dashboard", icon: Home },
 	{ to: "/my-work", label: "My Work", icon: ListChecks },
 	{ to: "/projects", label: "Projects", icon: FolderKanban },
+	{ to: "/notes", label: "Notes", icon: FileText },
 	{ to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
 	const navigate = useNavigate();
 	const [commandOpen, setCommandOpen] = useState(false);
+	const [notesOpen, setNotesOpen] = useState(false);
+	const [notesModalSelectedNoteId, setNotesModalSelectedNoteId] = useState<
+		string | null
+	>(null);
 	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 	const [commandSearch, setCommandSearch] = useState("");
 	const [listModalProject, setListModalProject] = useState<{
@@ -71,6 +81,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	const [deleteListError, setDeleteListError] = useState<string | null>(null);
 	const [isDeletingList, setIsDeletingList] = useState(false);
 	const listActionMenuRef = useRef<HTMLDivElement | null>(null);
+	const notesWorkspaceRef = useRef<PersonalNotesWorkspaceHandle | null>(null);
 
 	const me = useQuery(api.users.me);
 	const sidebarProjects = useQuery(api.projects.sidebar, {
@@ -87,6 +98,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			{ id: "go-dashboard", label: "Go to Dashboard", to: "/dashboard" },
 			{ id: "go-my-work", label: "Open My Work", to: "/my-work" },
 			{ id: "go-projects", label: "Go to Projects", to: "/projects" },
+			{ id: "go-notes", label: "Open Personal Notes", to: "/notes" },
 			{ id: "go-settings", label: "Open Settings", to: "/settings" },
 		];
 
@@ -268,6 +280,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 			if (event.key === "Escape") {
 				setCommandOpen(false);
+				setNotesOpen(false);
 				setMobileSidebarOpen(false);
 			}
 		};
@@ -300,6 +313,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			document.body.style.overflow = previousOverflow;
 		};
 	}, [mobileSidebarOpen]);
+
+	async function closeNotesModal() {
+		await notesWorkspaceRef.current?.flushDraft();
+		setNotesOpen(false);
+	}
 
 	return (
 		<div className="app-shell-grid min-h-dvh">
@@ -581,6 +599,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 						</kbd>
 					</button>
 
+					<Button
+						type="button"
+						variant="ghost"
+						className="h-9 px-3"
+						onClick={() => setNotesOpen(true)}
+					>
+						<FileText className="mr-2 h-4 w-4" />
+						Notes
+					</Button>
+
 					<div className="ml-auto flex items-center gap-2">
 						<ThemeToggle />
 						<UserButton />
@@ -856,6 +884,66 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 								</Button>
 							</div>
 						</div>
+					</div>
+				</div>
+			) : null}
+
+			{notesOpen ? (
+				<div
+					className="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+					role="dialog"
+					aria-modal="true"
+					aria-label="Personal notes"
+				>
+					<div className="notes-modal-shell">
+						<div className="notes-modal-header">
+							<div>
+								<h2 className="m-0 text-base font-semibold text-[var(--text)]">
+									Personal Notes
+								</h2>
+								<p className="m-0 mt-1 text-sm text-[var(--muted-text)]">
+									Private rich notes that stay outside project work.
+								</p>
+							</div>
+							<div className="flex items-center gap-2">
+								<Button
+									type="button"
+									size="sm"
+									variant="secondary"
+									onClick={() => {
+										const noteId =
+											notesWorkspaceRef.current?.getSelectedNoteId() ??
+											notesModalSelectedNoteId;
+										void closeNotesModal().then(() =>
+											navigate({
+												to: "/notes",
+												search: noteId ? { note: noteId } : {},
+											}),
+										);
+									}}
+								>
+									<FileText className="mr-2 h-4 w-4" />
+									Full screen
+								</Button>
+								<Button
+									type="button"
+									size="sm"
+									variant="ghost"
+									onClick={() => {
+										void closeNotesModal();
+									}}
+								>
+									Close
+								</Button>
+							</div>
+						</div>
+
+						<PersonalNotesWorkspace
+							ref={notesWorkspaceRef}
+							mode="modal"
+							selectedNoteId={notesModalSelectedNoteId}
+							onSelectedNoteIdChange={setNotesModalSelectedNoteId}
+						/>
 					</div>
 				</div>
 			) : null}

@@ -14,6 +14,7 @@ It supports:
 - Multi-project workspaces.
 - Global roles: `admin`, `member`, `viewer`.
 - Project membership and email invites.
+- Private global personal notes with modal and full-page access.
 - Task lists plus task status-based Kanban.
 - One-level sub-tasks with progress rollups.
 - Comments and activity history.
@@ -87,6 +88,7 @@ Main route files:
 - [`src/routes/index.tsx`](./src/routes/index.tsx): public landing page
 - [`src/routes/_app.dashboard.tsx`](./src/routes/_app.dashboard.tsx): dashboard summary
 - [`src/routes/_app.my-work.tsx`](./src/routes/_app.my-work.tsx): opinionated personal queue for assigned work with route-backed preset views, persisted last/default view preferences, and first-pass bulk actions
+- [`src/routes/_app.notes.tsx`](./src/routes/_app.notes.tsx): private personal notes workspace with note cards, modal/full-page access, and a single rich editor surface
 - [`src/routes/_app.projects.index.tsx`](./src/routes/_app.projects.index.tsx): project list + project creation
 - [`src/routes/_app.projects.$projectId.tsx`](./src/routes/_app.projects.$projectId.tsx): project detail, task list/kanban, filters, members, invites, import/export, project settings
 - [`src/routes/_app.issues.$issueId.tsx`](./src/routes/_app.issues.$issueId.tsx): issue detail, sub-tasks, comments, activity
@@ -104,6 +106,7 @@ Key backend files:
 - [`convex/lib/auth.ts`](./convex/lib/auth.ts): permission helpers
 - [`convex/lib/activity.ts`](./convex/lib/activity.ts): activity insertion helper
 - [`convex/users.ts`](./convex/users.ts): user sync/bootstrap, personal `My Work` view preferences, and admin controls
+- [`convex/userNotes.ts`](./convex/userNotes.ts): private global user note CRUD and search
 - [`convex/projects.ts`](./convex/projects.ts): project CRUD, members, sidebar, activity
 - [`convex/issues.ts`](./convex/issues.ts): task CRUD, filtering, hierarchy, status rules, and first-pass bulk updates
 - [`convex/myWork.ts`](./convex/myWork.ts): personalized assigned-work overview for the My Work route
@@ -119,6 +122,7 @@ Key backend files:
 Core tables in [`convex/schema.ts`](./convex/schema.ts):
 
 - `users`
+- `userNotes`
 - `projects`
 - `projectMembers`
 - `projectCounters`
@@ -141,6 +145,7 @@ Notable schema choices:
 - `issues.checklistItems` stores ordered per-task checklist items with completion state.
 - `issues.labels` stores project label keys, not freeform label strings.
 - `users.myWorkDefaultView` and `users.myWorkLastView` persist the current user’s preferred preset view for the `My Work` page.
+- `userNotes` are owner-scoped and private; they are not tied to any project and are only readable/writable by the owning user.
 
 ## Auth / Permission Model
 
@@ -214,6 +219,7 @@ Relevant code:
 - Deleting an issue list supports:
   - moving tasks to another list or no list
   - deleting all task trees rooted in that list
+- Deleting a personal user note is hard delete and only affects the current user’s private notes workspace.
 
 ### Project creation defaults
 
