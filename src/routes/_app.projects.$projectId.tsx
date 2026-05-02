@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback } from "react";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ProjectDetailContent } from "#/features/tasker/projects/components/ProjectDetailContent";
@@ -21,18 +22,18 @@ function ProjectDetailPage() {
 	const navigate = useNavigate();
 	const projectId = projectIdParam as Id<"projects">;
 
-	function updateProjectSearch(
-		patch: Partial<ProjectSearch>,
-		options?: { replace?: boolean },
-	) {
-		void navigate({
-			to: "/projects/$projectId",
-			params: { projectId },
-			replace: options?.replace ?? false,
-			search: (previous) =>
-				normalizeProjectSearch({ ...previous, ...patch } as ProjectSearch),
-		});
-	}
+	const updateProjectSearch = useCallback(
+		(patch: Partial<ProjectSearch>, options?: { replace?: boolean }) => {
+			void navigate({
+				to: "/projects/$projectId",
+				params: { projectId },
+				replace: options?.replace ?? false,
+				search: (previous) =>
+					normalizeProjectSearch({ ...previous, ...patch } as ProjectSearch),
+			});
+		},
+		[navigate, projectId],
+	);
 	const page = useProjectDetailPage({
 		projectId,
 		routeSearch,

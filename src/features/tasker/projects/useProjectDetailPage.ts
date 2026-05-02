@@ -1,5 +1,11 @@
 import { useAction, useMutation, useQuery } from "convex/react";
-import { type DragEvent, type FormEvent, useMemo, useState } from "react";
+import {
+	type DragEvent,
+	type FormEvent,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 import type { IssueChecklistItem } from "#/features/tasker/issues/checklists";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
 import type { ISSUE_PRIORITIES } from "#/features/tasker/model";
@@ -63,6 +69,7 @@ export function useProjectDetailPage({
 
 	const [statusPicker, setStatusPicker] = useState<string>("");
 	const search = routeSearch.q ?? "";
+	const [searchInput, setSearchInput] = useState(search);
 	const selectedStatuses = useMemo(
 		() => parseStatusFilters(routeSearch.statuses),
 		[routeSearch.statuses],
@@ -107,6 +114,32 @@ export function useProjectDetailPage({
 			),
 		[issueResults, isArchivedView],
 	);
+	const normalizedSearchInput = searchInput.trim().toLowerCase();
+	const visibleIssues = useMemo(() => {
+		if (!normalizedSearchInput) {
+			return issues;
+		}
+
+		return (issues ?? []).filter((issue) =>
+			issue.searchText.includes(normalizedSearchInput),
+		);
+	}, [issues, normalizedSearchInput]);
+
+	useEffect(() => {
+		setSearchInput((current) => (current === search ? current : search));
+	}, [search]);
+
+	useEffect(() => {
+		if (searchInput === search) {
+			return;
+		}
+
+		const timeoutId = setTimeout(() => {
+			updateProjectSearch({ q: searchInput }, { replace: true });
+		}, 180);
+
+		return () => clearTimeout(timeoutId);
+	}, [search, searchInput, updateProjectSearch]);
 
 	function addStatusFilter(nextStatus: string) {
 		if (
@@ -293,14 +326,14 @@ export function useProjectDetailPage({
 			layout: issueLayout,
 			list: listFilter,
 			priority,
-			search,
+			search: searchInput,
 			sort: sortBy,
 			statuses: selectedStatuses,
 			view: projectView,
 		},
 		issueListById,
 		issueLists,
-		issues: issues as ProjectIssueRow[] | undefined,
+		issues: visibleIssues as ProjectIssueRow[] | undefined,
 		project: projectData?.project,
 		projectId,
 		projectLabels,
@@ -310,18 +343,21 @@ export function useProjectDetailPage({
 	const groupedIssues = useMemo(
 		() =>
 			buildGroupedIssues(
-				(issues ?? []) as ProjectIssueRow[],
+				(visibleIssues ?? []) as ProjectIssueRow[],
 				groupBy,
 				issueListById,
 				projectStatuses,
 			),
-		[issues, issueListById, groupBy, projectStatuses],
+		[visibleIssues, issueListById, groupBy, projectStatuses],
 	);
 
 	const kanbanColumns = useMemo(
 		() =>
-			buildKanbanColumns((issues ?? []) as ProjectIssueRow[], projectStatuses),
-		[issues, projectStatuses],
+			buildKanbanColumns(
+				(visibleIssues ?? []) as ProjectIssueRow[],
+				projectStatuses,
+			),
+		[visibleIssues, projectStatuses],
 	);
 
 	async function submitIssue(event: FormEvent<HTMLFormElement>) {
@@ -685,6 +721,7 @@ export function useProjectDetailPage({
 		projectIssueById,
 		projectView,
 		search,
+		searchInput,
 		selectedStatuses,
 		sendProjectInvite,
 		setCompletionConfirm,
@@ -705,9 +742,11 @@ export function useProjectDetailPage({
 		setTransferStatusKey,
 		setStatusPicker,
 		setIssueForm,
+		setSearchInput,
 		sortBy,
 		statusPicker,
 		statusUpdateError,
+		visibleIssues,
 		submitEmailInvite,
 		submitIssue,
 		submitProjectSettings,

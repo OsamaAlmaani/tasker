@@ -67,6 +67,7 @@ type ProjectTasksPanelProps = {
 	priority: string;
 	renderKanbanIssueNode: (node: unknown) => ReactNode;
 	renderListIssueNode: (node: unknown) => ReactNode;
+	resultSummary?: string;
 	search: string;
 	selectedStatuses: ProjectStatusDefinition["key"][];
 	showEmptyState: boolean;
@@ -107,6 +108,7 @@ export function ProjectTasksPanel({
 	priority,
 	renderKanbanIssueNode,
 	renderListIssueNode,
+	resultSummary,
 	search,
 	selectedStatuses,
 	showEmptyState,
@@ -251,6 +253,11 @@ export function ProjectTasksPanel({
 						<option value="due_asc">Due date</option>
 					</Select>
 				</div>
+				{resultSummary ? (
+					<p className="mb-3 text-xs text-[var(--muted-text)]">
+						{resultSummary}
+					</p>
+				) : null}
 
 				{selectedStatuses.length ? (
 					<div className="mb-3 flex flex-wrap items-center gap-2">

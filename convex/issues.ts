@@ -666,6 +666,8 @@ export const listByProject = query({
     })
     const progressByIssueId = buildIssueProgressMap(progressSourceIssues)
 
+    const search = args.search?.trim().toLowerCase()
+
     let rows = issues.filter((issue) => {
       if (!args.includeArchived && issue.archived) {
         return false
@@ -696,8 +698,7 @@ export const listByProject = query({
           return false
         }
       }
-      if (args.search?.trim() && args.includeArchived) {
-        const search = args.search.trim().toLowerCase()
+      if (search) {
         if (!issue.searchText.includes(search)) {
           return false
         }

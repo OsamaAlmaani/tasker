@@ -128,7 +128,7 @@ export function ProjectDetailContent({
 		projectStatuses,
 		projectInvites,
 		projectView,
-		search,
+		searchInput,
 		selectedStatuses,
 		setCompletionConfirm,
 		setCreateError,
@@ -144,6 +144,7 @@ export function ProjectDetailContent({
 		setIssueForm,
 		setMemberToRemove,
 		setProjectForm,
+		setSearchInput,
 		sortBy,
 		statusToDelete,
 		statusPicker,
@@ -160,6 +161,7 @@ export function ProjectDetailContent({
 		isDeletingStatus,
 		toggleImportExportMenu,
 		updateIssue,
+		visibleIssues,
 	} = page;
 	const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(
 		() => new Set(),
@@ -167,8 +169,9 @@ export function ProjectDetailContent({
 	const [bulkActionError, setBulkActionError] = useState<string | null>(null);
 	const [isApplyingBulkAction, setIsApplyingBulkAction] = useState(false);
 	const hasActiveTaskFilters = Boolean(
-		search || selectedStatuses.length || priority || assigneeId,
+		searchInput || selectedStatuses.length || priority || assigneeId,
 	);
+	const trimmedSearch = searchInput.trim();
 	const selectedListName =
 		listFilter === "all"
 			? ""
@@ -176,25 +179,39 @@ export function ProjectDetailContent({
 				? "No list"
 				: ((issueLists ?? []).find((list) => list._id === listFilter)?.name ??
 					"");
+	const visibleIssueCount = visibleIssues?.length ?? 0;
+	const resultSummary = hasActiveTaskFilters
+		? trimmedSearch
+			? `${visibleIssueCount} ${visibleIssueCount === 1 ? "task" : "tasks"} match "${trimmedSearch}"`
+			: `${visibleIssueCount} ${visibleIssueCount === 1 ? "task" : "tasks"} shown`
+		: undefined;
 	const emptyStateTitle =
 		archive === "archived"
 			? hasActiveTaskFilters
 				? "No archived tasks match these filters"
 				: "No archived tasks yet"
 			: hasActiveTaskFilters
-				? "No tasks match these filters"
+				? trimmedSearch
+					? "No tasks match this search"
+					: "No tasks match these filters"
 				: selectedListName
 					? `No tasks in ${selectedListName} yet`
 					: "No tasks yet";
 	const emptyStateDescription =
 		archive === "archived"
 			? hasActiveTaskFilters
-				? "Try clearing one or more filters to browse archived work."
+				? trimmedSearch
+					? "Try a different search term or clear one or more filters."
+					: "Try clearing one or more filters to browse archived work."
 				: "Archived tasks will appear here after you archive them."
 			: hasActiveTaskFilters
-				? selectedListName
-					? `Nothing matches the current filters in ${selectedListName}.`
-					: "Try clearing one or more filters to see more tasks."
+				? trimmedSearch
+					? selectedListName
+						? `No tasks in ${selectedListName} match "${trimmedSearch}".`
+						: `No tasks match "${trimmedSearch}".`
+					: selectedListName
+						? `Nothing matches the current filters in ${selectedListName}.`
+						: "Try clearing one or more filters to see more tasks."
 				: selectedListName
 					? canWrite
 						? `Create the first task in ${selectedListName}.`
@@ -203,8 +220,8 @@ export function ProjectDetailContent({
 						? "Create your first task to start tracking work in this project."
 						: "This project does not have any tasks yet.";
 	const visibleIssueIds = useMemo(
-		() => new Set<string>((issues ?? []).map((issue) => issue._id)),
-		[issues],
+		() => new Set<string>((visibleIssues ?? []).map((issue) => issue._id)),
+		[visibleIssues],
 	);
 	const projectIssueById = useMemo(
 		() =>
@@ -565,9 +582,7 @@ export function ProjectDetailContent({
 								{ replace: true },
 							)
 						}
-						onSearchChange={(value) =>
-							updateProjectSearch({ q: value }, { replace: true })
-						}
+						onSearchChange={setSearchInput}
 						onSortChange={(value) =>
 							updateProjectSearch(
 								{
@@ -621,9 +636,10 @@ export function ProjectDetailContent({
 								statusOptions={projectStatuses}
 							/>
 						)}
-						search={search}
+						resultSummary={resultSummary}
+						search={searchInput}
 						selectedStatuses={selectedStatuses}
-						showEmptyState={Boolean(issues) && issues.length === 0}
+						showEmptyState={Boolean(visibleIssues) && visibleIssueCount === 0}
 						sortBy={sortBy}
 						statusOptions={projectStatuses}
 						statusPicker={statusPicker}
