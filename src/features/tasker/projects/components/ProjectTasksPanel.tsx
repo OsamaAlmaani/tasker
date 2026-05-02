@@ -5,6 +5,7 @@ import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { Input } from "#/components/ui/input";
 import { Select } from "#/components/ui/select";
+import { Switch } from "#/components/ui/switch";
 import { RemovableIssueStatusBadge } from "#/features/tasker/components/IssueBadges";
 import { ISSUE_PRIORITIES } from "#/features/tasker/model";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
@@ -42,6 +43,7 @@ type ProjectTasksPanelProps = {
 	emptyStateTitle: string;
 	groupBy: string;
 	groupedIssues: ProjectIssueGroup[];
+	hideDoneTasks: boolean;
 	issueLayout: "list" | "kanban";
 	kanbanColumns: KanbanColumn[];
 	onAddStatusFilter: (value: string) => void;
@@ -50,6 +52,7 @@ type ProjectTasksPanelProps = {
 	onClearStatuses: () => void;
 	onCreateTask: () => void;
 	onGroupByChange: (value: string) => void;
+	onHideDoneTasksChange: (value: boolean) => void;
 	onKanbanColumnDragLeave: (status: ProjectStatusDefinition["key"]) => void;
 	onKanbanColumnDragOver: (
 		event: DragEvent<HTMLElement>,
@@ -89,6 +92,7 @@ export function ProjectTasksPanel({
 	emptyStateTitle,
 	groupBy,
 	groupedIssues,
+	hideDoneTasks,
 	issueLayout,
 	kanbanColumns,
 	onAddStatusFilter,
@@ -97,6 +101,7 @@ export function ProjectTasksPanel({
 	onClearStatuses,
 	onCreateTask,
 	onGroupByChange,
+	onHideDoneTasksChange,
 	onKanbanColumnDragLeave,
 	onKanbanColumnDragOver,
 	onKanbanColumnDrop,
@@ -133,25 +138,34 @@ export function ProjectTasksPanel({
 				<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
 					<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
 						{isArchivedView ? null : (
-							<div className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-1">
-								<Button
-									type="button"
-									size="sm"
-									variant={issueLayout === "list" ? "secondary" : "ghost"}
-									className="h-7 px-3"
-									onClick={() => onToggleLayout("list")}
-								>
-									List
-								</Button>
-								<Button
-									type="button"
-									size="sm"
-									variant={issueLayout === "kanban" ? "secondary" : "ghost"}
-									className="h-7 px-3"
-									onClick={() => onToggleLayout("kanban")}
-								>
-									Kanban
-								</Button>
+							<div className="flex flex-wrap items-center gap-2">
+								<div className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-1">
+									<Button
+										type="button"
+										size="sm"
+										variant={issueLayout === "list" ? "secondary" : "ghost"}
+										className="h-7 px-3"
+										onClick={() => onToggleLayout("list")}
+									>
+										List
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										variant={issueLayout === "kanban" ? "secondary" : "ghost"}
+										className="h-7 px-3"
+										onClick={() => onToggleLayout("kanban")}
+									>
+										Kanban
+									</Button>
+								</div>
+								<div className="inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--muted-text)]">
+									<Switch
+										checked={hideDoneTasks}
+										onChange={onHideDoneTasksChange}
+									/>
+									Hide done
+								</div>
 							</div>
 						)}
 						{isArchivedView ? (

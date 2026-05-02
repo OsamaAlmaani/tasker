@@ -87,6 +87,8 @@ export function ProjectDetailContent({
 		handleKanbanDragEnd,
 		handleKanbanDragStart,
 		handleParentIssueChange,
+		hideDoneTasks,
+		hiddenDoneTaskCount,
 		importExportError,
 		importExportMenuRef,
 		importExportMessage,
@@ -135,6 +137,7 @@ export function ProjectDetailContent({
 		setCreateOpen,
 		setDragOverStatus,
 		setEditingProject,
+		setHideDoneTasks,
 		setInviteEmail,
 		setInviteSearch,
 		setInviteToRevoke,
@@ -168,7 +171,7 @@ export function ProjectDetailContent({
 	);
 	const [bulkActionError, setBulkActionError] = useState<string | null>(null);
 	const [isApplyingBulkAction, setIsApplyingBulkAction] = useState(false);
-	const hasActiveTaskFilters = Boolean(
+	const hasTaskFilters = Boolean(
 		searchInput || selectedStatuses.length || priority || assigneeId,
 	);
 	const trimmedSearch = searchInput.trim();
@@ -180,45 +183,51 @@ export function ProjectDetailContent({
 				: ((issueLists ?? []).find((list) => list._id === listFilter)?.name ??
 					"");
 	const visibleIssueCount = visibleIssues?.length ?? 0;
-	const resultSummary = hasActiveTaskFilters
-		? trimmedSearch
-			? `${visibleIssueCount} ${visibleIssueCount === 1 ? "task" : "tasks"} match "${trimmedSearch}"`
-			: `${visibleIssueCount} ${visibleIssueCount === 1 ? "task" : "tasks"} shown`
-		: undefined;
+	const hasHiddenDoneTasks = hiddenDoneTaskCount > 0;
+	const resultSummary =
+		hasTaskFilters || hasHiddenDoneTasks
+			? trimmedSearch
+				? `${visibleIssueCount} ${visibleIssueCount === 1 ? "task" : "tasks"} match "${trimmedSearch}"${hasHiddenDoneTasks ? ` · ${hiddenDoneTaskCount} done hidden` : ""}`
+				: `${visibleIssueCount} ${visibleIssueCount === 1 ? "task" : "tasks"} shown${hasHiddenDoneTasks ? ` · ${hiddenDoneTaskCount} done hidden` : ""}`
+			: undefined;
 	const emptyStateTitle =
 		archive === "archived"
-			? hasActiveTaskFilters
+			? hasTaskFilters
 				? "No archived tasks match these filters"
 				: "No archived tasks yet"
-			: hasActiveTaskFilters
+			: hasTaskFilters
 				? trimmedSearch
 					? "No tasks match this search"
 					: "No tasks match these filters"
-				: selectedListName
-					? `No tasks in ${selectedListName} yet`
-					: "No tasks yet";
+				: hasHiddenDoneTasks
+					? "All visible tasks are done"
+					: selectedListName
+						? `No tasks in ${selectedListName} yet`
+						: "No tasks yet";
 	const emptyStateDescription =
 		archive === "archived"
-			? hasActiveTaskFilters
+			? hasTaskFilters
 				? trimmedSearch
 					? "Try a different search term or clear one or more filters."
 					: "Try clearing one or more filters to browse archived work."
 				: "Archived tasks will appear here after you archive them."
-			: hasActiveTaskFilters
+			: hasTaskFilters
 				? trimmedSearch
 					? selectedListName
-						? `No tasks in ${selectedListName} match "${trimmedSearch}".`
-						: `No tasks match "${trimmedSearch}".`
+						? `No tasks in ${selectedListName} match "${trimmedSearch}".${hasHiddenDoneTasks ? " Some done tasks are hidden." : ""}`
+						: `No tasks match "${trimmedSearch}".${hasHiddenDoneTasks ? " Some done tasks are hidden." : ""}`
 					: selectedListName
-						? `Nothing matches the current filters in ${selectedListName}.`
-						: "Try clearing one or more filters to see more tasks."
-				: selectedListName
-					? canWrite
-						? `Create the first task in ${selectedListName}.`
-						: `This list does not have any tasks yet.`
-					: canWrite
-						? "Create your first task to start tracking work in this project."
-						: "This project does not have any tasks yet.";
+						? `Nothing matches current filters in ${selectedListName}.${hasHiddenDoneTasks ? " Some done tasks are hidden." : ""}`
+						: `Try clearing one or more filters to see more tasks.${hasHiddenDoneTasks ? " Some done tasks are hidden." : ""}`
+				: hasHiddenDoneTasks
+					? "Done tasks are hidden right now. Turn off Hide done to browse completed work."
+					: selectedListName
+						? canWrite
+							? `Create the first task in ${selectedListName}.`
+							: `This list does not have any tasks yet.`
+						: canWrite
+							? "Create your first task to start tracking work in this project."
+							: "This project does not have any tasks yet.";
 	const visibleIssueIds = useMemo(
 		() => new Set<string>((visibleIssues ?? []).map((issue) => issue._id)),
 		[visibleIssues],
@@ -479,7 +488,7 @@ export function ProjectDetailContent({
 						canWrite={canWrite}
 						dragOverStatus={dragOverStatus}
 						emptyStateAction={
-							hasActiveTaskFilters ? (
+							hasTaskFilters ? (
 								<Button
 									type="button"
 									size="sm"
@@ -517,6 +526,7 @@ export function ProjectDetailContent({
 						emptyStateTitle={emptyStateTitle}
 						groupBy={groupBy}
 						groupedIssues={groupedIssues}
+						hideDoneTasks={hideDoneTasks}
 						issueLayout={issueLayout}
 						kanbanColumns={kanbanColumns}
 						onAddStatusFilter={addStatusFilter}
@@ -557,6 +567,7 @@ export function ProjectDetailContent({
 								{ replace: true },
 							)
 						}
+						onHideDoneTasksChange={setHideDoneTasks}
 						onKanbanColumnDragLeave={(status) =>
 							setDragOverStatus((current) =>
 								current === status ? null : current,

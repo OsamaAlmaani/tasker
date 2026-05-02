@@ -23,6 +23,11 @@ import {
 	buildKanbanColumns,
 } from "#/features/tasker/projects/issueGrouping";
 import {
+	filterDoneTasks,
+	persistHideDoneTasksPreference,
+	readHideDoneTasksPreference,
+} from "#/features/tasker/projects/projectDoneVisibility";
+import {
 	applyParentIssueDraftDefaults,
 	createIssueDraft,
 	createProjectSettingsForm,
@@ -70,6 +75,11 @@ export function useProjectDetailPage({
 	const [statusPicker, setStatusPicker] = useState<string>("");
 	const search = routeSearch.q ?? "";
 	const [searchInput, setSearchInput] = useState(search);
+	const [hideDoneTasks, setHideDoneTasks] = useState(true);
+	const [
+		hasLoadedHideDoneTasksPreference,
+		setHasLoadedHideDoneTasksPreference,
+	] = useState(false);
 	const selectedStatuses = useMemo(
 		() => parseStatusFilters(routeSearch.statuses),
 		[routeSearch.statuses],
@@ -115,7 +125,7 @@ export function useProjectDetailPage({
 		[issueResults, isArchivedView],
 	);
 	const normalizedSearchInput = searchInput.trim().toLowerCase();
-	const visibleIssues = useMemo(() => {
+	const searchMatchedIssues = useMemo(() => {
 		if (!normalizedSearchInput) {
 			return issues;
 		}
@@ -124,10 +134,39 @@ export function useProjectDetailPage({
 			issue.searchText.includes(normalizedSearchInput),
 		);
 	}, [issues, normalizedSearchInput]);
+	const hiddenDoneTaskCount = useMemo(
+		() =>
+			archive === "active" && hideDoneTasks
+				? (searchMatchedIssues ?? []).filter((issue) => issue.status === "done")
+						.length
+				: 0,
+		[archive, hideDoneTasks, searchMatchedIssues],
+	);
+	const visibleIssues = useMemo(
+		() =>
+			filterDoneTasks((searchMatchedIssues ?? []) as ProjectIssueRow[], {
+				archiveState: archive,
+				hideDoneTasks,
+			}),
+		[archive, hideDoneTasks, searchMatchedIssues],
+	);
 
 	useEffect(() => {
 		setSearchInput((current) => (current === search ? current : search));
 	}, [search]);
+
+	useEffect(() => {
+		setHideDoneTasks(readHideDoneTasksPreference());
+		setHasLoadedHideDoneTasksPreference(true);
+	}, []);
+
+	useEffect(() => {
+		if (!hasLoadedHideDoneTasksPreference) {
+			return;
+		}
+
+		persistHideDoneTasksPreference(hideDoneTasks);
+	}, [hasLoadedHideDoneTasksPreference, hideDoneTasks]);
 
 	useEffect(() => {
 		if (searchInput === search) {
@@ -676,6 +715,8 @@ export function useProjectDetailPage({
 		handleKanbanDragStart,
 		handleImportTasksFile: importExport.handleImportTasksFile,
 		handleParentIssueChange,
+		hideDoneTasks,
+		hiddenDoneTaskCount,
 		importExportError: importExport.importExportError,
 		importExportMenuRef: importExport.importExportMenuRef,
 		importExportMessage: importExport.importExportMessage,
@@ -729,6 +770,7 @@ export function useProjectDetailPage({
 		setCreateOpen,
 		setDragOverStatus,
 		setEditingProject,
+		setHideDoneTasks,
 		setInviteEmail,
 		setInviteSearch,
 		setInviteToRevoke,
