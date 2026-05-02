@@ -20,7 +20,7 @@ function NotesPage() {
 		<div className="notes-page-shell">
 			<PageHeader
 				title="Personal Notes"
-				description="Private rich notes that stay outside project work."
+				description="Private notes for your own work, plans, and ideas."
 			/>
 			<div className="notes-page-body">
 				<PersonalNotesWorkspace

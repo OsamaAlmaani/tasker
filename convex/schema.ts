@@ -13,6 +13,8 @@ import {
   projectLabelValidator,
   projectStatusValidator,
   issueCustomFieldValueValidator,
+  notificationEmailStatusValidator,
+  notificationTypeValidator,
 } from './constants'
 
 export default defineSchema({
@@ -179,4 +181,29 @@ export default defineSchema({
     .index('by_issueId', ['issueId'])
     .index('by_actorId', ['actorId'])
     .index('by_entity', ['entityType', 'entityId']),
+
+  notifications: defineTable({
+    recipientUserId: v.id('users'),
+    actorUserId: v.optional(v.id('users')),
+    projectId: v.optional(v.id('projects')),
+    issueId: v.optional(v.id('issues')),
+    type: notificationTypeValidator,
+    title: v.string(),
+    body: v.string(),
+    link: v.string(),
+    metadata: v.optional(v.any()),
+    readAt: v.optional(v.number()),
+    emailStatus: notificationEmailStatusValidator,
+    emailAttempts: v.number(),
+    lastEmailAttemptAt: v.optional(v.number()),
+    emailSentAt: v.optional(v.number()),
+    lastEmailError: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_recipientUserId_createdAt', ['recipientUserId', 'createdAt'])
+    .index('by_recipientUserId_readAt', ['recipientUserId', 'readAt'])
+    .index('by_recipientUserId_emailStatus', ['recipientUserId', 'emailStatus'])
+    .index('by_issueId', ['issueId'])
+    .index('by_projectId', ['projectId']),
 })

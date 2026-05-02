@@ -14,6 +14,7 @@ It supports:
 - Multi-project workspaces.
 - Global roles: `admin`, `member`, `viewer`.
 - Project membership and email invites.
+- In-app inbox notifications plus assignment email delivery over SMTP.
 - Private global personal notes with modal and full-page access.
 - Task lists plus task status-based Kanban.
 - One-level sub-tasks with progress rollups.
@@ -63,6 +64,13 @@ From code and README, local dev expects:
 - Convex server env:
   - `CLERK_SECRET_KEY`
   - `APP_BASE_URL`
+  - `SMTP_HOST`
+  - `SMTP_PORT`
+  - `SMTP_SECURE`
+  - `SMTP_USER`
+  - `SMTP_PASS`
+  - `SMTP_FROM_EMAIL`
+  - `SMTP_FROM_NAME`
   - optional `CLERK_API_URL`
 
 Important auth wiring:
@@ -87,6 +95,7 @@ Main route files:
 
 - [`src/routes/index.tsx`](./src/routes/index.tsx): public landing page
 - [`src/routes/_app.dashboard.tsx`](./src/routes/_app.dashboard.tsx): dashboard summary
+- [`src/routes/_app.inbox.tsx`](./src/routes/_app.inbox.tsx): notification inbox for assignment alerts with mark-read controls
 - [`src/routes/_app.my-work.tsx`](./src/routes/_app.my-work.tsx): opinionated personal queue for assigned work with route-backed preset views, persisted last/default view preferences, and first-pass bulk actions
 - [`src/routes/_app.notes.tsx`](./src/routes/_app.notes.tsx): private personal notes workspace with note cards, modal/full-page access, and a single rich editor surface
 - [`src/routes/_app.projects.index.tsx`](./src/routes/_app.projects.index.tsx): project list + project creation
@@ -109,6 +118,8 @@ Key backend files:
 - [`convex/userNotes.ts`](./convex/userNotes.ts): private global user note CRUD and search
 - [`convex/projects.ts`](./convex/projects.ts): project CRUD, members, sidebar, activity
 - [`convex/issues.ts`](./convex/issues.ts): task CRUD, filtering, hierarchy, status rules, and first-pass bulk updates
+- [`convex/notifications.ts`](./convex/notifications.ts): inbox queries/mutations plus internal notification creation and email delivery state
+- [`convex/notificationsActions.ts`](./convex/notificationsActions.ts): SMTP email delivery actions for notifications
 - [`convex/myWork.ts`](./convex/myWork.ts): personalized assigned-work overview for the My Work route
 - [`convex/issueLists.ts`](./convex/issueLists.ts): per-project task lists
 - [`convex/comments.ts`](./convex/comments.ts): comments
@@ -131,6 +142,7 @@ Core tables in [`convex/schema.ts`](./convex/schema.ts):
 - `comments`
 - `projectInvites`
 - `activities`
+- `notifications`
 
 Notable schema choices:
 
@@ -144,6 +156,7 @@ Notable schema choices:
 - `issues.customFieldValues` stores task values keyed by the owning project’s custom field keys.
 - `issues.checklistItems` stores ordered per-task checklist items with completion state.
 - `issues.labels` stores project label keys, not freeform label strings.
+- `notifications` stores durable per-user inbox rows plus async email delivery state; notification history is separate from project activity history.
 - `users.myWorkDefaultView` and `users.myWorkLastView` persist the current user’s preferred preset view for the `My Work` page.
 - `userNotes` are owner-scoped and private; they are not tied to any project and are only readable/writable by the owning user.
 

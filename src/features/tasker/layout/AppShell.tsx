@@ -2,11 +2,13 @@ import { UserButton } from "@clerk/clerk-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import {
+	Bell,
 	CircleDot,
 	Command,
 	FileText,
 	FolderKanban,
 	Home,
+	Inbox,
 	ListChecks,
 	Menu,
 	MoreHorizontal,
@@ -26,6 +28,10 @@ import {
 	PersonalNotesWorkspace,
 	type PersonalNotesWorkspaceHandle,
 } from "#/features/tasker/notes/PersonalNotesWorkspace";
+import {
+	NotificationInboxList,
+	type NotificationListItem,
+} from "#/features/tasker/notifications/components/NotificationInboxList";
 import { getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
@@ -35,6 +41,7 @@ const navItems = [
 	{ to: "/dashboard", label: "Dashboard", icon: Home },
 	{ to: "/my-work", label: "My Work", icon: ListChecks },
 	{ to: "/projects", label: "Projects", icon: FolderKanban },
+	{ to: "/inbox", label: "Inbox", icon: Inbox },
 	{ to: "/notes", label: "Notes", icon: FileText },
 	{ to: "/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -47,6 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 		string | null
 	>(null);
 	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+	const [notificationsOpen, setNotificationsOpen] = useState(false);
 	const [commandSearch, setCommandSearch] = useState("");
 	const [listModalProject, setListModalProject] = useState<{
 		id: Id<"projects">;
@@ -81,13 +89,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	const [deleteListError, setDeleteListError] = useState<string | null>(null);
 	const [isDeletingList, setIsDeletingList] = useState(false);
 	const listActionMenuRef = useRef<HTMLDivElement | null>(null);
+	const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
 	const notesWorkspaceRef = useRef<PersonalNotesWorkspaceHandle | null>(null);
 
 	const me = useQuery(api.users.me);
 	const sidebarProjects = useQuery(api.projects.sidebar, {
 		includeArchived: false,
 	});
+	const notificationRows =
+		useQuery(api.notifications.list, {
+			limit: 8,
+		}) ?? [];
+	const unreadNotificationCount = useQuery(api.notifications.unreadCount) ?? 0;
 	const createIssueList = useMutation(api.issueLists.create);
+	const markNotificationRead = useMutation(api.notifications.markRead);
 	const updateIssueList = useMutation(api.issueLists.update);
 	const deleteIssueList = useMutation(api.issueLists.remove);
 	const canManageIssueLists = me ? canWriteRole(me.globalRole) : false;
@@ -97,6 +112,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			{ id: "go-dashboard", label: "Go to Dashboard", to: "/dashboard" },
 			{ id: "go-my-work", label: "Open My Work", to: "/my-work" },
 			{ id: "go-projects", label: "Go to Projects", to: "/projects" },
+			{ id: "go-inbox", label: "Open Inbox", to: "/inbox" },
 			{ id: "go-notes", label: "Open Personal Notes", to: "/notes" },
 			{ id: "go-settings", label: "Open Settings", to: "/settings" },
 		];
@@ -127,7 +143,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 		return commandRows.filter((item) =>
 			item.label.toLowerCase().includes(query),
 		);
-	}, [commandSearch, me?.globalRole, sidebarProjects]);
+	}, [commandSearch, me, sidebarProjects]);
 
 	async function submitCreateList(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
@@ -271,6 +287,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	}, [listActionMenu]);
 
 	useEffect(() => {
+		if (!notificationsOpen) {
+			return;
+		}
+
+		const onDocumentClick = (event: MouseEvent) => {
+			if (
+				notificationsMenuRef.current &&
+				!notificationsMenuRef.current.contains(event.target as Node)
+			) {
+				setNotificationsOpen(false);
+			}
+		};
+
+		const onDocumentKeydown = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				setNotificationsOpen(false);
+			}
+		};
+
+		document.addEventListener("mousedown", onDocumentClick);
+		document.addEventListener("keydown", onDocumentKeydown);
+		return () => {
+			document.removeEventListener("mousedown", onDocumentClick);
+			document.removeEventListener("keydown", onDocumentKeydown);
+		};
+	}, [notificationsOpen]);
+
+	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
 			if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
 				event.preventDefault();
@@ -316,6 +360,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	async function closeNotesModal() {
 		await notesWorkspaceRef.current?.flushDraft();
 		setNotesOpen(false);
+	}
+
+	function openNotification(notification: NotificationListItem) {
+		if (notification.isUnread) {
+			void markNotificationRead({ notificationId: notification._id });
+		}
+		setNotificationsOpen(false);
+		void navigate({ to: notification.link as never });
 	}
 
 	return (
@@ -609,6 +661,62 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 					</Button>
 
 					<div className="ml-auto flex items-center gap-2">
+						<div className="relative" ref={notificationsMenuRef}>
+							<Button
+								type="button"
+								variant="ghost"
+								className="relative h-9 w-9 px-0"
+								aria-label="Open inbox"
+								title="Open inbox"
+								onClick={() => setNotificationsOpen((value) => !value)}
+							>
+								<Bell className="h-4 w-4" />
+								{unreadNotificationCount ? (
+									<span className="absolute right-1.5 top-1.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-[var(--accent-foreground)]">
+										{unreadNotificationCount > 9
+											? "9+"
+											: unreadNotificationCount}
+									</span>
+								) : null}
+							</Button>
+							{notificationsOpen ? (
+								<div className="absolute right-0 z-20 mt-2 w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 shadow-[0_24px_64px_rgba(0,0,0,0.25)]">
+									<div className="mb-3 flex items-center justify-between gap-3">
+										<div>
+											<p className="m-0 text-sm font-semibold text-[var(--text)]">
+												Inbox
+											</p>
+											<p className="m-0 text-xs text-[var(--muted-text)]">
+												{unreadNotificationCount
+													? `${unreadNotificationCount} unread`
+													: "No unread notifications"}
+											</p>
+										</div>
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											onClick={() => {
+												setNotificationsOpen(false);
+												void navigate({ to: "/inbox" });
+											}}
+										>
+											View all
+										</Button>
+									</div>
+									<NotificationInboxList
+										emptyMessage="No notifications yet."
+										notifications={notificationRows}
+										onMarkRead={(notificationId) =>
+											void markNotificationRead({
+												notificationId,
+											})
+										}
+										onOpen={openNotification}
+									/>
+								</div>
+							) : null}
+						</div>
 						<ThemeToggle />
 						<UserButton />
 					</div>

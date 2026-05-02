@@ -74,6 +74,7 @@ Use this file to track feature progress. Check items off as they ship.
 
 Core workflow progress:
 - 2026-03-25: Added bulk task actions for status, priority, archive, and project-scoped assignee updates across `My Work` and project list views, backed by `convex/issues.bulkUpdate`.
+- 2026-05-02: Added first-pass notifications infrastructure with a dedicated inbox, unread state, and async SMTP email delivery for task assignment and reassignment. Invite emails still stay on Clerk, while due reminders, mentions, comments, and notification preferences remain open.
 
 ## Planning
 

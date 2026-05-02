@@ -27,7 +27,7 @@ function SettingsPage() {
 		<div>
 			<PageHeader
 				title="Settings"
-				description="Profile basics and developer utilities."
+				description="Manage your profile and account settings."
 			/>
 
 			<Card className="mb-4">
@@ -60,11 +60,11 @@ function SettingsPage() {
 
 			<Card>
 				<CardHeader>
-					<CardTitle>Developer Helpers</CardTitle>
+					<CardTitle>Workspace Tools</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<p className="mt-0 mb-3 text-sm text-[var(--muted-text)]">
-						Seed a sample project/tasks dataset for local testing.
+						Load sample projects and tasks for testing.
 					</p>
 					<Button
 						variant="secondary"
@@ -75,7 +75,7 @@ function SettingsPage() {
 							);
 						}}
 					>
-						Seed demo data
+						Load sample data
 					</Button>
 					{seedResult ? (
 						<p className="mb-0 mt-2 text-sm text-[var(--muted-text)]">

@@ -128,7 +128,7 @@ function ProjectsPage() {
 		<div>
 			<PageHeader
 				title="Projects"
-				description="Browse your accessible projects, create new ones, and jump into task planning."
+				description="Browse your projects, create new ones, and jump into the work."
 				actions={
 					canCreate ? (
 						<Button

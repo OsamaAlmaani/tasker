@@ -19,6 +19,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppNotesRouteImport } from './routes/_app.notes'
 import { Route as AppMyWorkRouteImport } from './routes/_app.my-work'
+import { Route as AppInboxRouteImport } from './routes/_app.inbox'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppProjectsIndexRouteImport } from './routes/_app.projects.index'
 import { Route as AppProjectsProjectIdRouteImport } from './routes/_app.projects.$projectId'
@@ -74,6 +75,11 @@ const AppMyWorkRoute = AppMyWorkRouteImport.update({
   path: '/my-work',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInboxRoute = AppInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/dashboard': typeof AppDashboardRoute
+  '/inbox': typeof AppInboxRoute
   '/my-work': typeof AppMyWorkRoute
   '/notes': typeof AppNotesRoute
   '/settings': typeof AppSettingsRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/dashboard': typeof AppDashboardRoute
+  '/inbox': typeof AppInboxRoute
   '/my-work': typeof AppMyWorkRoute
   '/notes': typeof AppNotesRoute
   '/settings': typeof AppSettingsRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/inbox': typeof AppInboxRoute
   '/_app/my-work': typeof AppMyWorkRoute
   '/_app/notes': typeof AppNotesRoute
   '/_app/settings': typeof AppSettingsRoute
@@ -160,6 +169,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/unauthorized'
     | '/dashboard'
+    | '/inbox'
     | '/my-work'
     | '/notes'
     | '/settings'
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/unauthorized'
     | '/dashboard'
+    | '/inbox'
     | '/my-work'
     | '/notes'
     | '/settings'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/unauthorized'
     | '/_app/dashboard'
+    | '/_app/inbox'
     | '/_app/my-work'
     | '/_app/notes'
     | '/_app/settings'
@@ -284,6 +296,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMyWorkRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/inbox': {
+      id: '/_app/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof AppInboxRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -324,6 +343,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
+  AppInboxRoute: typeof AppInboxRoute
   AppMyWorkRoute: typeof AppMyWorkRoute
   AppNotesRoute: typeof AppNotesRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -335,6 +355,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
+  AppInboxRoute: AppInboxRoute,
   AppMyWorkRoute: AppMyWorkRoute,
   AppNotesRoute: AppNotesRoute,
   AppSettingsRoute: AppSettingsRoute,

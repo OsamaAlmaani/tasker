@@ -80,6 +80,13 @@ export const MY_WORK_VIEWS = [
   'backlog',
   'completed',
 ] as const
+export const NOTIFICATION_TYPES = ['issue_assigned'] as const
+export const NOTIFICATION_EMAIL_STATUSES = [
+  'pending',
+  'sent',
+  'failed',
+  'skipped',
+] as const
 
 export type GlobalRole = (typeof GLOBAL_ROLES)[number]
 export type IssueStatus = string
@@ -114,6 +121,9 @@ export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number]
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number]
 export type InviteStatus = (typeof INVITE_STATUSES)[number]
 export type MyWorkView = (typeof MY_WORK_VIEWS)[number]
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number]
+export type NotificationEmailStatus =
+  (typeof NOTIFICATION_EMAIL_STATUSES)[number]
 
 export const globalRoleValidator = v.union(
   v.literal('owner'),
@@ -223,4 +233,13 @@ export const myWorkViewValidator = v.union(
   v.literal('overdue'),
   v.literal('backlog'),
   v.literal('completed'),
+)
+
+export const notificationTypeValidator = v.union(v.literal('issue_assigned'))
+
+export const notificationEmailStatusValidator = v.union(
+  v.literal('pending'),
+  v.literal('sent'),
+  v.literal('failed'),
+  v.literal('skipped'),
 )

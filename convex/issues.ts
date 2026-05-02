@@ -1,4 +1,5 @@
 import { ConvexError, v } from 'convex/values'
+import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
@@ -17,6 +18,7 @@ import {
   requireProjectWriteAccess,
 } from './lib/auth'
 import { createActivity } from './lib/activity'
+import { shouldNotifyAssigneeChange } from './lib/notifications'
 import {
   ensureProjectCustomFieldsExist,
   normalizeIssueCustomFieldValues,
@@ -602,6 +604,20 @@ async function applyIssueUpdate(
         to: changes.assigneeId,
       },
     })
+
+    if (shouldNotifyAssigneeChange(issue.assigneeId, changes.assigneeId)) {
+      await ctx.runMutation(internal.notifications.createAssignmentNotification, {
+        recipientUserId: changes.assigneeId as Id<'users'>,
+        actorUserId: user._id,
+        actorName: user.name,
+        projectId: issue.projectId,
+        projectKey: project.key,
+        projectName: project.name,
+        issueId: issue._id,
+        issueNumber: issue.issueNumber,
+        issueTitle: nextTitle,
+      })
+    }
   }
 
   if (changes.listId !== undefined && changes.listId !== issue.listId) {
@@ -974,6 +990,20 @@ export const create = mutation({
         parentIssueId: args.parentIssueId,
       },
     })
+
+    if (args.assigneeId) {
+      await ctx.runMutation(internal.notifications.createAssignmentNotification, {
+        recipientUserId: args.assigneeId,
+        actorUserId: user._id,
+        actorName: user.name,
+        projectId: args.projectId,
+        projectKey: project.key,
+        projectName: project.name,
+        issueId,
+        issueNumber,
+        issueTitle: args.title.trim(),
+      })
+    }
 
     return await ctx.db.get(issueId)
   },

@@ -48,14 +48,15 @@ function ConvexAuthTroubleshooting() {
 	return (
 		<main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col items-center justify-center gap-4 px-6 text-center">
 			<h1 className="m-0 text-2xl font-semibold">
-				Authentication setup incomplete
+				Sign-in verification incomplete
 			</h1>
 			<p className="m-0 text-sm text-[var(--muted-text)]">
-				Clerk session exists, but Convex could not verify your token yet.
+				Your sign-in session is active, but the app could not finish
+				verification yet.
 			</p>
 			<p className="m-0 text-sm text-[var(--muted-text)]">
-				Check Clerk JWT template name <code>convex</code> and restart{" "}
-				<code>pnpm dlx convex dev</code>.
+				If this is a local setup issue, check the JWT template name and restart
+				the backend.
 			</p>
 		</main>
 	);

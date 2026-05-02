@@ -382,7 +382,7 @@ function MyWorkPage() {
 		<div>
 			<PageHeader
 				title="My Work"
-				description="Opinionated personal queue: focus work, due soon tasks, overdue tasks, and recently completed follow-through."
+				description="Your personal queue for focus work, due dates, and recently completed tasks."
 			/>
 
 			<section className="mt-5 flex flex-wrap gap-3">
@@ -411,8 +411,8 @@ function MyWorkPage() {
 					<CardHeader>
 						<CardTitle>Saved Views</CardTitle>
 						<p className="m-0 text-sm text-[var(--muted-text)]">
-							Switch between opinionated personal queues without rebuilding
-							filters each time.
+							Switch between your saved queues without changing filters each
+							time.
 						</p>
 					</CardHeader>
 					<CardContent className="space-y-3">

@@ -10,10 +10,10 @@ import { Select } from "#/components/ui/select";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import {
 	canManageOwners,
+	type GlobalRole,
 	globalRoleLabel,
 	isAdminRole,
 	isOwnerRole,
-	type GlobalRole,
 } from "#/features/tasker/model";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
