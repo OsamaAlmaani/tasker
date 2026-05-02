@@ -8,6 +8,13 @@ import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { Input } from "#/components/ui/input";
 import { Select } from "#/components/ui/select";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
+import {
+	canManageOwners,
+	globalRoleLabel,
+	isAdminRole,
+	isOwnerRole,
+	type GlobalRole,
+} from "#/features/tasker/model";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
 
@@ -17,10 +24,14 @@ export const Route = createFileRoute("/_app/admin/users")({
 
 function AdminUsersPage() {
 	const me = useQuery(api.users.me);
+	const bootstrapOwner = useMutation(
+		api.users.bootstrapFirstOwnerForCurrentUser,
+	);
 
 	const [search, setSearch] = useState("");
 	const [role, setRole] = useState("");
-	const [isActive, setIsActive] = useState("");
+	const [isActive, setIsActive] = useState("true");
+	const [bootstrapMessage, setBootstrapMessage] = useState<string | null>(null);
 	const [selectedUserId, setSelectedUserId] = useState<Id<"users"> | null>(
 		null,
 	);
@@ -33,7 +44,7 @@ function AdminUsersPage() {
 
 	const users = useQuery(api.users.list, {
 		search: search || undefined,
-		role: (role || undefined) as "admin" | "member" | "viewer" | undefined,
+		role: (role || undefined) as GlobalRole | undefined,
 		isActive: isActive === "" ? undefined : isActive === "true",
 	});
 
@@ -62,7 +73,7 @@ function AdminUsersPage() {
 		}
 	}
 
-	if (me && me.globalRole !== "admin") {
+	if (me && !isAdminRole(me.globalRole)) {
 		return <Navigate to="/unauthorized" />;
 	}
 
@@ -70,8 +81,13 @@ function AdminUsersPage() {
 		<div>
 			<PageHeader
 				title="User Management"
-				description="Admin-only controls for global roles, account state, and project memberships."
+				description="Owner and admin controls for global roles, account state, and project memberships."
 			/>
+			{bootstrapMessage ? (
+				<p className="mb-4 text-sm text-[var(--muted-text)]">
+					{bootstrapMessage}
+				</p>
+			) : null}
 
 			<Card className="mb-4">
 				<CardContent className="grid gap-2 p-4 md:grid-cols-4">
@@ -85,6 +101,7 @@ function AdminUsersPage() {
 						onChange={(event) => setRole(event.target.value)}
 					>
 						<option value="">All roles</option>
+						<option value="owner">Owner</option>
 						<option value="admin">Admin</option>
 						<option value="member">Member</option>
 						<option value="viewer">Viewer</option>
@@ -97,8 +114,28 @@ function AdminUsersPage() {
 						<option value="true">Active</option>
 						<option value="false">Inactive</option>
 					</Select>
-					<div className="flex items-center text-xs text-[var(--muted-text)]">
-						{users ? `${users.length} users` : "Loading..."}
+					<div className="flex items-center justify-between gap-2 text-xs text-[var(--muted-text)]">
+						<span>{users ? `${users.length} users` : "Loading..."}</span>
+						{me && !isOwnerRole(me.globalRole) ? (
+							<Button
+								size="sm"
+								variant="ghost"
+								onClick={async () => {
+									try {
+										await bootstrapOwner({});
+										setBootstrapMessage("You are now an owner.");
+									} catch (error) {
+										setBootstrapMessage(
+											error instanceof Error
+												? error.message
+												: "Owner bootstrap failed.",
+										);
+									}
+								}}
+							>
+								Claim owner role
+							</Button>
+						) : null}
 					</div>
 				</CardContent>
 			</Card>
@@ -109,63 +146,85 @@ function AdminUsersPage() {
 						<CardTitle>Users</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-2">
-						{(users ?? []).map((user) => (
-							<div
-								key={user._id}
-								className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-3"
-							>
-								<div className="flex items-center justify-between gap-3">
-									<div>
-										<p className="m-0 text-sm font-medium text-[var(--text)]">
-											{user.name}
-										</p>
-										<p className="m-0 text-xs text-[var(--muted-text)]">
-											{user.email}
-										</p>
+						{(users ?? []).map((user) => {
+							const actorRole = me?.globalRole;
+							const canManageTarget = Boolean(
+								actorRole &&
+									(!isOwnerRole(user.globalRole) || canManageOwners(actorRole)),
+							);
+
+							return (
+								<div
+									key={user._id}
+									className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-3"
+								>
+									<div className="flex items-center justify-between gap-3">
+										<div>
+											<p className="m-0 text-sm font-medium text-[var(--text)]">
+												{user.name}
+											</p>
+											<p className="m-0 text-xs text-[var(--muted-text)]">
+												{user.email}
+											</p>
+											<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
+												{globalRoleLabel[user.globalRole]}
+											</p>
+										</div>
+										<div className="flex items-center gap-2">
+											<Badge>{user.isActive ? "Active" : "Inactive"}</Badge>
+											<Select
+												className="w-32"
+												value={user.globalRole}
+												disabled={!canManageTarget}
+												onChange={(event) =>
+													updateRole({
+														userId: user._id,
+														role: event.target.value as
+															| "owner"
+															| "admin"
+															| "member"
+															| "viewer",
+													})
+												}
+											>
+												{actorRole && canManageOwners(actorRole) ? (
+													<option value="owner">Owner</option>
+												) : null}
+												<option value="admin">Admin</option>
+												<option value="member">Member</option>
+												<option value="viewer">Viewer</option>
+											</Select>
+											<Button
+												size="sm"
+												variant="secondary"
+												disabled={!canManageTarget}
+												onClick={() =>
+													setStatusChangeTarget({
+														id: user._id,
+														name: user.name,
+														nextIsActive: !user.isActive,
+													})
+												}
+											>
+												{user.isActive ? "Deactivate" : "Activate"}
+											</Button>
+											<Button
+												size="sm"
+												variant="ghost"
+												onClick={() => setSelectedUserId(user._id)}
+											>
+												Inspect
+											</Button>
+										</div>
 									</div>
-									<div className="flex items-center gap-2">
-										<Badge>{user.isActive ? "Active" : "Inactive"}</Badge>
-										<Select
-											className="w-32"
-											value={user.globalRole}
-											onChange={(event) =>
-												updateRole({
-													userId: user._id,
-													role: event.target.value as
-														| "admin"
-														| "member"
-														| "viewer",
-												})
-											}
-										>
-											<option value="admin">Admin</option>
-											<option value="member">Member</option>
-											<option value="viewer">Viewer</option>
-										</Select>
-										<Button
-											size="sm"
-											variant="secondary"
-											onClick={() =>
-												setStatusChangeTarget({
-													id: user._id,
-													name: user.name,
-													nextIsActive: !user.isActive,
-												})
-											}
-										>
-											{user.isActive ? "Deactivate" : "Activate"}
-										</Button>
-										<Button
-											size="sm"
-											variant="ghost"
-											onClick={() => setSelectedUserId(user._id)}
-										>
-											Inspect
-										</Button>
-									</div>
+									{!canManageTarget ? (
+										<p className="m-0 mt-2 text-xs text-[var(--muted-text)]">
+											Only owners can change or deactivate owner accounts.
+										</p>
+									) : null}
 								</div>
-							</div>
-						))}
+							);
+						})}
 						{!users?.length ? (
 							<p className="m-0 text-sm text-[var(--muted-text)]">
 								No users found.

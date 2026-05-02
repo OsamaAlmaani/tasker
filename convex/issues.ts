@@ -9,6 +9,7 @@ import {
   type IssueChecklistItem,
 } from './constants'
 import {
+  isAdmin,
   requireIssueViewAccess,
   requireIssueWriteAccess,
   requireProjectIssueDeleteAccess,
@@ -130,7 +131,7 @@ async function ensureAssigneeAllowed(
     })
   }
 
-  if (assignee.globalRole === 'admin') {
+  if (isAdmin(assignee.globalRole)) {
     return assignee
   }
 

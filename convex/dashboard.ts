@@ -1,5 +1,5 @@
 import { query } from './_generated/server'
-import { getAccessibleProjectIds, requireCurrentUser } from './lib/auth'
+import { getAccessibleProjectIds, isAdmin, requireCurrentUser } from './lib/auth'
 import {
   getProjectStatusColor,
   getProjectStatusLabel,
@@ -13,7 +13,7 @@ export const overview = query({
     const now = Date.now()
 
     const accessibleProjects =
-      user.globalRole === 'admin'
+      isAdmin(user.globalRole)
         ? await ctx.db.query('projects').collect()
         : await Promise.all(
             (await getAccessibleProjectIds(ctx, user._id)).map((projectId) =>

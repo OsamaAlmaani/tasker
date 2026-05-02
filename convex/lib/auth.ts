@@ -45,18 +45,30 @@ export async function requireCurrentUser(ctx: Ctx) {
   return user
 }
 
+export function isOwner(role: GlobalRole) {
+  return role === 'owner'
+}
+
 export function isAdmin(role: GlobalRole) {
-  return role === 'admin'
+  return role === 'owner' || role === 'admin'
 }
 
 export function canWrite(role: GlobalRole) {
-  return role === 'admin' || role === 'member'
+  return isAdmin(role) || role === 'member'
 }
 
 export async function requireAdmin(ctx: Ctx) {
   const user = await requireCurrentUser(ctx)
   if (!isAdmin(user.globalRole)) {
     throw forbidden('Admin access is required for this operation.')
+  }
+  return user
+}
+
+export async function requireOwner(ctx: Ctx) {
+  const user = await requireCurrentUser(ctx)
+  if (!isOwner(user.globalRole)) {
+    throw forbidden('Owner access is required for this operation.')
   }
   return user
 }

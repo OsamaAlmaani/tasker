@@ -9,6 +9,7 @@ import {
 import {
   canWrite,
   getAccessibleProjectIds,
+  isAdmin,
   requireCurrentUser,
   requireProjectMemberManagementAccess,
   requireProjectViewAccess,
@@ -44,7 +45,7 @@ export const list = query({
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx)
 
-    if (user.globalRole === 'admin') {
+    if (isAdmin(user.globalRole)) {
       const projects = await ctx.db.query('projects').collect()
       return projects
         .filter((project) => args.includeArchived || !project.archived)
@@ -73,7 +74,7 @@ export const sidebar = query({
     const user = await requireCurrentUser(ctx)
 
     const projects =
-      user.globalRole === 'admin'
+      isAdmin(user.globalRole)
         ? await ctx.db.query('projects').collect()
         : (
             await Promise.all(
@@ -164,7 +165,7 @@ export const getById = query({
       membershipRows: members,
       canEdit: canWrite(user.globalRole),
       canManageMembers:
-        user.globalRole === 'admin' ||
+        isAdmin(user.globalRole) ||
         (user.globalRole === 'member' && normalizedProject.allowMemberInvites),
       canDeleteIssues:
         canWrite(user.globalRole) && normalizedProject.allowIssueDelete,

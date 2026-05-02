@@ -1,4 +1,4 @@
-export const GLOBAL_ROLES = ["admin", "member", "viewer"] as const;
+export const GLOBAL_ROLES = ["owner", "admin", "member", "viewer"] as const;
 export type GlobalRole = (typeof GLOBAL_ROLES)[number];
 
 export const ISSUE_STATUSES = [
@@ -36,7 +36,28 @@ export const issuePriorityLabel: Record<IssuePriority, string> = {
 };
 
 export const globalRoleLabel: Record<GlobalRole, string> = {
+	owner: "Owner",
 	admin: "Admin",
 	member: "Member",
 	viewer: "Viewer",
 };
+
+export function isOwnerRole(role: GlobalRole): boolean {
+	return role === "owner";
+}
+
+export function isAdminRole(role: GlobalRole): boolean {
+	return role === "owner" || role === "admin";
+}
+
+export function canWriteRole(role: GlobalRole): boolean {
+	return isAdminRole(role) || role === "member";
+}
+
+export function canManageOwners(role: GlobalRole): boolean {
+	return isOwnerRole(role);
+}
+
+export function canManageAdmins(role: GlobalRole): boolean {
+	return isAdminRole(role);
+}

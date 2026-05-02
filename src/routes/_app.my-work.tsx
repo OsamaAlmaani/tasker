@@ -19,6 +19,7 @@ import {
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatDate, formatRelative } from "#/features/tasker/format";
 import { IssueBulkActionsBar } from "#/features/tasker/issues/components/IssueBulkActionsBar";
+import { canWriteRole } from "#/features/tasker/model";
 import { cn, getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
@@ -178,7 +179,7 @@ function MyWorkPage() {
 	const defaultView = me?.myWorkDefaultView ?? "overview";
 	const selectedView =
 		search.view ?? me?.myWorkDefaultView ?? me?.myWorkLastView ?? "overview";
-	const canWrite = me?.globalRole === "admin" || me?.globalRole === "member";
+	const canWrite = me ? canWriteRole(me.globalRole) : false;
 	const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(
 		() => new Set(),
 	);

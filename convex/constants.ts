@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-export const GLOBAL_ROLES = ['admin', 'member', 'viewer'] as const
+export const GLOBAL_ROLES = ['owner', 'admin', 'member', 'viewer'] as const
 export const ISSUE_STATUSES = [
   'todo',
   'backlog',
@@ -116,6 +116,7 @@ export type InviteStatus = (typeof INVITE_STATUSES)[number]
 export type MyWorkView = (typeof MY_WORK_VIEWS)[number]
 
 export const globalRoleValidator = v.union(
+  v.literal('owner'),
   v.literal('admin'),
   v.literal('member'),
   v.literal('viewer'),

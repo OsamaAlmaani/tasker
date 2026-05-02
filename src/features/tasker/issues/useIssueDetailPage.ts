@@ -3,7 +3,11 @@ import { type FormEvent, useMemo, useState } from "react";
 import type { IssueChecklistItem } from "#/features/tasker/issues/checklists";
 import type { IssueDraft } from "#/features/tasker/issues/components/IssueDraftDialog";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
-import type { ISSUE_PRIORITIES, ISSUE_STATUSES } from "#/features/tasker/model";
+import {
+	canWriteRole,
+	type ISSUE_PRIORITIES,
+	type ISSUE_STATUSES,
+} from "#/features/tasker/model";
 import {
 	buildIssueCustomFieldSubmission,
 	normalizeIssueCustomFieldDraftValues,
@@ -139,7 +143,7 @@ export function useIssueDetailPage({
 	const [subIssueError, setSubIssueError] = useState<string | null>(null);
 	const [subIssueForm, setSubIssueForm] = useState(() => createSubIssueDraft());
 
-	const canWrite = me?.globalRole === "admin" || me?.globalRole === "member";
+	const canWrite = me ? canWriteRole(me.globalRole) : false;
 	const currentIssue = issueData?.issue as IssueDetailRow | undefined;
 	const projectId = issueData?.project._id;
 	const canDeleteIssue = Boolean(

@@ -12,6 +12,7 @@ import { Switch } from "#/components/ui/switch";
 import { Textarea } from "#/components/ui/textarea";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatRelative } from "#/features/tasker/format";
+import { canWriteRole } from "#/features/tasker/model";
 import { projectFormSchema } from "#/features/tasker/validation";
 import { getClientErrorMessage, parseConvexError } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
@@ -100,7 +101,7 @@ function ProjectsPage() {
 		}
 	}
 
-	const canCreate = me?.globalRole === "admin" || me?.globalRole === "member";
+	const canCreate = me ? canWriteRole(me.globalRole) : false;
 	const activeProjects = (projects ?? []).filter(
 		(project) => !project.archived,
 	);

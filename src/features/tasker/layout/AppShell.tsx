@@ -29,7 +29,7 @@ import {
 import { getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
-import { globalRoleLabel } from "../model";
+import { canWriteRole, globalRoleLabel, isAdminRole } from "../model";
 
 const navItems = [
 	{ to: "/dashboard", label: "Dashboard", icon: Home },
@@ -90,8 +90,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	const createIssueList = useMutation(api.issueLists.create);
 	const updateIssueList = useMutation(api.issueLists.update);
 	const deleteIssueList = useMutation(api.issueLists.remove);
-	const canManageIssueLists =
-		me?.globalRole === "admin" || me?.globalRole === "member";
+	const canManageIssueLists = me ? canWriteRole(me.globalRole) : false;
 
 	const quickCommands = useMemo(() => {
 		const commandRows = [
@@ -102,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			{ id: "go-settings", label: "Open Settings", to: "/settings" },
 		];
 
-		if (me?.globalRole === "admin") {
+		if (me && isAdminRole(me.globalRole)) {
 			commandRows.push({
 				id: "go-admin-users",
 				label: "Open User Management",
@@ -369,7 +368,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 							</Link>
 						);
 					})}
-					{me?.globalRole === "admin" ? (
+					{me && isAdminRole(me.globalRole) ? (
 						<Link
 							to="/admin/users"
 							className="nav-item"

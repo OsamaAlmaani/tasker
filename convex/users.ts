@@ -3,11 +3,31 @@ import { mutation, query } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
 import { GLOBAL_ROLES, globalRoleValidator, myWorkViewValidator } from './constants'
-import { requireAdmin, requireAuth, requireCurrentUser } from './lib/auth'
+import {
+  isAdmin,
+  isOwner,
+  requireAdmin,
+  requireAuth,
+  requireCurrentUser,
+} from './lib/auth'
 import { createActivity } from './lib/activity'
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase()
+}
+
+async function listOwners(ctx: MutationCtx) {
+  return await ctx.db
+    .query('users')
+    .withIndex('by_globalRole', (q) => q.eq('globalRole', 'owner'))
+    .collect()
+}
+
+async function listAdmins(ctx: MutationCtx) {
+  return await ctx.db
+    .query('users')
+    .withIndex('by_globalRole', (q) => q.eq('globalRole', 'admin'))
+    .collect()
 }
 
 async function claimPendingInvites(
@@ -115,7 +135,7 @@ export const ensureCurrentUser = mutation({
       email,
       name,
       imageUrl: args.imageUrl,
-      globalRole: firstUser ? 'member' : 'admin',
+      globalRole: firstUser ? 'member' : 'owner',
       isActive: true,
       createdAt: now,
       updatedAt: now,
@@ -216,8 +236,11 @@ export const listAssignableUsers = query({
   handler: async (ctx, args) => {
     const currentUser = await requireCurrentUser(ctx)
 
-    if (currentUser.globalRole === 'admin') {
-      return await ctx.db.query('users').withIndex('by_isActive', (q) => q.eq('isActive', true)).collect()
+    if (isAdmin(currentUser.globalRole)) {
+      return await ctx.db
+        .query('users')
+        .withIndex('by_isActive', (q) => q.eq('isActive', true))
+        .collect()
     }
 
     const membership = await ctx.db
@@ -271,16 +294,38 @@ export const updateRole = mutation({
       })
     }
 
-    if (target.globalRole === 'admin' && args.role !== 'admin') {
-      const admins = await ctx.db
-        .query('users')
-        .withIndex('by_globalRole', (q) => q.eq('globalRole', 'admin'))
-        .collect()
+    if (args.role === 'owner' && !isOwner(admin.globalRole)) {
+      throw new ConvexError({
+        code: 'FORBIDDEN',
+        message: 'Only owners can assign the owner role.',
+      })
+    }
 
+    if (isOwner(target.globalRole) && !isOwner(admin.globalRole)) {
+      throw new ConvexError({
+        code: 'FORBIDDEN',
+        message: 'Admins cannot change owner accounts.',
+      })
+    }
+
+    const owners = await listOwners(ctx)
+
+    if (isOwner(target.globalRole) && args.role !== 'owner') {
+      const activeOwners = owners.filter((user) => user.isActive)
+      if (target.isActive && activeOwners.length <= 1) {
+        throw new ConvexError({
+          code: 'FORBIDDEN',
+          message: 'At least one active owner is required.',
+        })
+      }
+    }
+
+    if (owners.length === 0 && target.globalRole === 'admin' && args.role !== 'admin') {
+      const admins = await listAdmins(ctx)
       if (admins.length <= 1) {
         throw new ConvexError({
           code: 'FORBIDDEN',
-          message: 'At least one admin is required.',
+          message: 'At least one admin is required until the first owner is bootstrapped.',
         })
       }
     }
@@ -304,25 +349,38 @@ export const setActive = mutation({
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx)
+    const admin = await requireAdmin(ctx)
     const target = await ctx.db.get(args.userId)
 
     if (!target) {
       throw new ConvexError({ code: 'NOT_FOUND', message: 'User not found.' })
     }
 
-    if (target.globalRole === 'admin' && !args.isActive) {
-      const activeAdmins = (
-        await ctx.db
-          .query('users')
-          .withIndex('by_globalRole', (q) => q.eq('globalRole', 'admin'))
-          .collect()
-      ).filter((user) => user.isActive)
+    if (isOwner(target.globalRole) && !isOwner(admin.globalRole)) {
+      throw new ConvexError({
+        code: 'FORBIDDEN',
+        message: 'Admins cannot deactivate owner accounts.',
+      })
+    }
 
-      if (activeAdmins.length <= 1) {
+    const owners = await listOwners(ctx)
+
+    if (isOwner(target.globalRole) && !args.isActive) {
+      const activeOwners = owners.filter((user) => user.isActive)
+      if (target.isActive && activeOwners.length <= 1) {
         throw new ConvexError({
           code: 'FORBIDDEN',
-          message: 'At least one active admin is required.',
+          message: 'At least one active owner is required.',
+        })
+      }
+    }
+
+    if (owners.length === 0 && target.globalRole === 'admin' && !args.isActive) {
+      const activeAdmins = (await listAdmins(ctx)).filter((user) => user.isActive)
+      if (target.isActive && activeAdmins.length <= 1) {
+        throw new ConvexError({
+          code: 'FORBIDDEN',
+          message: 'At least one active admin is required until the first owner is bootstrapped.',
         })
       }
     }
@@ -333,6 +391,28 @@ export const setActive = mutation({
     })
 
     return await ctx.db.get(target._id)
+  },
+})
+
+export const bootstrapFirstOwnerForCurrentUser = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireAdmin(ctx)
+    const owners = await listOwners(ctx)
+
+    if (owners.length > 0) {
+      throw new ConvexError({
+        code: 'FORBIDDEN',
+        message: 'Owner bootstrap is only available before the first owner exists.',
+      })
+    }
+
+    await ctx.db.patch(user._id, {
+      globalRole: 'owner',
+      updatedAt: Date.now(),
+    })
+
+    return await ctx.db.get(user._id)
   },
 })
 

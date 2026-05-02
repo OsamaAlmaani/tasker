@@ -1,6 +1,11 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
-import { canWrite, requireIssueViewAccess, requireIssueWriteAccess } from './lib/auth'
+import {
+  canWrite,
+  isAdmin,
+  requireIssueViewAccess,
+  requireIssueWriteAccess,
+} from './lib/auth'
 import { createActivity } from './lib/activity'
 
 export const listByIssue = query({
@@ -96,7 +101,7 @@ export const update = mutation({
 
     const { user } = await requireIssueWriteAccess(ctx, comment.issueId)
 
-    if (user.globalRole !== 'admin' && comment.authorId !== user._id) {
+    if (!isAdmin(user.globalRole) && comment.authorId !== user._id) {
       throw new ConvexError({
         code: 'FORBIDDEN',
         message: 'You can only edit your own comments.',

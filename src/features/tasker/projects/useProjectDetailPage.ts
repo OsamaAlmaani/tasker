@@ -8,7 +8,7 @@ import {
 } from "react";
 import type { IssueChecklistItem } from "#/features/tasker/issues/checklists";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
-import type { ISSUE_PRIORITIES } from "#/features/tasker/model";
+import { canWriteRole, type ISSUE_PRIORITIES } from "#/features/tasker/model";
 import {
 	buildIssueCustomFieldSubmission,
 	normalizeProjectCustomFields,
@@ -249,7 +249,7 @@ export function useProjectDetailPage({
 		projectData?.canManageMembers ? { projectId } : "skip",
 	);
 
-	const canWrite = me?.globalRole === "admin" || me?.globalRole === "member";
+	const canWrite = me ? canWriteRole(me.globalRole) : false;
 	const projectStatuses = useMemo(
 		() => normalizeProjectStatuses(projectData?.project.statuses),
 		[projectData?.project.statuses],
