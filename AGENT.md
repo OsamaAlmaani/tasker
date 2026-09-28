@@ -16,7 +16,7 @@ It supports:
 - Project membership and email invites.
 - In-app inbox notifications plus assignment email delivery over SMTP.
 - Private global personal notes with modal and full-page access.
-- Task lists plus task status-based Kanban.
+- Task lists, task status-based Kanban, and a task calendar with start/due dates and ranges.
 - One-level sub-tasks with progress rollups.
 - Comments and activity history.
 - Project archive state and issue soft-delete behavior.
@@ -34,8 +34,10 @@ Expectations:
 
 ## Runtime / Tooling
 
-- Package manager: `pnpm`
+- Package manager: `pnpm` `11.x` from [`package.json`](./package.json)
 - Target Node: `25.x` from [`package.json`](./package.json)
+- Dependency script decisions live in [`pnpm-workspace.yaml`](./pnpm-workspace.yaml): allow esbuild's binary setup and skip Clerk's optional telemetry notice script.
+- Deployment uses [`nixpacks.toml`](./nixpacks.toml), which explicitly runs pnpm 11 through `npx`, installs with the frozen lockfile, and starts the built Nitro server directly with Node.
 - TS/path aliases from [`tsconfig.json`](./tsconfig.json):
   - `#/*` -> `src/*`
   - `#convex/*` -> `convex/*`
@@ -99,7 +101,7 @@ Main route files:
 - [`src/routes/_app.my-work.tsx`](./src/routes/_app.my-work.tsx): opinionated personal queue for assigned work with route-backed preset views, persisted last/default view preferences, and first-pass bulk actions
 - [`src/routes/_app.notes.tsx`](./src/routes/_app.notes.tsx): private personal notes workspace with note cards, modal/full-page access, and a single rich editor surface
 - [`src/routes/_app.projects.index.tsx`](./src/routes/_app.projects.index.tsx): project list + project creation
-- [`src/routes/_app.projects.$projectId.tsx`](./src/routes/_app.projects.$projectId.tsx): project detail, task list/kanban, filters, members, invites, import/export, project settings
+- [`src/routes/_app.projects.$projectId.tsx`](./src/routes/_app.projects.$projectId.tsx): project detail, task list/kanban/calendar, filters, members, invites, import/export, project settings
 - [`src/routes/_app.issues.$issueId.tsx`](./src/routes/_app.issues.$issueId.tsx): issue detail, sub-tasks, comments, activity
   - issue detail also owns inline checklist editing for task-local checklist items
 - [`src/routes/_app.admin.users.tsx`](./src/routes/_app.admin.users.tsx): admin-only user management
@@ -323,6 +325,8 @@ This file is large and stateful. If changing shell behavior, isolate edits caref
 - handoff to the project detail controller hook and `ProjectDetailContent.tsx`
 
 Most project detail state, mutations, dialogs, and derived collections now live in `src/features/tasker/projects/useProjectDetailPage.ts`; most project-page composition now lives in `src/features/tasker/projects/components/ProjectDetailContent.tsx`; and shared project search helpers now live in `src/features/tasker/projects/projectSearch.ts`.
+
+`layout=calendar` selects `src/features/tasker/projects/components/ProjectTaskCalendar.tsx`, loaded lazily inside `ClientOnly` so calendar code stays out of the initial List/Kanban bundle. It uses FullCalendar Standard 7 with DayGrid, interaction, and classic theme plugins; `projectTaskCalendar.css` maps its palette to the app theme variables. Calendar consumes the same filtered `visibleIssues` collection, including independently dated sub-tasks. Archived tasks retain the existing List layout. Task `startDate` and `dueDate` are optional date-only UTC timestamps; `dueDate` is the inclusive end boundary. `taskCalendarDates.ts` maps single boundaries to one-day events and ranges to FullCalendar exclusive ends. Whole-event dragging preserves which boundaries are set and shifts both dates for ranges. Resizing either edge creates a missing boundary for single-date tasks, or changes the corresponding boundary for existing ranges. Both dates are saved atomically through `issues.update`; the server rejects invalid dates and start dates after due dates. Never convert these date-only values into local calendar dates. Dragging and resizing are disabled for viewers and during saves; failed mutations revert the event. Start dates are supported in task/sub-task creation, issue metadata, parent draft defaults, and JSON import/export. Crowded weeks use compact event rows because DayGrid aligns heights across each week; overflow uses the native more-link popover.
 
 ### Issue detail route
 

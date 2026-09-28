@@ -81,6 +81,10 @@ function createSubIssueDraft(
 		assigneeId: parentIssue?.assigneeId ?? "",
 		listId: parentIssue?.listId ?? "",
 		parentIssueId: parentIssue?._id ?? "",
+		startDate:
+			parentIssue?.startDate != null
+				? new Date(parentIssue.startDate).toISOString().slice(0, 10)
+				: "",
 		dueDate: parentIssue?.dueDate
 			? new Date(parentIssue.dueDate).toISOString().slice(0, 10)
 			: "",
@@ -343,6 +347,9 @@ export function useIssueDetailPage({
 					| Id<"issueLists">
 					| undefined,
 				parentIssueId: issueId,
+				startDate: parsed.data.startDate
+					? new Date(parsed.data.startDate).getTime()
+					: undefined,
 				dueDate: parsed.data.dueDate
 					? new Date(parsed.data.dueDate).getTime()
 					: undefined,
@@ -389,6 +396,13 @@ export function useIssueDetailPage({
 		await updateIssue({
 			issueId,
 			dueDate: value ? new Date(value).getTime() : null,
+		});
+	}
+
+	async function changeStartDate(value: string) {
+		await updateIssue({
+			issueId,
+			startDate: value ? new Date(value).getTime() : null,
 		});
 	}
 
@@ -450,6 +464,7 @@ export function useIssueDetailPage({
 		changeAssignee,
 		changeChecklistItems,
 		changeDueDate,
+		changeStartDate,
 		changeCustomFieldValues,
 		changeList,
 		changeLabels,

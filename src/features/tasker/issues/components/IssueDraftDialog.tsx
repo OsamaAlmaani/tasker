@@ -22,6 +22,7 @@ export type IssueDraft = {
 	status: ProjectStatusDefinition["key"];
 	priority: (typeof ISSUE_PRIORITIES)[number];
 	assigneeId: string;
+	startDate: string;
 	dueDate: string;
 	customFieldValues: Record<string, ProjectCustomFieldDraftValue>;
 	labels: string[];
@@ -237,9 +238,26 @@ export function IssueDraftDialog({
 						</Select>
 					</div>
 					<div>
+						<Label>Start Date</Label>
+						<Input
+							aria-label="Start Date"
+							type="date"
+							value={draft.startDate}
+							max={draft.dueDate || undefined}
+							onChange={(event) =>
+								setDraft((previous) => ({
+									...previous,
+									startDate: event.target.value,
+								}))
+							}
+						/>
+					</div>
+					<div>
 						<Label>Due Date</Label>
 						<Input
 							type="date"
+							aria-label="Due Date"
+							min={draft.startDate || undefined}
 							value={draft.dueDate}
 							onChange={(event) =>
 								setDraft((previous) => ({

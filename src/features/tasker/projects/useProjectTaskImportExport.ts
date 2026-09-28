@@ -11,6 +11,7 @@ type ImportedTask = {
 	status?: string;
 	priority?: (typeof ISSUE_PRIORITIES)[number];
 	labels?: string[] | string;
+	startDate?: number | string;
 	dueDate?: number | string;
 	listName?: string;
 	statusName?: string;
@@ -23,6 +24,7 @@ type ExportableIssue = Pick<
 	| "status"
 	| "priority"
 	| "labels"
+	| "startDate"
 	| "dueDate"
 	| "listId"
 >;
@@ -49,6 +51,7 @@ type CreateImportedIssueArgs = {
 	description?: string;
 	status?: string;
 	priority?: (typeof ISSUE_PRIORITIES)[number];
+	startDate?: number;
 	dueDate?: number;
 	labels?: string[];
 	listId?: Id<"issueLists">;
@@ -101,7 +104,7 @@ function normalizeTaskLabels(labels?: string[] | string): string[] | undefined {
 	return parsed.length ? parsed : undefined;
 }
 
-function normalizeTaskDueDate(dueDate?: string | number): number | undefined {
+function normalizeTaskDate(dueDate?: string | number): number | undefined {
 	if (dueDate === undefined || dueDate === null) {
 		return undefined;
 	}
@@ -228,6 +231,7 @@ export function useProjectTaskImportExport({
 						projectLabels.find((label) => label.key === labelKey)?.name ??
 						labelKey,
 				),
+				startDate: issue.startDate,
 				dueDate: issue.dueDate,
 				listName: issue.listId
 					? issueListById.get(issue.listId)?.name
@@ -338,7 +342,8 @@ export function useProjectTaskImportExport({
 						description: task.description?.trim() || undefined,
 						status,
 						priority,
-						dueDate: normalizeTaskDueDate(task.dueDate),
+						startDate: normalizeTaskDate(task.startDate),
+						dueDate: normalizeTaskDate(task.dueDate),
 						labels,
 						listId,
 					});

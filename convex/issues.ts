@@ -42,6 +42,26 @@ function normalizeIssueLabels(labels: string[]) {
   return [...new Set(labels.map((label) => label.trim()).filter(Boolean))]
 }
 
+function validateIssueDates(startDate?: number | null, dueDate?: number | null) {
+  for (const date of [startDate, dueDate]) {
+    if (date != null && !Number.isFinite(new Date(date).getTime())) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'Task dates must be valid dates.',
+      })
+    }
+  }
+  if (
+    startDate != null && dueDate != null &&
+    Math.floor(startDate / 86_400_000) > Math.floor(dueDate / 86_400_000)
+  ) {
+    throw new ConvexError({
+      code: 'VALIDATION_ERROR',
+      message: 'Start date cannot be after due date.',
+    })
+  }
+}
+
 type IssueUpdateChanges = {
   title?: string
   description?: string
@@ -54,6 +74,7 @@ type IssueUpdateChanges = {
   labels?: string[]
   checklistItems?: IssueChecklistItem[]
   customFieldValues?: Record<string, string | number | boolean>
+  startDate?: number | null
   dueDate?: number | null
   archived?: boolean
 }
@@ -511,6 +532,15 @@ async function applyIssueUpdate(
       })
     }
   }
+  if (changes.startDate !== undefined || changes.dueDate !== undefined) {
+    validateIssueDates(
+      changes.startDate === undefined ? issue.startDate : changes.startDate,
+      changes.dueDate === undefined ? issue.dueDate : changes.dueDate,
+    )
+  }
+  if (changes.startDate !== undefined) {
+    patch.startDate = changes.startDate ?? undefined
+  }
   if (changes.dueDate !== undefined) {
     patch.dueDate = changes.dueDate ?? undefined
   }
@@ -847,6 +877,7 @@ export const create = mutation({
       customFieldValues: v.optional(
         v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
       ),
+    startDate: v.optional(v.number()),
     dueDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -922,6 +953,8 @@ export const create = mutation({
       }
     })()
 
+    validateIssueDates(args.startDate, args.dueDate)
+
     const now = Date.now()
     let counter = await ctx.db
       .query('projectCounters')
@@ -966,6 +999,7 @@ export const create = mutation({
       labels: nextLabels,
       checklistItems: [],
       customFieldValues: nextCustomFieldValues,
+      startDate: args.startDate,
       dueDate: args.dueDate,
       archived: false,
       createdAt: now,
@@ -1025,6 +1059,7 @@ export const update = mutation({
     customFieldValues: v.optional(
       v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
     ),
+    startDate: v.optional(v.union(v.number(), v.null())),
     dueDate: v.optional(v.union(v.number(), v.null())),
     archived: v.optional(v.boolean()),
   },

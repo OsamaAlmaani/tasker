@@ -1,8 +1,11 @@
 [phases.setup]
 nixPkgs = ["nodejs_25"]
 
+[phases.install]
+cmds = ["npx --yes pnpm@11 install --frozen-lockfile"]
+
 [phases.build]
-cmds = ["npm install", "npm run build"]
+cmds = ["npx --yes pnpm@11 run build"]
 
 [start]
-cmd = "npm run start"
+cmd = "node .output/server/index.mjs"

@@ -9,6 +9,7 @@ import { Switch } from "#/components/ui/switch";
 import { RemovableIssueStatusBadge } from "#/features/tasker/components/IssueBadges";
 import { ISSUE_PRIORITIES } from "#/features/tasker/model";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
+import type { ProjectSearch } from "#/features/tasker/projects/projectSearch";
 import { cn } from "#/lib/utils";
 
 type ProjectIssueGroup = {
@@ -36,6 +37,7 @@ type ProjectTasksPanelProps = {
 	assignableUsers?: AssignableUserOption[];
 	assigneeId: string;
 	bulkActions?: ReactNode;
+	calendar?: ReactNode;
 	canWrite: boolean;
 	dragOverStatus: ProjectStatusDefinition["key"] | null;
 	emptyStateAction?: ReactNode;
@@ -44,7 +46,7 @@ type ProjectTasksPanelProps = {
 	groupBy: string;
 	groupedIssues: ProjectIssueGroup[];
 	hideDoneTasks: boolean;
-	issueLayout: "list" | "kanban";
+	issueLayout: NonNullable<ProjectSearch["layout"]>;
 	kanbanColumns: KanbanColumn[];
 	onAddStatusFilter: (value: string) => void;
 	onArchiveStateChange: (value: "active" | "archived") => void;
@@ -66,7 +68,7 @@ type ProjectTasksPanelProps = {
 	onRemoveStatus: (value: ProjectStatusDefinition["key"]) => void;
 	onSearchChange: (value: string) => void;
 	onSortChange: (value: string) => void;
-	onToggleLayout: (layout: "list" | "kanban") => void;
+	onToggleLayout: (layout: NonNullable<ProjectSearch["layout"]>) => void;
 	priority: string;
 	renderKanbanIssueNode: (node: unknown) => ReactNode;
 	renderListIssueNode: (node: unknown) => ReactNode;
@@ -85,6 +87,7 @@ export function ProjectTasksPanel({
 	assignableUsers,
 	assigneeId,
 	bulkActions,
+	calendar,
 	canWrite,
 	dragOverStatus,
 	emptyStateAction,
@@ -158,6 +161,16 @@ export function ProjectTasksPanel({
 									>
 										Kanban
 									</Button>
+									<Button
+										type="button"
+										size="sm"
+										variant={issueLayout === "calendar" ? "secondary" : "ghost"}
+										className="h-7 px-3"
+										aria-pressed={issueLayout === "calendar"}
+										onClick={() => onToggleLayout("calendar")}
+									>
+										Calendar
+									</Button>
 								</div>
 								<div className="inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--muted-text)]">
 									<Switch
@@ -203,7 +216,11 @@ export function ProjectTasksPanel({
 				<div
 					className={cn(
 						"mb-3 grid gap-2",
-						issueLayout === "list" ? "md:grid-cols-6" : "md:grid-cols-5",
+						issueLayout === "list"
+							? "md:grid-cols-6"
+							: issueLayout === "calendar"
+								? "md:grid-cols-4"
+								: "md:grid-cols-5",
 					)}
 				>
 					<Input
@@ -257,15 +274,17 @@ export function ProjectTasksPanel({
 							<option value="status">Group: Status</option>
 						</Select>
 					) : null}
-					<Select
-						value={sortBy}
-						onChange={(event) => onSortChange(event.target.value)}
-					>
-						<option value="updated_desc">Updated</option>
-						<option value="created_desc">Created</option>
-						<option value="priority_desc">Priority</option>
-						<option value="due_asc">Due date</option>
-					</Select>
+					{issueLayout !== "calendar" ? (
+						<Select
+							value={sortBy}
+							onChange={(event) => onSortChange(event.target.value)}
+						>
+							<option value="updated_desc">Updated</option>
+							<option value="created_desc">Created</option>
+							<option value="priority_desc">Priority</option>
+							<option value="due_asc">Due date</option>
+						</Select>
+					) : null}
 				</div>
 				{resultSummary ? (
 					<p className="mb-3 text-xs text-[var(--muted-text)]">
@@ -300,7 +319,9 @@ export function ProjectTasksPanel({
 				) : null}
 				{bulkActions ? <div className="mb-3">{bulkActions}</div> : null}
 
-				{showEmptyState ? (
+				{issueLayout === "calendar" ? (
+					calendar
+				) : showEmptyState ? (
 					<div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface-muted)] px-4 py-8 text-center">
 						<p className="m-0 text-base font-semibold text-[var(--text)]">
 							{emptyStateTitle}

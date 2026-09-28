@@ -38,6 +38,7 @@ import {
 	getProjectStatusLabel,
 	type ProjectStatusDefinition,
 } from "#/features/tasker/projectStatuses";
+import { getClientErrorMessage } from "#/lib/utils";
 
 type IssueLike = {
 	_id: string;
@@ -46,6 +47,7 @@ type IssueLike = {
 	childIssueCount: number;
 	completedChildIssueCount: number;
 	description?: string | null;
+	startDate?: number | null;
 	dueDate?: number | null;
 	hasChildren: boolean;
 	hasChecklist: boolean;
@@ -597,7 +599,8 @@ type IssueMetadataPanelProps = {
 	onCustomFieldValuesChange: (
 		values: Record<string, ProjectCustomFieldDraftValue>,
 	) => void;
-	onDueDateChange: (value: string) => void;
+	onDueDateChange: (value: string) => Promise<void>;
+	onStartDateChange: (value: string) => Promise<void>;
 	onLabelsChange: (labels: string[]) => void;
 	onListChange: (value: string) => void;
 	onPriorityChange: (value: (typeof ISSUE_PRIORITIES)[number]) => void;
@@ -616,6 +619,7 @@ export function IssueMetadataPanel({
 	onAssigneeChange,
 	onCustomFieldValuesChange,
 	onDueDateChange,
+	onStartDateChange,
 	onLabelsChange,
 	onListChange,
 	onPriorityChange,
@@ -640,6 +644,13 @@ export function IssueMetadataPanel({
 		[currentIssue.dueDate],
 	);
 	const [dueDateDraft, setDueDateDraft] = useState(currentDueDateValue);
+	const currentStartDateValue =
+		currentIssue.startDate != null
+			? new Date(currentIssue.startDate).toISOString().slice(0, 10)
+			: "";
+	const [startDateDraft, setStartDateDraft] = useState(currentStartDateValue);
+	const [savingDate, setSavingDate] = useState(false);
+	const [dateError, setDateError] = useState<string | null>(null);
 	const [editingCustomFieldValues, setEditingCustomFieldValues] = useState(
 		customFieldDraftValues,
 	);
@@ -654,6 +665,31 @@ export function IssueMetadataPanel({
 	useEffect(() => {
 		setDueDateDraft(currentDueDateValue);
 	}, [currentDueDateValue]);
+
+	useEffect(() => {
+		setStartDateDraft(currentStartDateValue);
+	}, [currentStartDateValue]);
+
+	async function saveDate(field: "startDate" | "dueDate", value: string) {
+		const currentValue =
+			field === "startDate" ? currentStartDateValue : currentDueDateValue;
+		if (savingDate || value === currentValue) return;
+		setSavingDate(true);
+		setDateError(null);
+		try {
+			await (field === "startDate" ? onStartDateChange : onDueDateChange)(
+				value,
+			);
+		} catch (error) {
+			setStartDateDraft(currentStartDateValue);
+			setDueDateDraft(currentDueDateValue);
+			setDateError(
+				getClientErrorMessage(error, "Could not update task dates."),
+			);
+		} finally {
+			setSavingDate(false);
+		}
+	}
 
 	function updateCustomFieldValue(
 		field: ProjectCustomFieldDefinition,
@@ -792,14 +828,40 @@ export function IssueMetadataPanel({
 			</div>
 
 			<div className="issue-meta-row">
+				<span className="issue-meta-label">Start Date</span>
+				<div className="issue-meta-value">
+					{canWrite ? (
+						<Input
+							className="issue-meta-control"
+							type="date"
+							aria-label="Start Date"
+							value={startDateDraft}
+							max={dueDateDraft || undefined}
+							disabled={savingDate}
+							onBlur={() => void saveDate("startDate", startDateDraft)}
+							onChange={(event) => setStartDateDraft(event.target.value)}
+						/>
+					) : (
+						<span className="issue-meta-static">
+							{currentIssue.startDate != null
+								? formatDate(currentIssue.startDate)
+								: "No start date"}
+						</span>
+					)}
+				</div>
+			</div>
+			<div className="issue-meta-row">
 				<span className="issue-meta-label">Due Date</span>
 				<div className="issue-meta-value">
 					{canWrite ? (
 						<Input
 							className="issue-meta-control"
 							type="date"
+							aria-label="Due Date"
+							min={startDateDraft || undefined}
+							disabled={savingDate}
 							value={dueDateDraft}
-							onBlur={() => onDueDateChange(dueDateDraft)}
+							onBlur={() => void saveDate("dueDate", dueDateDraft)}
 							onChange={(event) => setDueDateDraft(event.target.value)}
 						/>
 					) : (
@@ -812,6 +874,11 @@ export function IssueMetadataPanel({
 				</div>
 			</div>
 
+			{dateError ? (
+				<p role="alert" className="text-sm text-[var(--danger)]">
+					{dateError}
+				</p>
+			) : null}
 			<div
 				className={`issue-meta-row${projectCustomFields.length ? "" : " issue-meta-row-last"}`}
 			>

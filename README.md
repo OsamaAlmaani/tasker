@@ -9,8 +9,8 @@ This project was built end-to-end by **GPT-5.3-Codex**, covering architecture, b
 ## Product Overview
 
 - Project-based workspaces with scoped membership and permissions.
-- Dual task views: structured list view and drag-and-drop Kanban by status.
-- Fast task operations: status, priority, assignee, due date, labels, and search/filtering.
+- Three task views: structured list, drag-and-drop Kanban by status, and a task calendar with month/week navigation, start/due date ranges, drag-to-reschedule, resizing from either edge (including single-date tasks), and compact overflow popovers.
+- Fast task operations: status, priority, assignee, start date, due date, labels, and search/filtering.
 - Parent tasks with one-level sub-task support, progress rollups, and nested list/Kanban presentation.
 - Unified task timeline combining comments and system activity in chronological order.
 - In-app inbox plus assignment email notifications.
@@ -79,6 +79,8 @@ pnpm test
 This project is licensed under the Unlicense. See `/LICENSE`.
 
 ## Local Setup (Required)
+
+Use Node.js `25.x` and pnpm `11.x`. Deployment uses `nixpacks.toml` with pnpm 11 and a frozen lockfile.
 
 1. Install dependencies.
 

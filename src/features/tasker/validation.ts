@@ -15,18 +15,28 @@ export const projectFormSchema = z.object({
 	allowIssueDelete: z.boolean().default(true),
 });
 
-export const issueFormSchema = z.object({
-	title: z.string().trim().min(2, "Task title is required."),
-	description: z.string().trim().optional(),
-	status: z.string().trim().min(1, "Status is required.").default("todo"),
-	priority: z.enum(ISSUE_PRIORITIES).default("none"),
-	assigneeId: z.string().trim().optional(),
-	listId: z.string().trim().optional(),
-	parentIssueId: z.string().trim().optional(),
-	dueDate: z.string().trim().optional(),
-	customFieldValues: z.record(z.union([z.string(), z.boolean()])).default({}),
-	labels: z.array(z.string().trim()).default([]),
-});
+export const issueFormSchema = z
+	.object({
+		title: z.string().trim().min(2, "Task title is required."),
+		description: z.string().trim().optional(),
+		status: z.string().trim().min(1, "Status is required.").default("todo"),
+		priority: z.enum(ISSUE_PRIORITIES).default("none"),
+		assigneeId: z.string().trim().optional(),
+		listId: z.string().trim().optional(),
+		parentIssueId: z.string().trim().optional(),
+		startDate: z.string().trim().optional(),
+		dueDate: z.string().trim().optional(),
+		customFieldValues: z.record(z.union([z.string(), z.boolean()])).default({}),
+		labels: z.array(z.string().trim()).default([]),
+	})
+	.refine(
+		(issue) =>
+			!issue.startDate || !issue.dueDate || issue.startDate <= issue.dueDate,
+		{
+			message: "Start date cannot be after due date.",
+			path: ["dueDate"],
+		},
+	);
 
 export const commentFormSchema = z.object({
 	body: z.string().trim().min(1, "Comment cannot be empty."),

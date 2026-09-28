@@ -33,6 +33,7 @@ function IssueDetailPage() {
 		changeChecklistItems,
 		changeCustomFieldValues,
 		changeDueDate,
+		changeStartDate,
 		changeLabels,
 		changeList,
 		changePriority,
@@ -209,7 +210,8 @@ function IssueDetailPage() {
 					onCustomFieldValuesChange={(values) =>
 						void changeCustomFieldValues(values)
 					}
-					onDueDateChange={(value) => void changeDueDate(value)}
+					onDueDateChange={changeDueDate}
+					onStartDateChange={changeStartDate}
 					onLabelsChange={(labels) => void changeLabels(labels)}
 					onListChange={(value) => void changeList(value)}
 					onPriorityChange={(value) => void changePriority(value)}

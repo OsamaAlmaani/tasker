@@ -1,3 +1,4 @@
+import { ClientOnly, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
 	Download,
@@ -7,7 +8,7 @@ import {
 	Settings2,
 	Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ConfirmDialog } from "#/components/ui/confirm-dialog";
@@ -41,6 +42,8 @@ import { getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
 
+const ProjectTaskCalendar = lazy(() => import("./ProjectTaskCalendar"));
+
 type ProjectDetailContentProps = {
 	page: ProjectDetailPageState;
 	projectData: NonNullable<ProjectDetailPageState["projectData"]>;
@@ -57,6 +60,7 @@ export function ProjectDetailContent({
 	projectId,
 	updateProjectSearch,
 }: ProjectDetailContentProps) {
+	const navigate = useNavigate();
 	const bulkUpdateIssues = useMutation(api.issues.bulkUpdate);
 	const {
 		addMember,
@@ -486,6 +490,41 @@ export function ProjectDetailContent({
 							) : null
 						}
 						canWrite={canWrite}
+						calendar={
+							issueLayout === "calendar" ? (
+								<ClientOnly
+									fallback={
+										<div className="page-loading">Loading calendar…</div>
+									}
+								>
+									<Suspense
+										fallback={
+											<div className="page-loading">Loading calendar…</div>
+										}
+									>
+										<ProjectTaskCalendar
+											key={projectId}
+											canWrite={canWrite}
+											issues={visibleIssues}
+											projectKey={projectData.project.key}
+											statuses={projectStatuses}
+											onDatesChange={(issueId, dates) =>
+												updateIssue({
+													issueId: issueId as Id<"issues">,
+													...dates,
+												})
+											}
+											onOpenIssue={(issueId) => {
+												void navigate({
+													to: "/issues/$issueId",
+													params: { issueId },
+												});
+											}}
+										/>
+									</Suspense>
+								</ClientOnly>
+							) : null
+						}
 						dragOverStatus={dragOverStatus}
 						emptyStateAction={
 							hasTaskFilters ? (

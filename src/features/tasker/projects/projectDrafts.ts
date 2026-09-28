@@ -30,6 +30,7 @@ type ProjectSettingsLike = {
 
 type ParentIssueLike = {
 	assigneeId?: string | null;
+	startDate?: number | null;
 	dueDate?: number | null;
 	listId?: string | null;
 	priority: (typeof ISSUE_PRIORITIES)[number];
@@ -51,6 +52,7 @@ export function createIssueDraftWithOverrides(
 		status: "todo",
 		priority: "none",
 		assigneeId: "",
+		startDate: "",
 		dueDate: "",
 		customFieldValues: {},
 		labels: [],
@@ -112,6 +114,10 @@ export function applyParentIssueDraftDefaults(
 			draft.assigneeId || !parentIssue?.assigneeId
 				? draft.assigneeId
 				: parentIssue.assigneeId,
+		startDate:
+			draft.startDate || parentIssue?.startDate == null
+				? draft.startDate
+				: formatIssueInputDate(parentIssue.startDate),
 		dueDate:
 			draft.dueDate || !parentIssue?.dueDate
 				? draft.dueDate

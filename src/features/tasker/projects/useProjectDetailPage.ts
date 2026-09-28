@@ -427,6 +427,9 @@ export function useProjectDetailPage({
 				assigneeId: (parsed.data.assigneeId || undefined) as
 					| Id<"users">
 					| undefined,
+				startDate: parsed.data.startDate
+					? new Date(parsed.data.startDate).getTime()
+					: undefined,
 				dueDate: parsed.data.dueDate
 					? new Date(parsed.data.dueDate).getTime()
 					: undefined,

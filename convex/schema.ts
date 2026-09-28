@@ -111,6 +111,7 @@ export default defineSchema({
     labels: v.array(v.string()),
     checklistItems: v.optional(v.array(issueChecklistItemValidator)),
     customFieldValues: v.optional(v.record(v.string(), issueCustomFieldValueValidator)),
+    startDate: v.optional(v.number()),
     dueDate: v.optional(v.number()),
     archived: v.boolean(),
     deletedAt: v.optional(v.number()),

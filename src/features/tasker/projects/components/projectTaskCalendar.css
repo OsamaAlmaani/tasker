@@ -1,0 +1,196 @@
+.task-calendar,
+.task-calendar-popover {
+	--fc-classic-background: var(--surface);
+	--fc-classic-faint: var(--surface-muted);
+	--fc-classic-muted: color-mix(in srgb, var(--text) 8%, transparent);
+	--fc-classic-strong: color-mix(in srgb, var(--text) 15%, transparent);
+	--fc-classic-foreground: var(--text);
+	--fc-classic-faint-foreground: var(--muted-text);
+	--fc-classic-muted-foreground: var(--muted-text);
+	--fc-classic-border: var(--line);
+	--fc-classic-strong-border: var(--line);
+	--fc-classic-primary: var(--accent);
+	--fc-classic-primary-foreground: var(--accent-foreground);
+	--fc-classic-event: var(--accent);
+	--fc-classic-event-contrast: var(--text);
+	--fc-classic-today: color-mix(in srgb, var(--accent) 7%, transparent);
+	--fc-classic-highlight: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.task-calendar {
+	min-width: 0;
+}
+
+.task-calendar-day-header {
+	color: var(--muted-text);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.task-calendar .task-calendar-event,
+.task-calendar-popover .task-calendar-event {
+	min-width: 0;
+	overflow: hidden;
+	margin: 2px 4px;
+	border: 1px solid color-mix(in srgb, var(--fc-event-color) 25%, transparent);
+	border-inline-start: 3px solid var(--fc-event-color);
+	border-radius: 5px;
+	background: color-mix(in srgb, var(--fc-event-color) 10%, var(--surface));
+	color: var(--text);
+	text-decoration: none;
+}
+
+.task-calendar-event:hover,
+.task-calendar-event:focus-visible {
+	filter: brightness(0.96);
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+
+.task-calendar-event-inner {
+	min-width: 0;
+	width: 100%;
+	padding: 4px 10px;
+}
+
+.task-calendar-task {
+	min-width: 0;
+	width: 100%;
+	line-height: 1.35;
+}
+
+.task-calendar-resize-marker {
+	position: absolute;
+	top: 50%;
+	width: 2px;
+	height: 12px;
+	transform: translateY(-50%);
+	border-radius: 2px;
+	background: var(--fc-event-color);
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+.task-calendar-resize-start {
+	left: 5px;
+}
+
+.task-calendar-resize-end {
+	right: 5px;
+}
+
+.task-calendar .task-calendar-resize-handle,
+.task-calendar-popover .task-calendar-resize-handle {
+	z-index: 2;
+	width: 10px;
+}
+
+.task-calendar-resize-handle-start {
+	left: 0;
+}
+
+.task-calendar-resize-handle-end {
+	right: 0;
+}
+
+.task-calendar-task-title,
+.task-calendar-task-meta {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.task-calendar-task-title {
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.task-calendar-task-meta {
+	margin-top: 2px;
+	color: var(--muted-text);
+	font-size: 10px;
+}
+
+.task-calendar-event-compact .task-calendar-event-inner {
+	padding-block: 1px;
+}
+
+.task-calendar .task-calendar-event-compact {
+	margin-block: 1px;
+}
+
+.task-calendar-event-compact .task-calendar-task-meta {
+	display: none;
+}
+
+.task-calendar-popover .task-calendar-task-meta {
+	display: block;
+}
+
+.task-calendar-more {
+	margin: 2px 4px;
+	border-radius: 4px;
+	color: var(--accent);
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.task-calendar-popover {
+	position: fixed;
+	/* biome-ignore lint/complexity/noImportantStyles: FullCalendar's inline top position does not constrain the popover to the viewport. */
+	top: 20vh !important;
+	width: min(340px, calc(100vw - 24px));
+	max-height: min(440px, 60vh);
+	overflow-y: auto;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	background: var(--surface);
+	color: var(--text);
+	box-shadow: 0 12px 36px rgb(0 0 0 / 18%);
+	backdrop-filter: blur(16px);
+}
+
+.task-calendar-popover .task-calendar-day-header {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--bg-strong);
+}
+
+@media (max-width: 640px) {
+	.task-calendar .task-calendar-event {
+		margin-inline: 1px;
+		border-inline-start-width: 2px;
+	}
+
+	.task-calendar .task-calendar-event-inner {
+		padding: 3px 8px;
+	}
+
+	.task-calendar .task-calendar-task-title {
+		font-size: 10px;
+	}
+
+	.task-calendar .task-calendar-task-meta {
+		display: none;
+	}
+
+	.task-calendar .task-calendar-more {
+		margin-inline: 1px;
+		font-size: 10px;
+	}
+
+	.task-calendar-more-label {
+		display: none;
+	}
+
+	.task-calendar-popover {
+		/* biome-ignore lint/complexity/noImportantStyles: Override FullCalendar's inline popover position on narrow screens. */
+		left: 12px !important;
+		width: calc(100vw - 24px);
+		max-height: 60vh;
+	}
+}
