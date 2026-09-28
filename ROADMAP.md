@@ -80,12 +80,14 @@ Core workflow progress:
 
 - [x] Add calendar view
 - [x] Add task start dates, calendar ranges, and resizing from either edge
+- [x] Add Gantt view with task grid, date ranges, drag/resize, and zoom
 - [ ] Add workload and capacity planning by assignee
 - [ ] Add timeline view with milestones
 - [ ] Add task dependencies and blocker relationships
 - [ ] Add archived-task visibility within each project
 
 Planning progress:
+- 2026-09-28: Added a fourth project task view using SVAR React Gantt MIT core. The timeline supports independent task/subtask dates, single-date tasks and inclusive ranges, whole-bar dragging, either-edge resizing, day/week/month scales, Today/Fit controls, a resizable task grid, status colors, and derived progress. Existing filters and Hide done apply; undated tasks have separate links, viewers are read-only, and failed saves revert. Small screens show the timeline with a separate grid toggle. Calendar and Gantt share date-boundary rules and the atomic task update mutation; dependencies and milestones remain future work.
 - 2026-09-28: Added a project task calendar using FullCalendar Standard, with month/week navigation, due-date drag-and-drop through the existing task mutation, compact crowded weeks, truncated titles, and expandable overflow. Calendar honors task/list filters and Hide done; tasks without due dates are counted separately. Viewers retain read-only task links.
 
 - 2026-09-28: Added optional start dates across task/sub-task creation, metadata editing, Convex, and JSON import/export. Calendar uses whichever date is set, spans both dates inclusively, preserves configured boundaries when dragging, and fills missing boundaries when resizing single-date tasks. Existing ranges resize from either edge, with atomic saves, server date validation, viewer restrictions, and rollback on failure.

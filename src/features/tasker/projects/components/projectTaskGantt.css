@@ -1,0 +1,180 @@
+/* biome-ignore-all lint/complexity/noImportantStyles: native inline raster background needs a theme-aware override. */
+.task-gantt-chart {
+	height: min(640px, 70vh);
+	min-height: 300px;
+	overflow: hidden;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+}
+
+.task-gantt .wx-willow-theme {
+	height: 100%;
+	--wx-font-family: var(--font-sans);
+	--wx-font-size: 13px;
+	--wx-font-size-sm: 12px;
+	--wx-background: var(--surface);
+	--wx-background-alt: var(--surface-muted);
+	--wx-color-font: var(--text);
+	--wx-color-secondary-font: var(--muted-text);
+	--wx-color-primary: var(--accent);
+	--wx-color-primary-font: var(--accent-foreground);
+	--wx-border: 1px solid var(--line);
+	--wx-gantt-border-color: var(--line);
+	--wx-gantt-border: 1px solid var(--line);
+	--wx-gantt-select-color: var(--surface-muted);
+	--wx-gantt-icon-color: var(--muted-text);
+	--wx-gantt-holiday-background: var(--surface-muted);
+	--wx-grid-body-row-border: 1px solid var(--line);
+	--wx-gantt-bar-border-radius: 6px;
+	--wx-gantt-task-color: transparent;
+	--wx-gantt-task-border: none;
+	--wx-gantt-task-font-color: var(--text);
+	--wx-gantt-bar-shadow: none;
+}
+
+.task-gantt .wx-bar > .wx-link,
+.task-gantt .wx-progress-marker,
+.task-gantt .wx-progress-wrapper {
+	display: none;
+}
+
+.task-gantt-bar {
+	position: relative;
+	display: flex;
+	align-items: center;
+	width: 100%;
+	height: 100%;
+	min-width: 0;
+	overflow: hidden;
+	border: 1px solid var(--task-color);
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--task-color) 15%, var(--surface));
+	color: var(--text);
+}
+
+.task-gantt-fill {
+	position: absolute;
+	inset: 0 auto 0 0;
+	background: color-mix(in srgb, var(--task-color) 25%, transparent);
+}
+
+.task-gantt-bar-label {
+	position: relative;
+	padding: 0 10px;
+	overflow: hidden;
+	font-size: 12px;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.task-gantt-edge {
+	position: absolute;
+	top: 25%;
+	bottom: 25%;
+	width: 2px;
+	border-radius: 1px;
+	background: var(--task-color);
+	visibility: hidden;
+}
+
+.task-gantt-chart[data-editable="true"] .task-gantt-edge {
+	visibility: visible;
+}
+.task-gantt-edge-start {
+	left: 3px;
+}
+.task-gantt-edge-end {
+	right: 3px;
+}
+
+.task-gantt-task-link {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 2px;
+	min-width: 0;
+	width: 100%;
+	height: 100%;
+	text-align: left;
+	cursor: pointer;
+}
+
+.task-gantt-key {
+	color: var(--muted-text);
+	font-size: 10px;
+}
+.task-gantt-title {
+	overflow: hidden;
+	color: var(--text);
+	font-weight: 500;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.task-gantt-task-link:hover .task-gantt-title {
+	color: var(--accent);
+}
+.task-gantt-task-link:focus-visible,
+.task-gantt-undated-link:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+.task-gantt-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.task-gantt-status > span {
+	flex-shrink: 0;
+	height: 7px;
+	width: 7px;
+	border-radius: 50%;
+}
+.task-gantt-undated-link {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 5px 0;
+	text-align: left;
+	cursor: pointer;
+}
+.task-gantt-undated-link:hover {
+	color: var(--accent);
+}
+.task-gantt .task-gantt-weekend {
+	background: var(--surface-muted);
+}
+.task-gantt .task-gantt-today {
+	background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+/* SVAR's raster grid only parses hex colors. Use theme-aware CSS grid lines
+   over its inline image so rgba app palettes and theme changes stay correct. */
+.task-gantt .wx-area > div[style*="background: url"] {
+	background-image:
+		repeating-linear-gradient(
+			to right,
+			transparent 0,
+			transparent calc(var(--gantt-cell-width) - 1px),
+			var(--line) calc(var(--gantt-cell-width) - 1px),
+			var(--line) var(--gantt-cell-width)
+		),
+		repeating-linear-gradient(
+			to bottom,
+			transparent 0,
+			transparent calc(var(--gantt-cell-height) - 1px),
+			var(--line) calc(var(--gantt-cell-height) - 1px),
+			var(--line) var(--gantt-cell-height)
+		) !important;
+}
+
+@media (max-width: 640px) {
+	.task-gantt-chart {
+		height: 440px;
+		border-radius: 8px;
+	}
+}

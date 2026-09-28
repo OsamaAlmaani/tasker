@@ -38,6 +38,7 @@ type ProjectTasksPanelProps = {
 	assigneeId: string;
 	bulkActions?: ReactNode;
 	calendar?: ReactNode;
+	gantt?: ReactNode;
 	canWrite: boolean;
 	dragOverStatus: ProjectStatusDefinition["key"] | null;
 	emptyStateAction?: ReactNode;
@@ -88,6 +89,7 @@ export function ProjectTasksPanel({
 	assigneeId,
 	bulkActions,
 	calendar,
+	gantt,
 	canWrite,
 	dragOverStatus,
 	emptyStateAction,
@@ -125,6 +127,7 @@ export function ProjectTasksPanel({
 	statusPicker,
 }: ProjectTasksPanelProps) {
 	const isArchivedView = archiveState === "archived";
+	const isScheduleView = issueLayout === "calendar" || issueLayout === "gantt";
 
 	return (
 		<Card>
@@ -170,6 +173,16 @@ export function ProjectTasksPanel({
 										onClick={() => onToggleLayout("calendar")}
 									>
 										Calendar
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										variant={issueLayout === "gantt" ? "secondary" : "ghost"}
+										className="h-7 px-3"
+										aria-pressed={issueLayout === "gantt"}
+										onClick={() => onToggleLayout("gantt")}
+									>
+										Gantt
 									</Button>
 								</div>
 								<div className="inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--muted-text)]">
@@ -218,7 +231,7 @@ export function ProjectTasksPanel({
 						"mb-3 grid gap-2",
 						issueLayout === "list"
 							? "md:grid-cols-6"
-							: issueLayout === "calendar"
+							: isScheduleView
 								? "md:grid-cols-4"
 								: "md:grid-cols-5",
 					)}
@@ -274,7 +287,7 @@ export function ProjectTasksPanel({
 							<option value="status">Group: Status</option>
 						</Select>
 					) : null}
-					{issueLayout !== "calendar" ? (
+					{!isScheduleView ? (
 						<Select
 							value={sortBy}
 							onChange={(event) => onSortChange(event.target.value)}
@@ -321,6 +334,8 @@ export function ProjectTasksPanel({
 
 				{issueLayout === "calendar" ? (
 					calendar
+				) : issueLayout === "gantt" ? (
+					gantt
 				) : showEmptyState ? (
 					<div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface-muted)] px-4 py-8 text-center">
 						<p className="m-0 text-base font-semibold text-[var(--text)]">

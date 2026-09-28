@@ -23,6 +23,7 @@
     "@clerk/clerk-react": "^5.61.4",
     "@convex-dev/react-query": "0.1.0",
     "@fullcalendar/react": "7.1.0",
+    "@svar-ui/react-gantt": "2.7.3",
     "@t3-oss/env-core": "^0.13.11",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/react-devtools": "^0.7.11",

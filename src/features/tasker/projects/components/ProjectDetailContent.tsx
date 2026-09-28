@@ -43,6 +43,7 @@ import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
 
 const ProjectTaskCalendar = lazy(() => import("./ProjectTaskCalendar"));
+const ProjectTaskGantt = lazy(() => import("./ProjectTaskGantt"));
 
 type ProjectDetailContentProps = {
 	page: ProjectDetailPageState;
@@ -526,6 +527,39 @@ export function ProjectDetailContent({
 							) : null
 						}
 						dragOverStatus={dragOverStatus}
+						gantt={
+							issueLayout === "gantt" ? (
+								<ClientOnly
+									fallback={<div className="page-loading">Loading Gantt…</div>}
+								>
+									<Suspense
+										fallback={
+											<div className="page-loading">Loading Gantt…</div>
+										}
+									>
+										<ProjectTaskGantt
+											key={projectId}
+											canWrite={canWrite}
+											issues={visibleIssues}
+											projectKey={projectData.project.key}
+											statuses={projectStatuses}
+											onDatesChange={(issueId, dates) =>
+												updateIssue({
+													issueId: issueId as Id<"issues">,
+													...dates,
+												})
+											}
+											onOpenIssue={(issueId) => {
+												void navigate({
+													to: "/issues/$issueId",
+													params: { issueId },
+												});
+											}}
+										/>
+									</Suspense>
+								</ClientOnly>
+							) : null
+						}
 						emptyStateAction={
 							hasTaskFilters ? (
 								<Button

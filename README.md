@@ -9,7 +9,7 @@ This project was built end-to-end by **GPT-5.3-Codex**, covering architecture, b
 ## Product Overview
 
 - Project-based workspaces with scoped membership and permissions.
-- Three task views: structured list, drag-and-drop Kanban by status, and a task calendar with month/week navigation, start/due date ranges, drag-to-reschedule, resizing from either edge (including single-date tasks), and compact overflow popovers.
+- Four task views: structured list, drag-and-drop Kanban by status, a month/week calendar with compact overflow, and a Gantt timeline with a resizable task grid, day/week/month scales, Today/Fit controls, and status/progress bars. Both scheduling views support start/due dates, inclusive ranges, drag-to-reschedule, and resizing from either edge, including single-date tasks.
 - Fast task operations: status, priority, assignee, start date, due date, labels, and search/filtering.
 - Parent tasks with one-level sub-task support, progress rollups, and nested list/Kanban presentation.
 - Unified task timeline combining comments and system activity in chronological order.
