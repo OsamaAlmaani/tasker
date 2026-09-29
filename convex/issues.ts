@@ -265,7 +265,7 @@ async function ensureNoIssueCycle(
 async function collectIssueDescendants(
   ctx: MutationCtx,
   projectId: Id<'projects'>,
-  rootIssueId: Id<'issues'>,
+  rootIssueIds: Id<'issues'>[],
 ) {
   const issues = await ctx.db
     .query('issues')
@@ -284,7 +284,7 @@ async function collectIssueDescendants(
   }
 
   const issueIds: Id<'issues'>[] = []
-  const queue: Id<'issues'>[] = [rootIssueId]
+  const queue: Id<'issues'>[] = [...rootIssueIds]
   const visited = new Set<string>()
 
   while (queue.length) {
@@ -306,7 +306,7 @@ async function getVisibleIssueDescendants(
   projectId: Id<'projects'>,
   rootIssueId: Id<'issues'>,
 ) {
-  const descendantIds = await collectIssueDescendants(ctx, projectId, rootIssueId)
+  const descendantIds = await collectIssueDescendants(ctx, projectId, [rootIssueId])
   const descendants = (
     await Promise.all(descendantIds.map((issueId) => ctx.db.get(issueId)))
   ).filter((issue): issue is Doc<'issues'> => Boolean(issue))
@@ -558,7 +558,7 @@ async function applyIssueUpdate(
   const nextListId =
     (patch.listId as Id<'issueLists'> | undefined) ?? issue.listId ?? undefined
   if (nextListId !== issue.listId) {
-    const descendantIds = await collectIssueDescendants(ctx, issue.projectId, issue._id)
+    const descendantIds = await collectIssueDescendants(ctx, issue.projectId, [issue._id])
     const descendantIssues = (
       await Promise.all(descendantIds.map((issueId) => ctx.db.get(issueId)))
     ).filter((descendant): descendant is Doc<'issues'> => Boolean(descendant))
@@ -1174,7 +1174,7 @@ export const remove = mutation({
     const issueIdsToDelete = await collectIssueDescendants(
       ctx,
       issue.projectId,
-      args.issueId,
+      [args.issueId],
     )
 
     await Promise.all(
@@ -1209,6 +1209,67 @@ export const remove = mutation({
       deletedIssueCount: issueIdsToDelete.length,
       deletedAt: now,
     }
+  },
+})
+
+export const bulkRemove = mutation({
+  args: {
+    projectId: v.id('projects'),
+    issueIds: v.array(v.id('issues')),
+  },
+  handler: async (ctx, args) => {
+    const { user } = await requireProjectIssueDeleteAccess(ctx, args.projectId)
+    const uniqueIssueIds = [...new Set(args.issueIds)]
+    if (!uniqueIssueIds.length) {
+      throw new ConvexError({
+        code: 'VALIDATION_ERROR',
+        message: 'Select at least one task.',
+      })
+    }
+
+    const selectedIssues: Doc<'issues'>[] = []
+    for (const issueId of uniqueIssueIds) {
+      const issue = await ctx.db.get(issueId)
+      if (!issue || issue.deletedAt || issue.projectId !== args.projectId) {
+        throw new ConvexError({
+          code: 'VALIDATION_ERROR',
+          message: 'A selected task is no longer available in this project.',
+        })
+      }
+      selectedIssues.push(issue)
+    }
+
+    const issueIdsToDelete = await collectIssueDescendants(
+      ctx,
+      args.projectId,
+      uniqueIssueIds,
+    )
+    const now = Date.now()
+
+    await Promise.all(
+      issueIdsToDelete.map((issueId) =>
+        ctx.db.patch(issueId, {
+          deletedAt: now,
+          archived: true,
+          updatedAt: now,
+        }),
+      ),
+    )
+    await ctx.db.patch(args.projectId, { updatedAt: now })
+
+    for (const issue of selectedIssues) {
+      await createActivity(ctx, {
+        actorId: user._id,
+        projectId: args.projectId,
+        issueId: issue._id,
+        entityType: 'issue',
+        entityId: issue._id,
+        action: 'issue.deleted',
+        metadata: { issueNumber: issue.issueNumber, bulk: true },
+      })
+    }
+
+    return { deletedIssueCount: issueIdsToDelete.length, deletedAt: now }
   },
 })
 

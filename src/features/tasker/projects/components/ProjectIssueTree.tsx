@@ -164,6 +164,7 @@ type ProjectIssueListTreeProps = {
 	onToggleSelection?: (issueId: string) => void;
 	selectedIssueIds?: Set<string>;
 	selectionEnabled?: boolean;
+	selectionDisabled?: boolean;
 	statusOptions: ProjectStatusDefinition[];
 };
 
@@ -179,6 +180,7 @@ export function ProjectIssueListTree({
 	onToggleSelection,
 	selectedIssueIds,
 	selectionEnabled = false,
+	selectionDisabled = false,
 	statusOptions,
 }: ProjectIssueListTreeProps) {
 	return (
@@ -217,6 +219,7 @@ export function ProjectIssueListTree({
 										type="checkbox"
 										aria-label={`Select task ${issue.title}`}
 										checked={selectedIssueIds?.has(issue._id) ?? false}
+										disabled={selectionDisabled}
 										onChange={() => onToggleSelection?.(issue._id)}
 										className="h-4 w-4 rounded border border-[var(--line)] bg-[var(--surface-muted)] accent-[var(--accent)]"
 									/>
@@ -404,6 +407,7 @@ export function ProjectIssueListTree({
 									onToggleSelection={onToggleSelection}
 									selectedIssueIds={selectedIssueIds}
 									selectionEnabled={selectionEnabled}
+									selectionDisabled={selectionDisabled}
 									labelOptions={labelOptions}
 									statusOptions={statusOptions}
 								/>

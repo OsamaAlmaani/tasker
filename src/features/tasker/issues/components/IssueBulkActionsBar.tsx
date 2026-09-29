@@ -4,6 +4,7 @@ import {
 	ChevronDown,
 	Flag,
 	ListChecks,
+	Trash2,
 	UserRound,
 	X,
 } from "lucide-react";
@@ -27,6 +28,7 @@ type IssueBulkActionsBarProps = {
 	onArchiveChange: (archived: boolean) => void;
 	onAssigneeChange?: (assigneeId: string | null) => void;
 	onClearSelection: () => void;
+	onDelete?: () => void;
 	onPriorityChange: (priority: (typeof ISSUE_PRIORITIES)[number]) => void;
 	onStatusChange?: (status: ProjectStatusDefinition["key"]) => void;
 	selectedCount: number;
@@ -120,6 +122,7 @@ export function IssueBulkActionsBar({
 	onArchiveChange,
 	onAssigneeChange,
 	onClearSelection,
+	onDelete,
 	onPriorityChange,
 	onStatusChange,
 	selectedCount,
@@ -260,6 +263,20 @@ export function IssueBulkActionsBar({
 				<ArchiveRestore className="h-4 w-4" />
 				<span>Unarchive</span>
 			</Button>
+
+			{onDelete ? (
+				<Button
+					type="button"
+					size="sm"
+					variant="danger"
+					disabled={isApplying}
+					onClick={() => handleAction(onDelete)}
+					className="h-8 gap-2 rounded-full px-3"
+				>
+					<Trash2 className="h-4 w-4" />
+					<span>Delete</span>
+				</Button>
+			) : null}
 
 			<Button
 				type="button"

@@ -63,6 +63,7 @@ export function ProjectDetailContent({
 }: ProjectDetailContentProps) {
 	const navigate = useNavigate();
 	const bulkUpdateIssues = useMutation(api.issues.bulkUpdate);
+	const bulkDeleteIssues = useMutation(api.issues.bulkRemove);
 	const {
 		addMember,
 		addStatusFilter,
@@ -176,6 +177,9 @@ export function ProjectDetailContent({
 	);
 	const [bulkActionError, setBulkActionError] = useState<string | null>(null);
 	const [isApplyingBulkAction, setIsApplyingBulkAction] = useState(false);
+	const [issueIdsPendingDelete, setIssueIdsPendingDelete] = useState<
+		Id<"issues">[] | null
+	>(null);
 	const hasTaskFilters = Boolean(
 		searchInput || selectedStatuses.length || priority || assigneeId,
 	);
@@ -261,6 +265,7 @@ export function ProjectDetailContent({
 	}, [issueLayout]);
 
 	function toggleIssueSelection(issueId: string) {
+		if (isApplyingBulkAction) return;
 		setSelectedIssueIds((current) => {
 			const next = new Set(current);
 			if (next.has(issueId)) {
@@ -272,13 +277,48 @@ export function ProjectDetailContent({
 		});
 	}
 
+	function changeIssueSelection(issueIds: string[], selected: boolean) {
+		if (isApplyingBulkAction) return;
+		setSelectedIssueIds((current) => {
+			const next = new Set(current);
+			for (const issueId of issueIds) {
+				if (selected) next.add(issueId);
+				else next.delete(issueId);
+			}
+			return next;
+		});
+	}
+
+	async function confirmBulkDelete() {
+		if (
+			!projectData.canDeleteIssues ||
+			!issueIdsPendingDelete?.length ||
+			isApplyingBulkAction
+		)
+			return;
+
+		setIsApplyingBulkAction(true);
+		setBulkActionError(null);
+		try {
+			await bulkDeleteIssues({ projectId, issueIds: issueIdsPendingDelete });
+			setSelectedIssueIds(new Set());
+		} catch (error) {
+			setBulkActionError(
+				getClientErrorMessage(error, "Failed to delete selected tasks."),
+			);
+		} finally {
+			setIssueIdsPendingDelete(null);
+			setIsApplyingBulkAction(false);
+		}
+	}
+
 	async function applyBulkAction(changes: {
 		archived?: boolean;
 		assigneeId?: Id<"users"> | null;
 		priority?: ProjectIssueRow["priority"];
 		status?: ProjectIssueRow["status"];
 	}) {
-		if (!selectedIssueIds.size) {
+		if (!selectedIssueIds.size || isApplyingBulkAction) {
 			return;
 		}
 
@@ -467,13 +507,21 @@ export function ProjectDetailContent({
 						assignableUsers={assignableUsers}
 						assigneeId={assigneeId}
 						bulkActions={
-							issueLayout === "list" && selectedIssueIds.size ? (
+							canWrite && issueLayout === "list" && selectedIssueIds.size ? (
 								<IssueBulkActionsBar
 									assignableUsers={assignableUsers}
 									isApplying={isApplyingBulkAction}
 									selectedCount={selectedIssueIds.size}
 									statusOptions={projectStatuses}
 									onClearSelection={() => setSelectedIssueIds(new Set())}
+									onDelete={
+										projectData.canDeleteIssues
+											? () =>
+													setIssueIdsPendingDelete([
+														...selectedIssueIds,
+													] as Id<"issues">[])
+											: undefined
+									}
 									onStatusChange={(status) => void applyBulkAction({ status })}
 									onPriorityChange={(priority) =>
 										void applyBulkAction({ priority })
@@ -491,6 +539,9 @@ export function ProjectDetailContent({
 							) : null
 						}
 						canWrite={canWrite}
+						isApplyingBulkAction={isApplyingBulkAction}
+						onSelectionChange={changeIssueSelection}
+						selectedIssueIds={selectedIssueIds}
 						calendar={
 							issueLayout === "calendar" ? (
 								<ClientOnly
@@ -716,6 +767,7 @@ export function ProjectDetailContent({
 								onToggleSelection={toggleIssueSelection}
 								selectedIssueIds={selectedIssueIds}
 								selectionEnabled={canWrite}
+								selectionDisabled={isApplyingBulkAction}
 								labelOptions={projectLabels}
 								statusOptions={projectStatuses}
 							/>
@@ -826,6 +878,17 @@ export function ProjectDetailContent({
 				transferStatusOptions={projectStatuses.filter(
 					(status) => status.key !== statusToDelete?.key,
 				)}
+			/>
+
+			<ConfirmDialog
+				open={Boolean(issueIdsPendingDelete)}
+				title="Delete selected tasks"
+				description={`Delete ${issueIdsPendingDelete?.length ?? 0} selected task${issueIdsPendingDelete?.length === 1 ? "" : "s"}? Any sub-tasks will also be deleted, including those hidden by filters or archived. This cannot be undone from the app.`}
+				confirmLabel="Delete tasks"
+				confirmingLabel="Deleting..."
+				isConfirming={isApplyingBulkAction}
+				onCancel={() => setIssueIdsPendingDelete(null)}
+				onConfirm={confirmBulkDelete}
 			/>
 
 			<ConfirmDialog

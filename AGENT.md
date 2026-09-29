@@ -231,6 +231,7 @@ Relevant code:
   - sets `archived: true`
   - cascades through descendants
 - Project issue deletion can be disabled per project with `allowIssueDelete`.
+- Project list selection supports all filtered visible tasks or all tasks in a list/status group, including displayed sub-tasks. Bulk deletion uses `issues.bulkRemove` in one mutation, validates every selected task against the project before writing, and deduplicates cascading descendants. The confirmation warns that hidden or archived sub-tasks are also deleted.
 - Deleting an issue list supports:
   - moving tasks to another list or no list
   - deleting all task trees rooted in that list
@@ -268,7 +269,7 @@ Invite flow is split intentionally:
 - The `My Work` page is intentionally opinionated around assigned-task sections: `Focus`, `Due Soon`, `Overdue`, `Backlog & Todo`, and `Recently Completed`.
 - `My Work` uses route search state for preset views (`overview`, `focus`, `due_soon`, `overdue`, `backlog`, `completed`) instead of exposing a full custom filter builder as the default experience.
 - `My Work` also persists the user’s last selected preset view and supports pinning one preset as the default landing view.
-- Bulk task actions currently cover `status`, `priority`, `archive`, and project-scoped `assignee` updates. `My Work` intentionally omits bulk reassignment because selections can span multiple projects with different membership rules. Bulk list moves and bulk delete remain separate follow-up work.
+- Bulk task actions cover `status`, `priority`, `archive`, and project-scoped `assignee` updates, plus confirmed deletion in project list views when `canDeleteIssues` permits it. `My Work` intentionally omits bulk reassignment because selections can span multiple projects with different membership rules. Bulk list moves and deletion in `My Work` remain follow-up work.
 - Permissions remain simple by default: `admin` has full access, `member` can write in accessible projects, and `viewer` is read-only.
 
 ## Frontend Structure Notes

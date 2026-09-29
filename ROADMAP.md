@@ -68,11 +68,13 @@ Use this file to track feature progress. Check items off as they ship.
 - [ ] Add per-user notification preferences
 - [ ] Add recurring tasks plus reusable task and project templates
 - [x] Add bulk task actions for status, assignee, priority, and archive
-- [ ] Extend bulk task actions with list moves and delete
+- [x] Add select all, group selection, and confirmed bulk delete to project list views
+- [ ] Extend bulk task actions with list moves and delete in My Work
 - [ ] Add undo and recovery flows for destructive actions
 - [ ] Add a proper trash / restore flow for deleted tasks and projects if deletion remains part of the product
 
 Core workflow progress:
+- 2026-09-28: Added filtered select-all and per-list/status group selection, plus atomic bulk soft deletion in project list views with existing deletion permissions and descendant cascading.
 - 2026-03-25: Added bulk task actions for status, priority, archive, and project-scoped assignee updates across `My Work` and project list views, backed by `convex/issues.bulkUpdate`.
 - 2026-05-02: Added first-pass notifications infrastructure with a dedicated inbox, unread state, and async SMTP email delivery for task assignment and reassignment. Invite emails still stay on Clerk, while due reminders, mentions, comments, and notification preferences remain open.
 

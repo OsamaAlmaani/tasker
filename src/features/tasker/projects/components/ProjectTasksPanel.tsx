@@ -15,9 +15,56 @@ import { cn } from "#/lib/utils";
 type ProjectIssueGroup = {
 	key: string;
 	title: string;
-	items: unknown[];
+	items: { _id: string }[];
 	tree: unknown[];
 };
+
+function TaskSelectionCheckbox({
+	items,
+	selectedIssueIds,
+	label,
+	children,
+	className,
+	disabled,
+	onChange,
+}: {
+	items: { _id: string }[];
+	selectedIssueIds: ReadonlySet<string>;
+	label: string;
+	children: ReactNode;
+	className: string;
+	disabled: boolean;
+	onChange: (issueIds: string[], selected: boolean) => void;
+}) {
+	const selectedCount = items.filter((item) =>
+		selectedIssueIds.has(item._id),
+	).length;
+	const checked = items.length > 0 && selectedCount === items.length;
+	const indeterminate = selectedCount > 0 && !checked;
+
+	return (
+		<label className={cn("inline-flex items-center gap-2", className)}>
+			<input
+				type="checkbox"
+				aria-label={label}
+				aria-checked={indeterminate ? "mixed" : checked}
+				checked={checked}
+				disabled={disabled || items.length === 0}
+				ref={(input) => {
+					if (input) input.indeterminate = indeterminate;
+				}}
+				onChange={(event) =>
+					onChange(
+						items.map((item) => item._id),
+						event.target.checked,
+					)
+				}
+				className="h-4 w-4 shrink-0 rounded border border-[var(--line)] bg-[var(--surface-muted)] accent-[var(--accent)]"
+			/>
+			<span>{children}</span>
+		</label>
+	);
+}
 
 type KanbanColumn = {
 	status: ProjectStatusDefinition["key"];
@@ -48,6 +95,7 @@ type ProjectTasksPanelProps = {
 	groupedIssues: ProjectIssueGroup[];
 	hideDoneTasks: boolean;
 	issueLayout: NonNullable<ProjectSearch["layout"]>;
+	isApplyingBulkAction: boolean;
 	kanbanColumns: KanbanColumn[];
 	onAddStatusFilter: (value: string) => void;
 	onArchiveStateChange: (value: "active" | "archived") => void;
@@ -68,6 +116,7 @@ type ProjectTasksPanelProps = {
 	onPriorityChange: (value: string) => void;
 	onRemoveStatus: (value: ProjectStatusDefinition["key"]) => void;
 	onSearchChange: (value: string) => void;
+	onSelectionChange: (issueIds: string[], selected: boolean) => void;
 	onSortChange: (value: string) => void;
 	onToggleLayout: (layout: NonNullable<ProjectSearch["layout"]>) => void;
 	priority: string;
@@ -75,6 +124,7 @@ type ProjectTasksPanelProps = {
 	renderListIssueNode: (node: unknown) => ReactNode;
 	resultSummary?: string;
 	search: string;
+	selectedIssueIds: ReadonlySet<string>;
 	selectedStatuses: ProjectStatusDefinition["key"][];
 	showEmptyState: boolean;
 	sortBy: string;
@@ -99,6 +149,7 @@ export function ProjectTasksPanel({
 	groupedIssues,
 	hideDoneTasks,
 	issueLayout,
+	isApplyingBulkAction,
 	kanbanColumns,
 	onAddStatusFilter,
 	onArchiveStateChange,
@@ -113,6 +164,7 @@ export function ProjectTasksPanel({
 	onPriorityChange,
 	onRemoveStatus,
 	onSearchChange,
+	onSelectionChange,
 	onSortChange,
 	onToggleLayout,
 	priority,
@@ -120,6 +172,7 @@ export function ProjectTasksPanel({
 	renderListIssueNode,
 	resultSummary,
 	search,
+	selectedIssueIds,
 	selectedStatuses,
 	showEmptyState,
 	sortBy,
@@ -128,6 +181,7 @@ export function ProjectTasksPanel({
 }: ProjectTasksPanelProps) {
 	const isArchivedView = archiveState === "archived";
 	const isScheduleView = issueLayout === "calendar" || issueLayout === "gantt";
+	const selectableIssues = groupedIssues.flatMap((group) => group.items);
 
 	return (
 		<Card>
@@ -330,6 +384,18 @@ export function ProjectTasksPanel({
 						</Button>
 					</div>
 				) : null}
+				{canWrite && issueLayout === "list" && selectableIssues.length > 0 ? (
+					<TaskSelectionCheckbox
+						className="mb-3 text-sm text-[var(--muted-text)]"
+						items={selectableIssues}
+						selectedIssueIds={selectedIssueIds}
+						label="Select all visible tasks"
+						disabled={isApplyingBulkAction}
+						onChange={onSelectionChange}
+					>
+						Select all ({selectableIssues.length})
+					</TaskSelectionCheckbox>
+				) : null}
 				{bulkActions ? <div className="mb-3">{bulkActions}</div> : null}
 
 				{issueLayout === "calendar" ? (
@@ -355,9 +421,22 @@ export function ProjectTasksPanel({
 						{groupedIssues.map((group) => (
 							<div key={group.key} className="space-y-2">
 								<div className="flex items-center justify-between">
-									<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
-										{group.title}
-									</p>
+									{canWrite ? (
+										<TaskSelectionCheckbox
+											className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]"
+											items={group.items}
+											selectedIssueIds={selectedIssueIds}
+											label={`Select all tasks in ${group.title}`}
+											disabled={isApplyingBulkAction}
+											onChange={onSelectionChange}
+										>
+											{group.title}
+										</TaskSelectionCheckbox>
+									) : (
+										<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
+											{group.title}
+										</p>
+									)}
 									<Badge>{group.items.length}</Badge>
 								</div>
 
