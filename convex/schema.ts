@@ -102,6 +102,7 @@ export default defineSchema({
     issueNumber: v.number(),
     title: v.string(),
     description: v.optional(v.string()),
+    descriptionDoc: v.optional(v.object({ type: v.literal('doc'), content: v.array(v.any()) })),
     searchText: v.string(),
     status: issueStatusValidator,
     priority: issuePriorityValidator,

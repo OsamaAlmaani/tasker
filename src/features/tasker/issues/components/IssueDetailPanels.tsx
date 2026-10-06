@@ -39,6 +39,11 @@ import {
 	type ProjectStatusDefinition,
 } from "#/features/tasker/projectStatuses";
 import { getClientErrorMessage } from "#/lib/utils";
+import type {
+	DescriptionDoc,
+	DescriptionValue,
+} from "#convex/lib/issueDescriptions";
+import { DescriptionContent, DescriptionEditor } from "./DescriptionEditor";
 
 type IssueLike = {
 	_id: string;
@@ -47,6 +52,7 @@ type IssueLike = {
 	childIssueCount: number;
 	completedChildIssueCount: number;
 	description?: string | null;
+	descriptionDoc?: DescriptionDoc;
 	startDate?: number | null;
 	dueDate?: number | null;
 	hasChildren: boolean;
@@ -103,13 +109,15 @@ type IssueOverviewPanelProps = {
 	canWrite: boolean;
 	childIssueRows: ChildIssueRow[];
 	currentIssue: IssueLike;
-	descriptionDraft: string;
+	descriptionDraft: DescriptionValue;
+	descriptionError: string | null;
+	isSavingDescription: boolean;
 	editingDescription: boolean;
 	editingTitle: boolean;
 	onChecklistItemsChange: (items: IssueChecklistItem[]) => void;
 	onCancelDescriptionEdit: () => void;
 	onCancelTitleEdit: () => void;
-	onDescriptionDraftChange: (value: string) => void;
+	onDescriptionDraftChange: (value: DescriptionValue) => void;
 	onOpenSubIssueForm: () => void;
 	onSaveDescription: () => void | Promise<void>;
 	onStartDescriptionEdit: () => void;
@@ -126,6 +134,8 @@ export function IssueOverviewPanel({
 	childIssueRows,
 	currentIssue,
 	descriptionDraft,
+	descriptionError,
+	isSavingDescription,
 	editingDescription,
 	editingTitle,
 	onChecklistItemsChange,
@@ -268,27 +278,39 @@ export function IssueOverviewPanel({
 				</div>
 				{editingDescription ? (
 					<div className="space-y-2">
-						<Textarea
+						<DescriptionEditor
 							value={descriptionDraft}
-							onChange={(event) => onDescriptionDraftChange(event.target.value)}
+							disabled={isSavingDescription}
+							onChange={onDescriptionDraftChange}
 						/>
+						{descriptionError ? (
+							<p role="alert" className="m-0 text-sm text-[var(--danger)]">
+								{descriptionError}
+							</p>
+						) : null}
 						<div className="flex items-center gap-2">
-							<Button size="sm" onClick={() => void onSaveDescription()}>
+							<Button
+								size="sm"
+								disabled={isSavingDescription}
+								onClick={() => void onSaveDescription()}
+							>
 								Save
 							</Button>
 							<Button
 								size="sm"
 								variant="ghost"
 								onClick={onCancelDescriptionEdit}
+								disabled={isSavingDescription}
 							>
 								Cancel
 							</Button>
 						</div>
 					</div>
 				) : (
-					<p className="m-0 whitespace-pre-wrap text-[1.05rem] leading-relaxed text-[var(--text)]">
-						{currentIssue.description || "No description provided."}
-					</p>
+					<DescriptionContent
+						description={currentIssue.description ?? ""}
+						descriptionDoc={currentIssue.descriptionDoc}
+					/>
 				)}
 			</section>
 

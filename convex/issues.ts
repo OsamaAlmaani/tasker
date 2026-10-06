@@ -19,6 +19,8 @@ import {
 } from './lib/auth'
 import { createActivity } from './lib/activity'
 import { shouldNotifyAssigneeChange } from './lib/notifications'
+import { matchesIssueFilters, validateDateFilters } from './lib/issueFilters'
+import { buildDescriptionFields, descriptionDocValidator, type DescriptionDoc } from './lib/issueDescriptions'
 import {
   ensureProjectCustomFieldsExist,
   normalizeIssueCustomFieldValues,
@@ -36,6 +38,14 @@ import {
 
 function buildSearchText(title: string, description?: string) {
   return `${title} ${description ?? ''}`.trim().toLowerCase()
+}
+
+function prepareDescription(description?: string, descriptionDoc?: unknown) {
+  try {
+    return buildDescriptionFields(description, descriptionDoc)
+  } catch (error) {
+    throw new ConvexError({ code: 'VALIDATION_ERROR', message: (error as Error).message })
+  }
 }
 
 function normalizeIssueLabels(labels: string[]) {
@@ -65,6 +75,7 @@ function validateIssueDates(startDate?: number | null, dueDate?: number | null) 
 type IssueUpdateChanges = {
   title?: string
   description?: string
+  descriptionDoc?: DescriptionDoc | null
   status?: Doc<'issues'>['status']
   priority?: Doc<'issues'>['priority']
   assigneeId?: Id<'users'> | null
@@ -389,8 +400,8 @@ async function applyIssueUpdate(
   if (changes.title !== undefined) {
     patch.title = changes.title.trim()
   }
-  if (changes.description !== undefined) {
-    patch.description = changes.description.trim()
+  if (changes.description !== undefined || changes.descriptionDoc !== undefined) {
+    Object.assign(patch, prepareDescription(changes.description ?? issue.description, changes.descriptionDoc))
   }
   if (changes.status !== undefined) {
     if (!ensureProjectStatusExists(project, changes.status)) {
@@ -675,7 +686,11 @@ export const listByProject = query({
     status: v.optional(issueStatusValidator),
     statuses: v.optional(v.array(issueStatusValidator)),
     priority: v.optional(issuePriorityValidator),
-    assigneeId: v.optional(v.id('users')),
+    assigneeId: v.optional(v.union(v.id('users'), v.null())),
+    startFrom: v.optional(v.string()),
+    startTo: v.optional(v.string()),
+    dueFrom: v.optional(v.string()),
+    dueTo: v.optional(v.string()),
     creatorId: v.optional(v.id('users')),
     listId: v.optional(v.union(v.id('issueLists'), v.null())),
     includeArchived: v.optional(v.boolean()),
@@ -690,6 +705,11 @@ export const listByProject = query({
     ),
   },
   handler: async (ctx, args) => {
+    try {
+      validateDateFilters(args)
+    } catch (error) {
+      throw new ConvexError({ code: 'VALIDATION_ERROR', message: (error as Error).message })
+    }
     const project = await ctx.db.get(args.projectId)
     if (!project) {
       return []
@@ -731,7 +751,7 @@ export const listByProject = query({
       if (args.priority && issue.priority !== args.priority) {
         return false
       }
-      if (args.assigneeId && issue.assigneeId !== args.assigneeId) {
+      if (!matchesIssueFilters(issue, args)) {
         return false
       }
       if (args.creatorId && issue.createdBy !== args.creatorId) {
@@ -867,6 +887,7 @@ export const create = mutation({
     projectId: v.id('projects'),
     title: v.string(),
     description: v.optional(v.string()),
+    descriptionDoc: v.optional(descriptionDocValidator),
     status: v.optional(issueStatusValidator),
     priority: v.optional(issuePriorityValidator),
     assigneeId: v.optional(v.id('users')),
@@ -954,6 +975,7 @@ export const create = mutation({
     })()
 
     validateIssueDates(args.startDate, args.dueDate)
+    const descriptionFields = prepareDescription(args.description, args.descriptionDoc)
 
     const now = Date.now()
     let counter = await ctx.db
@@ -987,8 +1009,8 @@ export const create = mutation({
       projectId: args.projectId,
       issueNumber,
       title: args.title.trim(),
-      description: args.description?.trim(),
-      searchText: buildSearchText(args.title, args.description),
+      ...descriptionFields,
+      searchText: buildSearchText(args.title, descriptionFields.description),
       listId: parentIssue?.listId ?? args.listId,
       parentIssueId: args.parentIssueId,
       status: nextStatus,
@@ -1048,6 +1070,7 @@ export const update = mutation({
     issueId: v.id('issues'),
     title: v.optional(v.string()),
     description: v.optional(v.string()),
+    descriptionDoc: v.optional(v.union(descriptionDocValidator, v.null())),
     status: v.optional(issueStatusValidator),
     priority: v.optional(issuePriorityValidator),
     assigneeId: v.optional(v.union(v.id('users'), v.null())),

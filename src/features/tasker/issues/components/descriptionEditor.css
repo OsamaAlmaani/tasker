@@ -1,0 +1,101 @@
+.task-description-editor {
+	min-width: 0;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--surface-muted);
+}
+.task-description-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+	padding: 4px;
+	border-bottom: 1px solid var(--line);
+}
+.task-description-content {
+	min-width: 0;
+	min-height: 160px;
+	padding: 12px;
+	color: var(--text);
+	font-size: 14px;
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+	outline: none;
+}
+.task-description-reader .task-description-content {
+	min-height: 0;
+	padding: 0;
+}
+.task-description-content > :first-child {
+	margin-top: 0;
+}
+.task-description-content > :last-child {
+	margin-bottom: 0;
+}
+.task-description-content p {
+	margin: 0.5em 0;
+}
+.task-description-content h1 {
+	font-size: 24px;
+	font-weight: 700;
+	margin: 0.8em 0 0.4em;
+}
+.task-description-content h2 {
+	font-size: 20px;
+	font-weight: 650;
+	margin: 0.8em 0 0.4em;
+}
+.task-description-content h3 {
+	font-size: 16px;
+	font-weight: 650;
+	margin: 0.8em 0 0.4em;
+}
+.task-description-content ul,
+.task-description-content ol {
+	padding-left: 1.5em;
+	margin: 0.5em 0;
+}
+.task-description-content ul {
+	list-style: disc;
+}
+.task-description-content ol {
+	list-style: decimal;
+}
+.task-description-content blockquote {
+	border-left: 3px solid var(--line);
+	padding-left: 12px;
+	margin: 0.8em 0;
+	color: var(--muted-text);
+}
+.task-description-content pre {
+	max-width: 100%;
+	overflow-x: auto;
+	white-space: pre;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	padding: 10px;
+}
+.task-description-content code {
+	font-family: monospace;
+	background: var(--surface);
+	border-radius: 3px;
+	padding: 1px 3px;
+}
+.task-description-content pre code {
+	padding: 0;
+	background: transparent;
+}
+.task-description-content a {
+	color: var(--accent);
+	text-decoration: underline;
+}
+.task-description-content p.is-editor-empty:first-child::before {
+	content: attr(data-placeholder);
+	color: var(--muted-text);
+	float: left;
+	height: 0;
+	pointer-events: none;
+}
+.task-description-editor:focus-within {
+	border-color: var(--accent);
+}

@@ -7,6 +7,36 @@ import {
 } from "#/features/tasker/projects/projectSearch";
 
 describe("projectSearchSchema", () => {
+	it("preserves unassigned and date ranges through URL normalization", () => {
+		const filters = {
+			assignee: "unassigned",
+			startFrom: "2026-10-01",
+			startTo: "2026-10-06",
+			dueFrom: "2026-10-06",
+			dueTo: "2026-10-10",
+		};
+		expect(normalizeProjectSearch(projectSearchSchema.parse(filters))).toEqual(
+			filters,
+		);
+		expect(
+			normalizeProjectSearch({ ...filters, startFrom: "", dueTo: undefined }),
+		).toEqual({
+			assignee: "unassigned",
+			startTo: "2026-10-06",
+			dueFrom: "2026-10-06",
+		});
+	});
+	it("rejects invalid dates and reversed ranges from URLs", () => {
+		expect(
+			projectSearchSchema.safeParse({ startFrom: "2026-02-30" }).success,
+		).toBe(false);
+		expect(
+			projectSearchSchema.safeParse({
+				startFrom: "2026-10-06",
+				startTo: "2026-10-01",
+			}).success,
+		).toBe(false);
+	});
 	it("accepts valid project search params", () => {
 		const parsed = projectSearchSchema.parse({
 			archive: "archived",

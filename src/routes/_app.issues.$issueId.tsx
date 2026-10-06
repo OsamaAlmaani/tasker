@@ -48,6 +48,8 @@ function IssueDetailPage() {
 		currentIssue,
 		deleteError,
 		descriptionDraft,
+		descriptionError,
+		isSavingDescription,
 		editingCommentId,
 		editingDescription,
 		editingTitle,
@@ -183,6 +185,8 @@ function IssueDetailPage() {
 					childIssueRows={childIssueRows}
 					currentIssue={currentIssue}
 					descriptionDraft={descriptionDraft}
+					descriptionError={descriptionError}
+					isSavingDescription={isSavingDescription}
 					editingDescription={editingDescription}
 					editingTitle={editingTitle}
 					onChecklistItemsChange={(items) => void changeChecklistItems(items)}
@@ -222,6 +226,7 @@ function IssueDetailPage() {
 				/>
 
 				<IssueDiscussionPanel
+					key={currentIssue._id}
 					canWrite={canWrite}
 					comment={comment}
 					commentDraft={commentDraft}

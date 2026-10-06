@@ -22,6 +22,7 @@ import {
 import { getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Doc, Id } from "#convex/_generated/dataModel";
+import type { DescriptionValue } from "#convex/lib/issueDescriptions";
 
 type CommentRow = {
 	comment: Doc<"comments">;
@@ -137,7 +138,11 @@ export function useIssueDetailPage({
 	const [editingTitle, setEditingTitle] = useState(false);
 	const [titleDraft, setTitleDraft] = useState("");
 	const [editingDescription, setEditingDescription] = useState(false);
-	const [descriptionDraft, setDescriptionDraft] = useState("");
+	const [descriptionDraft, setDescriptionDraft] = useState<DescriptionValue>({
+		description: "",
+	});
+	const [descriptionError, setDescriptionError] = useState<string | null>(null);
+	const [isSavingDescription, setIsSavingDescription] = useState(false);
 	const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
 	const [commentDraft, setCommentDraft] = useState("");
 	const [isDeleting, setIsDeleting] = useState(false);
@@ -193,14 +198,12 @@ export function useIssueDetailPage({
 			comment: row.comment,
 			author: row.author,
 		}));
-		const activityItems: TimelineItem[] = (activity ?? [])
-			.filter((row) => !row.action.startsWith("comment."))
-			.map((row) => ({
-				type: "activity",
-				key: `activity-${row._id}`,
-				createdAt: row.createdAt,
-				activity: row,
-			}));
+		const activityItems: TimelineItem[] = (activity ?? []).map((row) => ({
+			type: "activity",
+			key: `activity-${row._id}`,
+			createdAt: row.createdAt,
+			activity: row,
+		}));
 
 		return [...commentItems, ...activityItems].sort(
 			(left, right) => left.createdAt - right.createdAt,
@@ -288,8 +291,12 @@ export function useIssueDetailPage({
 	}
 
 	function startDescriptionEdit() {
+		setDescriptionError(null);
 		setEditingDescription(true);
-		setDescriptionDraft(currentIssue?.description ?? "");
+		setDescriptionDraft({
+			description: currentIssue?.description ?? "",
+			descriptionDoc: currentIssue?.descriptionDoc,
+		});
 	}
 
 	function cancelDescriptionEdit() {
@@ -297,11 +304,19 @@ export function useIssueDetailPage({
 	}
 
 	async function saveDescription() {
-		await updateIssue({
-			issueId,
-			description: descriptionDraft,
-		});
-		setEditingDescription(false);
+		if (isSavingDescription) return;
+		setDescriptionError(null);
+		setIsSavingDescription(true);
+		try {
+			await updateIssue({ issueId, ...descriptionDraft });
+			setEditingDescription(false);
+		} catch (error) {
+			setDescriptionError(
+				getClientErrorMessage(error, "Failed to save description."),
+			);
+		} finally {
+			setIsSavingDescription(false);
+		}
 	}
 
 	function openSubIssueForm() {
@@ -338,6 +353,7 @@ export function useIssueDetailPage({
 				projectId,
 				title: parsed.data.title,
 				description: parsed.data.description,
+				descriptionDoc: subIssueForm.descriptionDoc,
 				status: parsed.data.status,
 				priority: parsed.data.priority,
 				assigneeId: (parsed.data.assigneeId || undefined) as
@@ -479,6 +495,8 @@ export function useIssueDetailPage({
 		currentIssue,
 		deleteError,
 		descriptionDraft,
+		descriptionError,
+		isSavingDescription,
 		editingCommentId,
 		editingDescription,
 		editingTitle,

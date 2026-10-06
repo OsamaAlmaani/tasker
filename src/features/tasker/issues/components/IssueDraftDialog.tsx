@@ -3,7 +3,6 @@ import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Select } from "#/components/ui/select";
-import { Textarea } from "#/components/ui/textarea";
 import { ProjectCustomFieldInput } from "#/features/tasker/components/ProjectCustomFieldInput";
 import { ProjectLabelSelector } from "#/features/tasker/components/ProjectLabelSelector";
 import { ISSUE_PRIORITIES, issuePriorityLabel } from "#/features/tasker/model";
@@ -13,10 +12,13 @@ import type {
 } from "#/features/tasker/projectCustomFields";
 import type { ProjectLabelDefinition } from "#/features/tasker/projectLabels";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
+import type { DescriptionDoc } from "#convex/lib/issueDescriptions";
+import { DescriptionEditor } from "./DescriptionEditor";
 
 export type IssueDraft = {
 	title: string;
 	description: string;
+	descriptionDoc?: DescriptionDoc;
 	listId: string;
 	parentIssueId: string;
 	status: ProjectStatusDefinition["key"];
@@ -119,12 +121,12 @@ export function IssueDraftDialog({
 					</div>
 					<div className="md:col-span-2">
 						<Label>Description</Label>
-						<Textarea
-							value={draft.description}
-							onChange={(event) =>
+						<DescriptionEditor
+							value={draft}
+							onChange={(value) =>
 								setDraft((previous) => ({
 									...previous,
-									description: event.target.value,
+									...value,
 								}))
 							}
 						/>

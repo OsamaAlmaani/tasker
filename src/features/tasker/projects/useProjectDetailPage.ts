@@ -42,6 +42,7 @@ import { issueFormSchema } from "#/features/tasker/validation";
 import { getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Doc, Id } from "#convex/_generated/dataModel";
+import type { IssueDateFilters } from "#convex/lib/issueFilters";
 
 export type ProjectIssueRow = Doc<"issues"> & {
 	childIssueCount: number;
@@ -88,6 +89,12 @@ export function useProjectDetailPage({
 	const isArchivedView = archive === "archived";
 	const priority = routeSearch.priority ?? "";
 	const assigneeId = routeSearch.assignee ?? "";
+	const dateFilters: IssueDateFilters = {
+		startFrom: routeSearch.startFrom,
+		startTo: routeSearch.startTo,
+		dueFrom: routeSearch.dueFrom,
+		dueTo: routeSearch.dueTo,
+	};
 	const listFilter = routeSearch.list ?? "all";
 	const groupBy = routeSearch.groupBy ?? "list";
 	const projectView = routeSearch.view ?? "issues";
@@ -105,7 +112,11 @@ export function useProjectDetailPage({
 					priority: (priority || undefined) as
 						| (typeof ISSUE_PRIORITIES)[number]
 						| undefined,
-					assigneeId: (assigneeId || undefined) as Id<"users"> | undefined,
+					assigneeId:
+						assigneeId === "unassigned"
+							? null
+							: ((assigneeId || undefined) as Id<"users"> | undefined),
+					...dateFilters,
 					listId:
 						listFilter === "all"
 							? undefined
@@ -360,6 +371,7 @@ export function useProjectDetailPage({
 		createIssue,
 		filters: {
 			assigneeId,
+			...dateFilters,
 			archive,
 			groupBy,
 			layout: issueLayout,
@@ -416,6 +428,7 @@ export function useProjectDetailPage({
 				projectId,
 				title: parsed.data.title,
 				description: parsed.data.description,
+				descriptionDoc: issueForm.descriptionDoc,
 				listId: (parsed.data.listId || undefined) as
 					| Id<"issueLists">
 					| undefined,
@@ -698,6 +711,7 @@ export function useProjectDetailPage({
 		assignableUserById,
 		assignableUsers,
 		assigneeId,
+		dateFilters,
 		canWrite,
 		completionConfirm,
 		confirmArchiveToggle,

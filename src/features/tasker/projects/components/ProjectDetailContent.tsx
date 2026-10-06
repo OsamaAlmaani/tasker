@@ -72,6 +72,7 @@ export function ProjectDetailContent({
 		assignableUserById,
 		assignableUsers,
 		assigneeId,
+		dateFilters,
 		canWrite,
 		completionConfirm,
 		confirmArchiveToggle,
@@ -181,7 +182,11 @@ export function ProjectDetailContent({
 		Id<"issues">[] | null
 	>(null);
 	const hasTaskFilters = Boolean(
-		searchInput || selectedStatuses.length || priority || assigneeId,
+		searchInput ||
+			selectedStatuses.length ||
+			priority ||
+			assigneeId ||
+			Object.values(dateFilters).some(Boolean),
 	);
 	const trimmedSearch = searchInput.trim();
 	const selectedListName =
@@ -506,6 +511,10 @@ export function ProjectDetailContent({
 						archivedCount={archivedIssueCount}
 						assignableUsers={assignableUsers}
 						assigneeId={assigneeId}
+						dateFilters={dateFilters}
+						onDateFiltersChange={(value) =>
+							updateProjectSearch(value, { replace: true })
+						}
 						bulkActions={
 							canWrite && issueLayout === "list" && selectedIssueIds.size ? (
 								<IssueBulkActionsBar

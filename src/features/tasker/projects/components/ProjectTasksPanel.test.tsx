@@ -26,6 +26,8 @@ function panelProps(
 		archiveState: "active",
 		archivedCount: 0,
 		assigneeId: "",
+		dateFilters: {},
+		onDateFiltersChange: noop,
 		canWrite: true,
 		dragOverStatus: null,
 		emptyStateDescription: "No tasks",
@@ -67,6 +69,57 @@ function panelProps(
 }
 
 describe("list selection", () => {
+	it("offers an unassigned filter and forwards date ranges", () => {
+		const props = panelProps();
+		render(<ProjectTasksPanel {...props} />);
+		fireEvent.change(
+			screen.getByRole("combobox", { name: "Assignee filter" }),
+			{ target: { value: "unassigned" } },
+		);
+		expect(props.onAssigneeChange).toHaveBeenCalledWith("unassigned");
+		fireEvent.click(screen.getByText("Dates"));
+		fireEvent.change(screen.getByLabelText("Start date from"), {
+			target: { value: "2026-10-01" },
+		});
+		fireEvent.change(screen.getByLabelText("Due date to"), {
+			target: { value: "2026-10-06" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+		expect(props.onDateFiltersChange).toHaveBeenCalledWith({
+			startFrom: "2026-10-01",
+			startTo: undefined,
+			dueFrom: undefined,
+			dueTo: "2026-10-06",
+		});
+	});
+	it("keeps invalid date drafts out of the active filters", () => {
+		const props = panelProps();
+		render(<ProjectTasksPanel {...props} />);
+		fireEvent.click(screen.getByText("Dates"));
+		fireEvent.change(screen.getByLabelText("Due date from"), {
+			target: { value: "2026-10-06" },
+		});
+		fireEvent.change(screen.getByLabelText("Due date to"), {
+			target: { value: "2026-10-01" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+		expect(props.onDateFiltersChange).not.toHaveBeenCalled();
+		expect(screen.getByRole("alert").textContent).toContain("cannot be after");
+	});
+	it("clears all four date bounds", () => {
+		const props = panelProps({
+			dateFilters: { startFrom: "2026-10-01", dueTo: "2026-10-06" },
+		});
+		render(<ProjectTasksPanel {...props} />);
+		fireEvent.click(screen.getByText("Dates (2)"));
+		fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+		expect(props.onDateFiltersChange).toHaveBeenCalledWith({
+			startFrom: undefined,
+			startTo: undefined,
+			dueFrom: undefined,
+			dueTo: undefined,
+		});
+	});
 	it("selects all displayed tasks including nested children", () => {
 		const props = panelProps();
 		render(<ProjectTasksPanel {...props} />);

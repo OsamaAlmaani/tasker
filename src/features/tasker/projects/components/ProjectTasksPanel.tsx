@@ -11,6 +11,8 @@ import { ISSUE_PRIORITIES } from "#/features/tasker/model";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 import type { ProjectSearch } from "#/features/tasker/projects/projectSearch";
 import { cn } from "#/lib/utils";
+import type { IssueDateFilters } from "#convex/lib/issueFilters";
+import { TaskDateFilters } from "./TaskDateFilters";
 
 type ProjectIssueGroup = {
 	key: string;
@@ -83,6 +85,8 @@ type ProjectTasksPanelProps = {
 	archivedCount: number;
 	assignableUsers?: AssignableUserOption[];
 	assigneeId: string;
+	dateFilters: IssueDateFilters;
+	onDateFiltersChange: (value: IssueDateFilters) => void;
 	bulkActions?: ReactNode;
 	calendar?: ReactNode;
 	gantt?: ReactNode;
@@ -137,6 +141,8 @@ export function ProjectTasksPanel({
 	archivedCount,
 	assignableUsers,
 	assigneeId,
+	dateFilters,
+	onDateFiltersChange,
 	bulkActions,
 	calendar,
 	gantt,
@@ -284,10 +290,10 @@ export function ProjectTasksPanel({
 					className={cn(
 						"mb-3 grid gap-2",
 						issueLayout === "list"
-							? "md:grid-cols-6"
+							? "md:grid-cols-4 xl:grid-cols-7"
 							: isScheduleView
-								? "md:grid-cols-4"
-								: "md:grid-cols-5",
+								? "md:grid-cols-3 xl:grid-cols-5"
+								: "md:grid-cols-3 xl:grid-cols-6",
 					)}
 				>
 					<Input
@@ -323,15 +329,18 @@ export function ProjectTasksPanel({
 					</Select>
 					<Select
 						value={assigneeId}
+						aria-label="Assignee filter"
 						onChange={(event) => onAssigneeChange(event.target.value)}
 					>
 						<option value="">All assignees</option>
+						<option value="unassigned">Unassigned</option>
 						{(assignableUsers ?? []).map((user) => (
 							<option key={user._id} value={user._id}>
 								{user.name}
 							</option>
 						))}
 					</Select>
+					<TaskDateFilters value={dateFilters} onChange={onDateFiltersChange} />
 					{issueLayout === "list" ? (
 						<Select
 							value={groupBy}

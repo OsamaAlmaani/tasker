@@ -4,10 +4,16 @@ import type { ProjectLabelDefinition } from "#/features/tasker/projectLabels";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 import { getClientErrorMessage } from "#/lib/utils";
 import type { Doc, Id } from "#convex/_generated/dataModel";
+import {
+	type DescriptionDoc,
+	normalizeDescriptionDoc,
+} from "#convex/lib/issueDescriptions";
+import type { IssueDateFilters } from "#convex/lib/issueFilters";
 
 type ImportedTask = {
 	title: string;
 	description?: string;
+	descriptionDoc?: DescriptionDoc;
 	status?: string;
 	priority?: (typeof ISSUE_PRIORITIES)[number];
 	labels?: string[] | string;
@@ -21,6 +27,7 @@ type ExportableIssue = Pick<
 	Doc<"issues">,
 	| "title"
 	| "description"
+	| "descriptionDoc"
 	| "status"
 	| "priority"
 	| "labels"
@@ -32,7 +39,7 @@ type ExportableIssue = Pick<
 type IssueListSummary = Pick<Doc<"issueLists">, "_id" | "name">;
 type ProjectSummary = Pick<Doc<"projects">, "_id" | "key" | "name">;
 
-type TaskFilters = {
+type TaskFilters = IssueDateFilters & {
 	archive?: string;
 	search?: string;
 	statuses?: (typeof ISSUE_STATUSES)[number][];
@@ -49,6 +56,7 @@ type CreateImportedIssueArgs = {
 	projectId: Id<"projects">;
 	title: string;
 	description?: string;
+	descriptionDoc?: DescriptionDoc;
 	status?: string;
 	priority?: (typeof ISSUE_PRIORITIES)[number];
 	startDate?: number;
@@ -207,6 +215,10 @@ export function useProjectTaskImportExport({
 				statuses: filters.statuses?.length ? filters.statuses : undefined,
 				priority: filters.priority || undefined,
 				assigneeId: filters.assigneeId || undefined,
+				startFrom: filters.startFrom,
+				startTo: filters.startTo,
+				dueFrom: filters.dueFrom,
+				dueTo: filters.dueTo,
 				list:
 					filters.list === "all"
 						? undefined
@@ -221,6 +233,7 @@ export function useProjectTaskImportExport({
 			tasks: taskRows.map((issue) => ({
 				title: issue.title,
 				description: issue.description,
+				descriptionDoc: issue.descriptionDoc,
 				status: issue.status,
 				statusName:
 					projectStatuses.find((status) => status.key === issue.status)?.name ??
@@ -340,6 +353,10 @@ export function useProjectTaskImportExport({
 						projectId,
 						title,
 						description: task.description?.trim() || undefined,
+						descriptionDoc:
+							task.descriptionDoc === undefined
+								? undefined
+								: normalizeDescriptionDoc(task.descriptionDoc),
 						status,
 						priority,
 						startDate: normalizeTaskDate(task.startDate),
