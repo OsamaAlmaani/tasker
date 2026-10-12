@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "convex/react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
@@ -22,23 +22,17 @@ export function AgentConnectionCard() {
 	const [revokingId, setRevokingId] = useState<Id<"agentTokens"> | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
+	const [endpoint, setEndpoint] = useState("");
+	useEffect(() => {
+		setEndpoint(new URL("/mcp", window.location.origin).href);
+	}, []);
 	const config = JSON.stringify(
 		{
 			mcpServers: {
 				tasker: {
-					command: "pnpm",
-					args: [
-						"--dir",
-						"/absolute/path/to/tasker",
-						"exec",
-						"tsx",
-						"mcp/index.ts",
-					],
-					env: {
-						TASKER_CONVEX_URL:
-							import.meta.env.VITE_CONVEX_URL ||
-							"https://your-deployment.convex.cloud",
-						TASKER_API_TOKEN: newToken ?? "YOUR_AGENT_TOKEN",
+					url: endpoint,
+					headers: {
+						Authorization: `Bearer ${newToken ?? "YOUR_AGENT_TOKEN"}`,
 					},
 				},
 			},
@@ -217,9 +211,9 @@ export function AgentConnectionCard() {
 						MCP client configuration
 					</label>
 					<p className="m-0 text-sm text-[var(--muted-text)]">
-						Install Tasker locally with Node 25 and pnpm 11. Replace the
-						repository path below with your local checkout, then add this
-						configuration to your agent’s MCP settings.
+						Connect your agent to this Tasker server using the configuration
+						below. No local installation or command-line tools are needed. Your
+						agent must support remote MCP with an Authorization header.
 					</p>
 					<Textarea
 						id={`${id}-config`}

@@ -19,7 +19,7 @@ It supports:
 - Task lists, task status-based Kanban, a task calendar, and a Gantt timeline with start/due dates and ranges.
 - One-level sub-tasks with progress rollups.
 - Comments and activity history.
-- Local MCP task discovery, renewable agent claims, and result submission for human review.
+- Hosted and local MCP task discovery, renewable agent claims, and result submission for human review.
 - Project archive state and issue soft-delete behavior.
 
 ## Working Rule For Future Agents
@@ -422,6 +422,11 @@ If the task is about:
 
 ## Agent / MCP Workflow
 
+- Hosted endpoint: `src/routes/mcp.ts` mounts `/mcp` outside the Clerk-protected app routes. `src/server/taskerMcp.ts` resolves the backend URL from server `TASKER_CONVEX_URL`, runtime `VITE_CONVEX_URL`, or build-time `VITE_CONVEX_URL`. It deploys with the normal Node app build/start and needs no separate process.
+- `mcp/http.ts` wraps the shared tool factory using stateless Streamable HTTP with JSON responses and a 1 MiB request-body limit. Each request has its own token-bound server/transport and is closed after handling. HTTP responses use `Cache-Control: no-store`; transport and backend failures are sanitized.
+- Every HTTP request authenticates `Authorization: Bearer <personal-token>` using `agentTokens.authenticate` before initialization/discovery/calls. Deploy that query before the web app. Existing task handlers still recheck authorization and task state. Never capture one user's credential in a shared global server or configure a deployment-wide agent token.
+- Browser Origin is checked against the request origin and optional exact origins from server `TASKER_MCP_ALLOWED_ORIGINS` (comma-separated). OPTIONS serves trusted-origin preflight; GET/DELETE return 405 for this stateless endpoint. Native clients without Origin are supported. Clients need remote MCP plus custom bearer-header support; OAuth-only clients are not supported yet.
+- Settings generates the current app's `/mcp` URL and bearer header after hydration, removes the secret from the configuration when hidden, and requires no CLI or local checkout from consumers. Protocol/auth/isolation coverage: `tests/mcpHttp.test.ts`.
 - Local stdio entrypoint: `mcp/index.ts`; tool adapter: `mcp/server.ts`; launch with `pnpm mcp` and type-check with `pnpm mcp:check`.
 - MCP environment: `TASKER_CONVEX_URL` (`.convex.cloud` URL) and `TASKER_API_TOKEN`. Secrets are never client `VITE_` variables.
 - Settings composes `src/features/tasker/agents/AgentConnectionCard.tsx` for cryptographically random personal tokens, one-time secret display, client configuration, and revocation.

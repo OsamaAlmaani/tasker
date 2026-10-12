@@ -176,7 +176,11 @@ Workflow model progress:
 - [ ] Add import from other task tools if migration becomes important
 - [x] Add personal, expiring, revocable tokens for scoped agent task access
 - [x] Add local MCP task discovery, claims, and completion handoff to human review
+- [x] Serve authenticated remote MCP at the deployed app's `/mcp` URL, with URL-based agent setup and no consumer CLI installation (2026-10-12)
 - [x] Bound MCP task-list database reads and add separate completed-task discovery with assignment/project filters (2026-10-12)
+
+Integration progress:
+- 2026-10-12: Added the hosted `/mcp` Streamable HTTP endpoint to the app deployment, personal bearer authentication on every request, isolated callers, trusted-origin browser support, URL-based Settings configuration, and a production-app HTTP smoke test. Deploy `agentTokens.authenticate` before the app; consumers need a remote MCP client with custom-header support.
 
 ## Quality and Experience
 

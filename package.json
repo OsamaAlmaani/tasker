@@ -12,6 +12,7 @@
   "scripts": {
     "mcp": "tsx mcp/index.ts",
     "mcp:check": "tsc --noEmit -p mcp/tsconfig.json",
+    "mcp:smoke": "node scripts/mcp-smoke.mjs",
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "preview": "vite preview",

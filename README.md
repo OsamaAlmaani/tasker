@@ -80,28 +80,30 @@ This project is licensed under the Unlicense. See `/LICENSE`.
 
 ## Agents and MCP
 
-Tasker includes a local stdio MCP server. Your agent can discover tasks assigned to you, other users, or nobody, read their context, claim work, and submit its finished result for human review. The agent performs the actual work with its own tools; Tasker manages the queue, claims, and review handoff.
+Tasker serves a remote MCP endpoint at `/mcp` as part of the deployed app. Agents connect over Streamable HTTP without installing Tasker, Node, pnpm, or any CLI on their devices. Your agent can discover tasks assigned to you, other users, or nobody, read their context, claim work, and submit its finished result for human review. The agent performs the actual work with its own tools; Tasker manages the queue, claims, and review handoff.
 
-1. Deploy the updated Convex schema/functions and app through your normal deployment workflow. For an already configured development deployment, use `pnpm exec convex dev --once`.
+1. Deploy the updated Convex schema/functions **before** the web app, including the `agentTokens.authenticate` query. The existing `pnpm build` / `pnpm start` deployment includes `/mcp`; no separate MCP service is needed. Serve the app through HTTPS. For an already configured development backend, use `pnpm exec convex dev --once`.
 2. Open **Settings → Agent connection**, create a named personal token, and copy it while it is visible. Tokens expire after the selected period and can be revoked there.
-3. Install this repository locally using Node 25.x and pnpm 11.x, then add the following to your MCP client's configuration. Replace the checkout path, Convex deployment URL, and token. On Windows, use a path such as `D:/projects/tasker`.
+3. Add the configuration from Settings to your agent's remote MCP settings. Replace the example app URL and token below. The client must support Streamable HTTP and a custom Authorization header; exact configuration syntax varies by client.
 
 ```json
 {
   "mcpServers": {
     "tasker": {
-      "command": "pnpm",
-      "args": ["--dir", "/absolute/path/to/tasker", "exec", "tsx", "mcp/index.ts"],
-      "env": {
-        "TASKER_CONVEX_URL": "https://your-deployment.convex.cloud",
-        "TASKER_API_TOKEN": "YOUR_AGENT_TOKEN"
+      "url": "https://your-tasker-app.example/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_AGENT_TOKEN"
       }
     }
   }
 }
 ```
 
-Use the `.convex.cloud` deployment URL, not the `.convex.site` HTTP-action URL. `TASKER_API_TOKEN` belongs in the MCP client's environment; never prefix it with `VITE_`. Settings provides this configuration with the backend URL and newly created token filled in.
+Settings fills in the current app's `/mcp` URL and newly created token. The client connects to the **Tasker app**, not directly to the Convex deployment. The server resolves its backend URL from `TASKER_CONVEX_URL`, runtime `VITE_CONVEX_URL`, or the existing build-time `VITE_CONVEX_URL`, in that order. This must be the Convex API/deployment URL, not its HTTP-action URL. Never put an agent token in a URL or a `VITE_` environment variable, and do not configure one shared server token.
+
+Every request, including initialization and tool discovery, validates the caller's personal token against Convex. Requests use independent MCP instances, no persistent HTTP session, and JSON responses. GET/DELETE return 405; OPTIONS supports browser preflight. Responses are not cached. Missing/invalid/expired/revoked credentials return 401, inactive owners return 403, and unavailable authentication returns a sanitized 503. A newly revoked token fails on the next request. Tool calls additionally recheck existing backend permissions and task state.
+
+Browser requests accept the app origin by default. For trusted browser-based agents on other origins, set the optional server variable `TASKER_MCP_ALLOWED_ORIGINS` to a comma-separated list of exact origins, such as `https://agent.example,https://another-agent.example`. Native/server-side clients normally omit Origin and need no CORS configuration. Your reverse proxy must preserve Authorization, request bodies, and MCP protocol headers. Clients that only support OAuth sign-in cannot use this personal-token endpoint; OAuth authorization/discovery is not implemented.
 
 The server exposes six tools:
 
@@ -124,7 +126,7 @@ Example agent request:
 
 > Find one unassigned task in my project using Tasker. Read its details, claim it with a unique run ID, implement the work, and verify the result. Renew the claim if needed. Submit a summary with the verification results and relevant links for review. If blocked, release the task and explain the blocker.
 
-For a direct launch, set `TASKER_CONVEX_URL` and `TASKER_API_TOKEN` in the process environment and run `pnpm mcp`. Run `pnpm mcp:check` to type-check the adapter. Implementation references: [MCP SDK server documentation](https://ts.sdk.modelcontextprotocol.io/server) and [Convex runtime APIs](https://docs.convex.dev/functions/runtimes).
+Local stdio remains available for existing integrations: install the repository, set `TASKER_CONVEX_URL` and `TASKER_API_TOKEN` in the process environment, and run `pnpm mcp`. Hosted clients do not need this setup. Run `pnpm mcp:check` to type-check the adapters. After building with the app's usual public Vite environment, run `pnpm mcp:smoke` to test the actual production app over HTTP against a disposable backend fixture (no live task data). Implementation references: [MCP SDK server documentation](https://ts.sdk.modelcontextprotocol.io/server) and [Convex runtime APIs](https://docs.convex.dev/functions/runtimes).
 
 ## Local Setup (Required)
 

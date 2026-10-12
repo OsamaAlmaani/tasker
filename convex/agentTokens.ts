@@ -1,7 +1,16 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireCurrentUser } from './lib/auth'
-import { hashToken, validateTokenFormat } from './lib/agentTokens'
+import { hashToken, requireAgentUser, validateTokenFormat } from './lib/agentTokens'
+
+// Authenticate HTTP initialization and discovery without returning credential data.
+export const authenticate = query({
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    await requireAgentUser(ctx, args.token)
+    return null
+  },
+})
 
 export const list = query({
   args: {},

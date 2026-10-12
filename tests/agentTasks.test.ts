@@ -64,6 +64,12 @@ async function context(role = 'member') {
 }
 
 describe('agent token authentication', () => {
+  it('authenticates hosted connections without exposing user or credential data', async () => {
+    const { ctx, records } = await context()
+    expect(await handler(tokens.authenticate)(ctx, { token })).toBeNull()
+    records.get(tokenId).revokedAt = 1
+    await expect(handler(tokens.authenticate)(ctx, { token })).rejects.toThrow()
+  })
   it('rejects invalid, revoked, expired tokens and inactive owners', async () => {
     const { ctx, records } = await context()
     await expect(handler(tasks.list)(ctx, { token: 'invalid' })).rejects.toThrow()
