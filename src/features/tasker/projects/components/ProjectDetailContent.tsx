@@ -15,6 +15,7 @@ import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { ActivityFeed } from "#/features/tasker/components/ActivityFeed";
 import { MemberAvatarStack } from "#/features/tasker/components/MemberAvatarStack";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
+import { GithubProjectSettings } from "#/features/tasker/github/GithubProjectSettings";
 import { IssueBulkActionsBar } from "#/features/tasker/issues/components/IssueBulkActionsBar";
 import { IssueDraftDialog } from "#/features/tasker/issues/components/IssueDraftDialog";
 import { findDoneAncestorIssue } from "#/features/tasker/issues/hierarchy";
@@ -490,6 +491,13 @@ export function ProjectDetailContent({
 			) : null}
 
 			<ProjectSettingsCard
+				githubSettings={
+					<GithubProjectSettings
+						projectId={projectId}
+						statuses={projectData.project.statuses}
+						archived={projectData.project.archived}
+					/>
+				}
 				archived={projectData.project.archived}
 				error={projectSettingsError}
 				form={projectForm}

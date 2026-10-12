@@ -43,7 +43,7 @@ function requireClaim(issue: Doc<'issues'>, tokenId: Id<'agentTokens'>, runId: s
   if (!claim || claim.tokenId !== tokenId || claim.runId !== runId || claim.expiresAt <= Date.now()) {
     fail('CONFLICT', 'This run does not hold an active claim. Claim the task before continuing.')
   }
-  if (issue.status !== claim.workStatus) fail('CONFLICT', 'The task status changed while the agent was working. Read the task again.')
+  if (claim.invalidated || issue.status !== claim.workStatus) fail('CONFLICT', 'The task status changed while the agent was working. Release the claim and read the task again.')
   return claim
 }
 
@@ -156,10 +156,10 @@ export const claim = mutation({
     const sameRun = current?.tokenId === credential._id && current.runId === args.runId && current.expiresAt > now
     const workStatus = args.workStatus ?? (sameRun ? current.workStatus : 'in_progress')
     validateStatus(project, workStatus)
-    if (sameRun && (issue.status !== current.workStatus || workStatus !== current.workStatus)) {
+    if (sameRun && (current.invalidated || issue.status !== current.workStatus || workStatus !== current.workStatus)) {
       fail('CONFLICT', 'The task or work status changed. Release the claim and read the task again.')
     }
-    await applyIssueUpdate(ctx, { issue, user, changes: { status: workStatus }, now })
+    await applyIssueUpdate(ctx, { issue, user, source: 'agent', changes: { status: workStatus }, now })
     await ctx.db.patch(issue._id, { agentClaim: {
       tokenId: credential._id, userId: user._id, runId: args.runId,
       expiresAt: now + LEASE_MS,
@@ -181,7 +181,7 @@ export const submitReview = mutation({
     validateStatus(project, reviewStatus)
     if (reviewStatus === activeClaim.workStatus) fail('VALIDATION_ERROR', 'Review status must differ from the work status.')
     const now = Date.now()
-    await applyIssueUpdate(ctx, { issue, user, changes: { status: reviewStatus }, now })
+    await applyIssueUpdate(ctx, { issue, user, source: 'agent', changes: { status: reviewStatus }, now })
     const commentId = await ctx.db.insert('comments', { issueId: issue._id, projectId: project._id, authorId: user._id, body: `Agent result (${args.runId})\n\n${summary}`, createdAt: now, updatedAt: now })
     await createActivity(ctx, { actorId: user._id, projectId: project._id, issueId: issue._id, entityType: 'comment', entityId: commentId, action: 'comment.created', metadata: { source: 'mcp', runId: args.runId } })
     await ctx.db.patch(issue._id, { agentClaim: undefined })
@@ -197,8 +197,8 @@ export const release = mutation({
     const activeClaim = issue.agentClaim
     if (!activeClaim || activeClaim.tokenId !== credential._id || activeClaim.runId !== args.runId) fail('CONFLICT', 'This run does not own the claim.')
     // Do not overwrite a human's intervening status edit or restore a deleted status.
-    if (issue.status === activeClaim.workStatus && ensureProjectStatusExists(project, activeClaim.previousStatus)) {
-      await applyIssueUpdate(ctx, { issue, user, changes: { status: activeClaim.previousStatus } })
+    if (!activeClaim.invalidated && issue.status === activeClaim.workStatus && ensureProjectStatusExists(project, activeClaim.previousStatus)) {
+      await applyIssueUpdate(ctx, { issue, user, source: 'agent', changes: { status: activeClaim.previousStatus } })
     }
     await ctx.db.patch(issue._id, { agentClaim: undefined, updatedAt: Date.now() })
     return await ctx.db.get(issue._id)

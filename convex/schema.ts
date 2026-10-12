@@ -136,6 +136,7 @@ export default defineSchema({
       expiresAt: v.number(),
       previousStatus: v.string(),
       workStatus: v.string(),
+      invalidated: v.optional(v.boolean()),
     })),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -204,6 +205,64 @@ export default defineSchema({
     .index('by_issueId', ['issueId'])
     .index('by_actorId', ['actorId'])
     .index('by_entity', ['entityType', 'entityId']),
+
+  githubConnections: defineTable({
+    projectId: v.id('projects'),
+    owner: v.string(),
+    repo: v.string(),
+    repositoryId: v.number(),
+    installationId: v.number(),
+    baseBranch: v.string(),
+    workStatus: v.string(),
+    reviewStatus: v.string(),
+    enabled: v.boolean(),
+    configuredBy: v.id('users'),
+    version: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_projectId', ['projectId'])
+    .index('by_repositoryId', ['repositoryId'])
+    .index('by_installationId', ['installationId']),
+
+  githubLinks: defineTable({
+    projectId: v.id('projects'),
+    issueId: v.id('issues'),
+    connectionId: v.id('githubConnections'),
+    repositoryId: v.number(),
+    branch: v.string(),
+    baseBranch: v.string(),
+    createdBy: v.id('users'),
+    creationState: v.union(v.literal('pending'), v.literal('ready'), v.literal('failed')),
+    creationAttempt: v.string(),
+    creationLeaseUntil: v.number(),
+    syncEnabled: v.boolean(),
+    pauseReason: v.optional(v.string()),
+    lastAppliedStatus: v.string(),
+    branchExists: v.optional(v.boolean()),
+    pullNumber: v.optional(v.number()),
+    minimumPullNumber: v.optional(v.number()),
+    pullState: v.optional(v.union(v.literal('draft'), v.literal('open'), v.literal('closed'), v.literal('merged'))),
+    pullBaseBranch: v.optional(v.string()),
+    syncLease: v.optional(v.string()),
+    syncLeaseUntil: v.optional(v.number()),
+    syncError: v.optional(v.string()),
+    lastSyncedAt: v.optional(v.number()),
+    nextSyncAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_issueId', ['issueId'])
+    .index('by_projectId', ['projectId'])
+    .index('by_repositoryId_branch', ['repositoryId', 'branch'])
+    .index('by_creationState_nextSyncAt', ['creationState', 'nextSyncAt']),
+
+  githubDeliveries: defineTable({
+    deliveryId: v.string(),
+    receivedAt: v.number(),
+  })
+    .index('by_deliveryId', ['deliveryId'])
+    .index('by_receivedAt', ['receivedAt']),
 
   notifications: defineTable({
     recipientUserId: v.id('users'),

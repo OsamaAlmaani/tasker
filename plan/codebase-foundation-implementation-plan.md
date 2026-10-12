@@ -36,6 +36,8 @@ Refactor oversized route files into maintainable feature modules while preservin
 - [x] Mark roadmap foundation items completed once route sizes are materially reduced.
 
 ## Notes
+- 2026-10-12: Review follow-up preserves the existing backend structure: GitHub settings use a version precondition around external validation; the shared issue helper distinguishes agent transitions and invalidates claims on intervening status changes, with workflow-transfer coverage in `convex/projects.ts`.
+- 2026-10-12: GitHub branch/PR lifecycle integration follows the route composition structure: dedicated `src/features/tasker/github/` components are composed by project settings and issue detail. Backend auth/invariants remain in Convex, with the shared authorized `applyIssueUpdate` helper preserving hierarchy and human overrides. See `docs/superpowers/plans/2026-10-11-github-task-lifecycle.md`.
 - Keep refactors incremental and behavior-preserving.
 - Keep this plan updated as tasks start and finish.
 - Initial extraction complete: `buildDescendantStats` and `findDoneAncestorIssue` now live in `src/features/tasker/issues/hierarchy.ts`.

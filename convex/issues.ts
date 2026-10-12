@@ -18,6 +18,7 @@ import {
   requireProjectWriteAccess,
 } from './lib/auth'
 import { createActivity } from './lib/activity'
+import { pauseGithubSync } from './lib/githubLinks'
 import { shouldNotifyAssigneeChange } from './lib/notifications'
 import { matchesIssueFilters, validateDateFilters } from './lib/issueFilters'
 import { buildDescriptionFields, descriptionDocValidator, type DescriptionDoc } from './lib/issueDescriptions'
@@ -375,11 +376,13 @@ export async function applyIssueUpdate(
     user,
     changes,
     now = Date.now(),
+    source,
   }: {
     issue: Doc<'issues'>
     user: Doc<'users'>
     changes: IssueUpdateChanges
     now?: number
+    source?: 'github' | 'agent'
   },
 ) {
   const project = await ctx.db.get(issue.projectId)
@@ -436,11 +439,13 @@ export async function applyIssueUpdate(
       if (changes.cascadeDescendantsToDone) {
         await Promise.all(
           unfinishedDescendants.map((descendant) =>
-            ctx.db.patch(descendant._id, {
-              status: 'done',
-              completedAt: now,
-              updatedAt: now,
-            }),
+            (async () => {
+              await ctx.db.patch(descendant._id, {
+                status: 'done', completedAt: now, updatedAt: now,
+                ...(descendant.agentClaim && source !== 'agent' ? { agentClaim: { ...descendant.agentClaim, invalidated: true } } : {}),
+              })
+              if (source !== 'github') await pauseGithubSync(ctx, descendant._id)
+            })(),
           ),
         )
       }
@@ -460,6 +465,9 @@ export async function applyIssueUpdate(
 
     patch.status = changes.status
     patch.completedAt = changes.status === 'done' ? now : undefined
+    if (changes.status !== issue.status && issue.agentClaim && source !== 'agent') {
+      patch.agentClaim = { ...issue.agentClaim, invalidated: true }
+    }
   }
   if (changes.priority !== undefined) {
     patch.priority = changes.priority
@@ -567,6 +575,10 @@ export async function applyIssueUpdate(
 
   await ctx.db.patch(issue._id, patch)
 
+  if (source !== 'github' && changes.status !== undefined && changes.status !== issue.status) {
+    await pauseGithubSync(ctx, issue._id)
+  }
+
   const nextListId =
     (patch.listId as Id<'issueLists'> | undefined) ?? issue.listId ?? undefined
   if (nextListId !== issue.listId) {
@@ -592,7 +604,7 @@ export async function applyIssueUpdate(
   })
 
   await createActivity(ctx, {
-    actorId: user._id,
+    actorId: source === 'github' ? undefined : user._id,
     projectId: issue.projectId,
     issueId: issue._id,
     entityType: 'issue',
@@ -605,12 +617,12 @@ export async function applyIssueUpdate(
 
   if (changes.status !== undefined && changes.status !== issue.status) {
     await createActivity(ctx, {
-      actorId: user._id,
+      actorId: source === 'github' ? undefined : user._id,
       projectId: issue.projectId,
       issueId: issue._id,
       entityType: 'issue',
       entityId: issue._id,
-      action: 'issue.status_changed',
+      action: source === 'github' ? 'issue.github_status_changed' : 'issue.status_changed',
       metadata: {
         from: issue.status,
         to: changes.status,

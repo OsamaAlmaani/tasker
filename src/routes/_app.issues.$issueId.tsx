@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 import { formatRelative } from "#/features/tasker/format";
+import { GithubIssuePanel } from "#/features/tasker/github/GithubIssuePanel";
 import {
 	IssueMetadataPanel,
 	IssueOverviewPanel,
@@ -223,6 +224,14 @@ function IssueDetailPage() {
 					projectCustomFields={projectCustomFields}
 					projectLabels={projectLabels}
 					projectStatuses={projectStatuses}
+				/>
+
+				<GithubIssuePanel
+					key={currentIssue._id}
+					issueId={currentIssue._id}
+					canWrite={canWrite}
+					archived={currentIssue.archived || issueData.project.archived}
+					completed={currentIssue.status === "done"}
 				/>
 
 				<IssueDiscussionPanel

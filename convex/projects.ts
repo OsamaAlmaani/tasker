@@ -485,6 +485,7 @@ export const deleteStatus = mutation({
       affectedIssues.map((issue) =>
         ctx.db.patch(issue._id, {
           status: args.transferToStatusKey,
+          ...(issue.agentClaim ? { agentClaim: { ...issue.agentClaim, invalidated: true } } : {}),
           completedAt: args.transferToStatusKey === 'done' ? now : undefined,
           updatedAt: now,
         }),
