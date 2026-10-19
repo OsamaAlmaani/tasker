@@ -46,6 +46,18 @@ const ProjectTaskCalendar = lazy(() => import("./ProjectTaskCalendar"));
 const ProjectTaskGantt = lazy(() => import("./ProjectTaskGantt"));
 const ProjectTaskSheet = lazy(() => import("./ProjectTaskSheet"));
 
+function TaskViewLoading({
+	onLoadingChange,
+}: {
+	onLoadingChange: (loading: boolean) => void;
+}) {
+	useEffect(() => {
+		onLoadingChange(true);
+		return () => onLoadingChange(false);
+	}, [onLoadingChange]);
+	return <div className="min-h-[40vh]" aria-hidden="true" />;
+}
+
 type ProjectDetailContentProps = {
 	page: ProjectDetailPageState;
 	projectData: NonNullable<ProjectDetailPageState["projectData"]>;
@@ -75,6 +87,7 @@ export function ProjectDetailContent({
 		assigneeId,
 		dateFilters,
 		canWrite,
+		canExportTasks,
 		completionConfirm,
 		confirmArchiveToggle,
 		confirmCascadeCompletion,
@@ -86,6 +99,7 @@ export function ProjectDetailContent({
 		dragOverStatus,
 		editingProject,
 		exportTasks,
+		exportTasksToExcel,
 		groupBy,
 		groupedIssues,
 		handleImportTasksFile,
@@ -111,6 +125,8 @@ export function ProjectDetailContent({
 		isCompletingIssueTree,
 		isImportExportMenuOpen,
 		isImportingTasks,
+		isExportingExcel,
+		isLoadingIssues,
 		isInviteModalOpen,
 		isMembersModalOpen,
 		isRemovingMember,
@@ -120,7 +136,6 @@ export function ProjectDetailContent({
 		issueForm,
 		issueLayout,
 		issueLists,
-		issues,
 		kanbanColumns,
 		allProjectIssues,
 		listFilter,
@@ -174,6 +189,10 @@ export function ProjectDetailContent({
 		updateIssue,
 		visibleIssues,
 	} = page;
+	const [isLoadingTaskView, setIsLoadingTaskView] = useState(false);
+	const taskViewFallback = (
+		<TaskViewLoading onLoadingChange={setIsLoadingTaskView} />
+	);
 	const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(
 		() => new Set(),
 	);
@@ -451,11 +470,21 @@ export function ProjectDetailContent({
 										type="button"
 										role="menuitem"
 										className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
-										disabled={!issues}
+										disabled={!canExportTasks}
 										onClick={exportTasks}
 									>
 										<Download className="h-4 w-4" />
-										Export tasks
+										Export tasks (JSON)
+									</button>
+									<button
+										type="button"
+										role="menuitem"
+										className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+										disabled={!canExportTasks || isExportingExcel}
+										onClick={exportTasksToExcel}
+									>
+										<Download className="h-4 w-4" />
+										{isExportingExcel ? "Exporting…" : "Export to Excel"}
 									</button>
 								</div>
 							) : null}
@@ -552,21 +581,17 @@ export function ProjectDetailContent({
 						}
 						canWrite={canWrite}
 						isApplyingBulkAction={isApplyingBulkAction}
+						isLoading={isLoadingIssues || isLoadingTaskView}
 						onSelectionChange={changeIssueSelection}
 						selectedIssueIds={selectedIssueIds}
 						sheet={
 							issueLayout === "sheet" ? (
-								<ClientOnly
-									fallback={<div className="page-loading">Loading sheet…</div>}
-								>
-									<Suspense
-										fallback={
-											<div className="page-loading">Loading sheet…</div>
-										}
-									>
+								<ClientOnly fallback={taskViewFallback}>
+									<Suspense fallback={taskViewFallback}>
 										<ProjectTaskSheet
 											key={projectId}
 											issues={visibleIssues}
+											isLoading={isLoadingIssues}
 											projectKey={projectData.project.key}
 											canWrite={canWrite}
 											disabled={
@@ -597,18 +622,11 @@ export function ProjectDetailContent({
 						}
 						calendar={
 							issueLayout === "calendar" ? (
-								<ClientOnly
-									fallback={
-										<div className="page-loading">Loading calendar…</div>
-									}
-								>
-									<Suspense
-										fallback={
-											<div className="page-loading">Loading calendar…</div>
-										}
-									>
+								<ClientOnly fallback={taskViewFallback}>
+									<Suspense fallback={taskViewFallback}>
 										<ProjectTaskCalendar
 											key={projectId}
+											isLoading={isLoadingIssues}
 											canWrite={canWrite}
 											issues={visibleIssues}
 											projectKey={projectData.project.key}
@@ -633,16 +651,11 @@ export function ProjectDetailContent({
 						dragOverStatus={dragOverStatus}
 						gantt={
 							issueLayout === "gantt" ? (
-								<ClientOnly
-									fallback={<div className="page-loading">Loading Gantt…</div>}
-								>
-									<Suspense
-										fallback={
-											<div className="page-loading">Loading Gantt…</div>
-										}
-									>
+								<ClientOnly fallback={taskViewFallback}>
+									<Suspense fallback={taskViewFallback}>
 										<ProjectTaskGantt
 											key={projectId}
+											isLoading={isLoadingIssues}
 											canWrite={canWrite}
 											issues={visibleIssues}
 											projectKey={projectData.project.key}
@@ -825,7 +838,7 @@ export function ProjectDetailContent({
 								statusOptions={projectStatuses}
 							/>
 						)}
-						resultSummary={resultSummary}
+						resultSummary={isLoadingIssues ? undefined : resultSummary}
 						search={searchInput}
 						selectedStatuses={selectedStatuses}
 						showEmptyState={Boolean(visibleIssues) && visibleIssueCount === 0}

@@ -9,6 +9,7 @@ import {
 	normalizeDescriptionDoc,
 } from "#convex/lib/issueDescriptions";
 import type { IssueDateFilters } from "#convex/lib/issueFilters";
+import type { SheetOptions } from "./taskSheet";
 
 type ImportedTask = {
 	title: string;
@@ -34,6 +35,10 @@ type ExportableIssue = Pick<
 	| "startDate"
 	| "dueDate"
 	| "listId"
+	| "issueNumber"
+	| "assigneeId"
+	| "parentIssueId"
+	| "customFieldValues"
 >;
 
 type IssueListSummary = Pick<Doc<"issueLists">, "_id" | "name">;
@@ -76,6 +81,7 @@ type UseProjectTaskImportExportOptions = {
 	projectId: Id<"projects">;
 	projectLabels: ProjectLabelDefinition[];
 	projectStatuses: ProjectStatusDefinition[];
+	sheetOptions: SheetOptions;
 };
 
 function extractImportTasks(payload: unknown): ImportedTask[] {
@@ -140,9 +146,11 @@ export function useProjectTaskImportExport({
 	projectId,
 	projectLabels,
 	projectStatuses,
+	sheetOptions,
 }: UseProjectTaskImportExportOptions) {
 	const [isImportExportMenuOpen, setIsImportExportMenuOpen] = useState(false);
 	const [isImportingTasks, setIsImportingTasks] = useState(false);
+	const [isExportingExcel, setIsExportingExcel] = useState(false);
 	const [importExportMessage, setImportExportMessage] = useState<string | null>(
 		null,
 	);
@@ -194,7 +202,7 @@ export function useProjectTaskImportExport({
 	}
 
 	function exportTasks() {
-		if (!project) {
+		if (!project || !issues) {
 			return;
 		}
 
@@ -264,6 +272,33 @@ export function useProjectTaskImportExport({
 		setImportExportMessage(
 			`Exported ${payload.tasks.length} task${payload.tasks.length === 1 ? "" : "s"}.`,
 		);
+	}
+
+	async function exportTasksToExcel() {
+		if (!project || !issues || isExportingExcel) return;
+		setIsImportExportMenuOpen(false);
+		setImportExportError(null);
+		setImportExportMessage(null);
+		setIsExportingExcel(true);
+		try {
+			const [{ buildTaskWorkbook }, { writeFileXLSX }] = await Promise.all([
+				import("./taskExcel"),
+				import("xlsx"),
+			]);
+			writeFileXLSX(
+				buildTaskWorkbook(issues, project, sheetOptions),
+				`${project.key.toLowerCase()}-tasks-${new Date().toISOString().slice(0, 10)}.xlsx`,
+			);
+			setImportExportMessage(
+				`Exported ${issues.length} task${issues.length === 1 ? "" : "s"} to Excel.`,
+			);
+		} catch (error) {
+			setImportExportError(
+				getClientErrorMessage(error, "Failed to export tasks to Excel."),
+			);
+		} finally {
+			setIsExportingExcel(false);
+		}
 	}
 
 	async function handleImportTasksFile(event: ChangeEvent<HTMLInputElement>) {
@@ -392,6 +427,7 @@ export function useProjectTaskImportExport({
 
 	return {
 		exportTasks,
+		exportTasksToExcel,
 		handleImportTasksFile,
 		importExportError,
 		importExportMenuRef,
@@ -399,6 +435,7 @@ export function useProjectTaskImportExport({
 		importFileInputRef,
 		isImportExportMenuOpen,
 		isImportingTasks,
+		isExportingExcel,
 		openImportPicker,
 		toggleImportExportMenu,
 	};

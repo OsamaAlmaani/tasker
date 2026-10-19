@@ -35,6 +35,7 @@ type CalendarIssue = {
 
 type ProjectTaskCalendarProps = {
 	canWrite: boolean;
+	isLoading?: boolean;
 	issues: CalendarIssue[];
 	onDatesChange: (
 		issueId: string,
@@ -55,6 +56,7 @@ function getCalendarWeek(date: string) {
 
 export default function ProjectTaskCalendar({
 	canWrite,
+	isLoading,
 	issues,
 	onDatesChange,
 	onOpenIssue,
@@ -184,7 +186,9 @@ export default function ProjectTaskCalendar({
 							{range?.view.title ?? "Calendar"}
 						</h3>
 						<p className="m-0 text-xs text-[var(--muted-text)]">
-							{rangeCount} {rangeCount === 1 ? "task" : "tasks"} in view
+							{isLoading
+								? "Loading tasks…"
+								: `${rangeCount} ${rangeCount === 1 ? "task" : "tasks"} in view`}
 						</p>
 					</div>
 				</div>
@@ -248,8 +252,12 @@ export default function ProjectTaskCalendar({
 						: "Click a task to open it."}
 				</p>
 				<p className="m-0">
-					{events.length} scheduled
-					{undatedCount ? ` · ${undatedCount} without dates` : ""}
+					{!isLoading && (
+						<>
+							{events.length} scheduled
+							{undatedCount ? ` · ${undatedCount} without dates` : ""}
+						</>
+					)}
 				</p>
 			</div>
 			{error ? (
@@ -268,7 +276,7 @@ export default function ProjectTaskCalendar({
 			>
 				{savingIssueId ? "Saving task dates…" : announcement}
 			</p>
-			{events.length === 0 ? (
+			{!isLoading && events.length === 0 ? (
 				<p className="mb-3 rounded-lg border border-dashed border-[var(--line)] bg-[var(--surface-muted)] p-4 text-sm text-[var(--muted-text)]">
 					No scheduled tasks. Tasks matching your filters appear here once they
 					have a start or due date.

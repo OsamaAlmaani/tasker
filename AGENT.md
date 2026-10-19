@@ -296,6 +296,7 @@ Invite flow is split intentionally:
 - Place reusable custom-field value controls in `src/features/tasker/components/ProjectCustomFieldInput.tsx` so task dialogs and issue metadata reuse the same field-type rendering rules.
 - Place the remaining project-page composition, dialogs, and project-view switching UI in `src/features/tasker/projects/components/ProjectDetailContent.tsx` so the route stays focused on params, search-state updates, and loading/not-found handling.
 - Place project task import/export state, menu behavior, and file parsing in `src/features/tasker/projects/useProjectTaskImportExport.ts` instead of keeping that workflow inline in route files.
+- Project task Excel export lazy-loads SheetJS and `projects/taskExcel.ts`, reuses Sheet field definitions, and downloads the already-loaded `visibleIssues` without another query. Export waits for the current filtered query and display metadata, including all project tasks for readable active/archived parent references; retained rows during refetch must not be exported. Descriptions exceeding Excel's 32,767-character cell limit continue in additional columns without splitting surrogate pairs. Project task queries use `.collect()` without pagination.
 - Place project detail page queries, derived state, modal state, and mutation handlers in `src/features/tasker/projects/useProjectDetailPage.ts` so the route stays focused on search-state normalization and composition.
 - Place project members/invite modal UI in `src/features/tasker/projects/components/` and keep the route focused on modal state plus mutation wiring.
 - Place the project settings modal UI in `src/features/tasker/projects/components/ProjectSettingsCard.tsx` and keep the route focused on settings state, submit handlers, archive confirmation state, and modal open/close wiring.
@@ -337,6 +338,8 @@ Most project detail state, mutations, dialogs, and derived collections now live 
 `layout=sheet` selects the lazy, client-only `ProjectTaskSheet.tsx` using the pinned MIT `react-data-grid` package. It shares filtered issues, task creation, bulk actions and the existing status-confirmation flow. `taskSheet.ts` owns typed cell validation and mutation payloads; custom-field edits preserve other values. List edits are locked for sub-tasks, and parent edits for tasks with children. Clipboard paste is single-cell; fill saves sequentially and reports partial failure. Status fill directs users to bulk actions. Descriptions, checklists, comments and activity remain on task details. Grid colors use app theme variables; keep only the identifier frozen so narrow screens can reach all columns.
 
 Sheet row refreshes wait until the cell editor closes so live updates cannot discard drafts or change the row being edited. Saves resolve task IDs against the latest issues before validation and custom-field merging; copied select cells carry option values so duplicate display names remain unambiguous.
+
+All task views show initial data and lazy-module loading beside the Tasks title, with loading text instead of premature empty messages. Keep the last task query result during refetches to avoid flashing loaders or unmounting views; discard it when the project ID changes.
 
 ### Issue detail route
 

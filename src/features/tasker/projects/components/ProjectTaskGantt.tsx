@@ -44,6 +44,7 @@ type GanttIssue = {
 
 type ProjectTaskGanttProps = {
 	canWrite: boolean;
+	isLoading?: boolean;
 	issues: GanttIssue[];
 	onDatesChange: (
 		issueId: string,
@@ -165,6 +166,7 @@ function highlightTime(date: Date, unit: string) {
 
 export default function ProjectTaskGantt({
 	canWrite,
+	isLoading,
 	issues,
 	onDatesChange,
 	onOpenIssue,
@@ -457,7 +459,9 @@ export default function ProjectTaskGantt({
 			</div>
 			<div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--muted-text)]">
 				<span>
-					{tasks.length} scheduled · {undated.length} without dates
+					{isLoading
+						? "Loading tasks…"
+						: `${tasks.length} scheduled · ${undated.length} without dates`}
 				</span>
 				<span>
 					{savingId
@@ -511,10 +515,14 @@ export default function ProjectTaskGantt({
 				</div>
 			) : (
 				<div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface-muted)] px-4 py-10 text-center">
-					<p className="m-0 font-semibold">No scheduled tasks</p>
-					<p className="m-0 mt-2 text-sm text-[var(--muted-text)]">
-						Add a start or due date to show tasks on the timeline.
+					<p className="m-0 font-semibold">
+						{isLoading ? "Loading tasks…" : "No scheduled tasks"}
 					</p>
+					{!isLoading && (
+						<p className="m-0 mt-2 text-sm text-[var(--muted-text)]">
+							Add a start or due date to show tasks on the timeline.
+						</p>
+					)}
 				</div>
 			)}
 			{undated.length ? (

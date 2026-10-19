@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { LoaderCircle, Plus } from "lucide-react";
 import type { DragEvent, ReactNode } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -101,6 +101,7 @@ type ProjectTasksPanelProps = {
 	hideDoneTasks: boolean;
 	issueLayout: NonNullable<ProjectSearch["layout"]>;
 	isApplyingBulkAction: boolean;
+	isLoading?: boolean;
 	kanbanColumns: KanbanColumn[];
 	onAddStatusFilter: (value: string) => void;
 	onArchiveStateChange: (value: "active" | "archived") => void;
@@ -158,6 +159,7 @@ export function ProjectTasksPanel({
 	hideDoneTasks,
 	issueLayout,
 	isApplyingBulkAction,
+	isLoading,
 	kanbanColumns,
 	onAddStatusFilter,
 	onArchiveStateChange,
@@ -194,7 +196,17 @@ export function ProjectTasksPanel({
 	return (
 		<Card>
 			<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-				<CardTitle>Tasks</CardTitle>
+				<CardTitle className="flex items-center gap-2">
+					Tasks
+					{isLoading && (
+						<span role="status" aria-label="Loading tasks">
+							<LoaderCircle
+								aria-hidden="true"
+								className="h-4 w-4 motion-safe:animate-spin"
+							/>
+						</span>
+					)}
+				</CardTitle>
 				{canWrite ? (
 					<Button variant="secondary" onClick={onCreateTask}>
 						<Plus className="mr-2 h-4 w-4" />
@@ -423,22 +435,24 @@ export function ProjectTasksPanel({
 					calendar
 				) : issueLayout === "gantt" ? (
 					gantt
+				) : issueLayout === "sheet" ? (
+					sheet
 				) : showEmptyState ? (
 					<div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface-muted)] px-4 py-8 text-center">
 						<p className="m-0 text-base font-semibold text-[var(--text)]">
-							{emptyStateTitle}
+							{isLoading ? "Loading tasks…" : emptyStateTitle}
 						</p>
-						<p className="m-0 mt-2 text-sm text-[var(--muted-text)]">
-							{emptyStateDescription}
-						</p>
-						{emptyStateAction ? (
+						{!isLoading && (
+							<p className="m-0 mt-2 text-sm text-[var(--muted-text)]">
+								{emptyStateDescription}
+							</p>
+						)}
+						{!isLoading && emptyStateAction ? (
 							<div className="mt-4 flex items-center justify-center">
 								{emptyStateAction}
 							</div>
 						) : null}
 					</div>
-				) : issueLayout === "sheet" ? (
-					sheet
 				) : issueLayout === "list" ? (
 					<div className="space-y-4">
 						{groupedIssues.map((group) => (

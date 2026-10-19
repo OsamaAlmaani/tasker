@@ -5,7 +5,7 @@ import type { ProjectLabelDefinition } from "#/features/tasker/projectLabels";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 import type { ProjectIssueRow } from "#/features/tasker/projects/useProjectDetailPage";
 import type { api } from "#convex/_generated/api";
-import type { Id } from "#convex/_generated/dataModel";
+import type { Doc, Id } from "#convex/_generated/dataModel";
 import { isCalendarDate } from "#convex/lib/issueFilters";
 import { calendarDate, calendarTimestamp } from "./taskCalendarDates";
 
@@ -80,7 +80,22 @@ export function getSheetFields(options: SheetOptions): SheetField[] {
 	];
 }
 
-export function getSheetValue(issue: ProjectIssueRow, key: string): SheetValue {
+export function getSheetValue(
+	issue: Pick<
+		Doc<"issues">,
+		| "title"
+		| "status"
+		| "priority"
+		| "assigneeId"
+		| "listId"
+		| "parentIssueId"
+		| "startDate"
+		| "dueDate"
+		| "labels"
+		| "customFieldValues"
+	>,
+	key: string,
+): SheetValue {
 	if (key.startsWith("custom:"))
 		return issue.customFieldValues?.[key.slice(7)] ?? "";
 	switch (key) {

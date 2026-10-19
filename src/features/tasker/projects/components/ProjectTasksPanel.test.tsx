@@ -223,6 +223,35 @@ describe("list selection", () => {
 });
 
 describe("sheet layout", () => {
+	it.each([
+		"list",
+		"kanban",
+		"calendar",
+		"gantt",
+		"sheet",
+	] as const)("shows initial loading beside Tasks for %s without false empty messages", (issueLayout) => {
+		const props = panelProps({
+			issueLayout,
+			isLoading: true,
+			showEmptyState: true,
+			groupedIssues: [],
+			sheet: <div>Sheet grid</div>,
+			calendar: <div>Calendar grid</div>,
+			gantt: <div>Gantt grid</div>,
+		});
+		const { rerender } = render(<ProjectTasksPanel {...props} />);
+		expect(screen.getByRole("status", { name: "Loading tasks" })).toBeTruthy();
+		expect(screen.queryByText("No tasks")).toBeNull();
+		const view = ["sheet", "calendar", "gantt"].includes(issueLayout)
+			? screen.getByText(
+					`${issueLayout === "sheet" ? "Sheet" : issueLayout === "calendar" ? "Calendar" : "Gantt"} grid`,
+				)
+			: undefined;
+		rerender(<ProjectTasksPanel {...props} isLoading={false} />);
+		expect(screen.queryByRole("status", { name: "Loading tasks" })).toBeNull();
+		if (view) expect(view.isConnected).toBe(true);
+		else expect(screen.getAllByText("No tasks").length).toBeGreaterThan(0);
+	});
 	it("switches to Sheet, renders its grid and retains bulk controls", () => {
 		const props = panelProps({
 			issueLayout: "sheet",

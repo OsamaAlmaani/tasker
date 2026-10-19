@@ -3,9 +3,15 @@ import { Blob as NodeBlob } from "node:buffer";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import type { ChangeEvent } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { utils, writeFileXLSX } from "xlsx";
 import type { Id } from "#convex/_generated/dataModel";
 import { plainDescriptionDoc } from "#convex/lib/issueDescriptions";
 import { useProjectTaskImportExport } from "./useProjectTaskImportExport";
+
+vi.mock("xlsx", async (importOriginal) => ({
+	...(await importOriginal<typeof import("xlsx")>()),
+	writeFileXLSX: vi.fn(),
+}));
 
 afterEach(() => {
 	cleanup();
@@ -14,6 +20,74 @@ afterEach(() => {
 });
 
 describe("rich task import/export", () => {
+	it("downloads the current rows for viewers and waits for a loaded result", async () => {
+		const projectId = "project" as Id<"projects">;
+		const issue = {
+			issueNumber: 5,
+			title: "Visible task",
+			status: "todo",
+			priority: "none" as const,
+			labels: [],
+		};
+		const options = {
+			canWrite: false,
+			createIssue: vi.fn(),
+			projectId,
+			project: { _id: projectId, key: "TEST", name: "Test" },
+			filters: {},
+			issueListById: new Map(),
+			issueLists: [],
+			projectLabels: [],
+			projectStatuses: [],
+			sheetOptions: {
+				statuses: [],
+				customFields: [],
+				labels: [],
+				users: [],
+				lists: [],
+				parents: [],
+			},
+		};
+		const { result, rerender } = renderHook(
+			({ issues }: { issues: (typeof issue)[] | undefined }) =>
+				useProjectTaskImportExport({ ...options, issues }),
+			{
+				initialProps: { issues: undefined } as {
+					issues: (typeof issue)[] | undefined;
+				},
+			},
+		);
+		vi.mocked(writeFileXLSX).mockClear();
+		await act(async () => {
+			await result.current.exportTasksToExcel();
+		});
+		expect(writeFileXLSX).not.toHaveBeenCalled();
+		rerender({ issues: [issue] });
+		await act(async () => {
+			await result.current.exportTasksToExcel();
+		});
+		expect(writeFileXLSX).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.stringMatching(/^test-tasks-\d{4}-\d{2}-\d{2}\.xlsx$/),
+		);
+		const workbook = vi.mocked(writeFileXLSX).mock.calls[0][0];
+		expect(utils.sheet_to_json(workbook.Sheets.Tasks)).toEqual([
+			expect.objectContaining({ Task: "TEST-5", Title: "Visible task" }),
+		]);
+		expect(result.current.importExportMessage).toBe(
+			"Exported 1 task to Excel.",
+		);
+		expect(options.createIssue).not.toHaveBeenCalled();
+		rerender({ issues: [] });
+		vi.mocked(writeFileXLSX).mockImplementationOnce(() => {
+			throw new Error("Download failed");
+		});
+		await act(async () => {
+			await result.current.exportTasksToExcel();
+		});
+		expect(result.current.importExportError).toBe("Download failed");
+		expect(result.current.isExportingExcel).toBe(false);
+	});
 	it("preserves formatted descriptions and date filter metadata across export/import", async () => {
 		let exported: NodeBlob | undefined;
 		vi.stubGlobal("Blob", NodeBlob);
@@ -49,9 +123,18 @@ describe("rich task import/export", () => {
 				issueLists: [],
 				projectLabels: [],
 				projectStatuses: [],
+				sheetOptions: {
+					statuses: [],
+					customFields: [],
+					labels: [],
+					users: [],
+					lists: [],
+					parents: [],
+				},
 				issues: [
 					{
 						title: "Task",
+						issueNumber: 1,
 						description: "Formatted task",
 						descriptionDoc: doc,
 						status: "todo",

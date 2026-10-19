@@ -82,6 +82,16 @@ function cell(column: number, row = 2) {
 }
 
 describe("task sheet using the real React Data Grid", () => {
+	it("keeps the sheet mounted while its initial loading count resolves", () => {
+		const p = props({ issues: [], isLoading: true });
+		const { rerender } = render(<ProjectTaskSheet {...p} />);
+		const grid = screen.getByRole("grid", { name: "Task sheet" });
+		expect(screen.getByRole("status").textContent).toBe("Loading tasks…");
+		expect(screen.queryByText(/Double-click or press Enter/)).toBeNull();
+		rerender(<ProjectTaskSheet {...p} isLoading={false} />);
+		expect(screen.getByRole("grid")).toBe(grid);
+		expect(screen.getByRole("status").textContent).toBe("0 tasks");
+	});
 	it.each([
 		"Enter",
 		"Escape",

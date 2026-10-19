@@ -128,12 +128,29 @@ export function useProjectDetailPage({
 				}
 			: "skip",
 	);
+	const [lastIssueResults, setLastIssueResults] = useState({
+		projectId,
+		data: issueResults,
+	});
+	if (
+		lastIssueResults.projectId !== projectId ||
+		(issueResults !== undefined && lastIssueResults.data !== issueResults)
+	) {
+		setLastIssueResults({ projectId, data: issueResults });
+	}
+	// Keep the current rows while filters refetch; only the first load needs a loader.
+	const currentIssueResults =
+		issueResults ??
+		(lastIssueResults.projectId === projectId
+			? lastIssueResults.data
+			: undefined);
+	const isLoadingIssues = currentIssueResults === undefined;
 	const issues = useMemo(
 		() =>
-			(issueResults ?? []).filter((issue) =>
+			(currentIssueResults ?? []).filter((issue) =>
 				isArchivedView ? issue.archived : !issue.archived,
 			),
-		[issueResults, isArchivedView],
+		[currentIssueResults, isArchivedView],
 	);
 	const normalizedSearchInput = searchInput.trim().toLowerCase();
 	const searchMatchedIssues = useMemo(() => {
@@ -384,11 +401,22 @@ export function useProjectDetailPage({
 		},
 		issueListById,
 		issueLists,
-		issues: visibleIssues as ProjectIssueRow[] | undefined,
+		issues: issueResults === undefined ? undefined : visibleIssues,
 		project: projectData?.project,
 		projectId,
 		projectLabels,
 		projectStatuses,
+		sheetOptions: {
+			statuses: projectStatuses,
+			customFields: projectCustomFields,
+			labels: projectLabels,
+			users: assignableUsers ?? [],
+			lists: issueLists ?? [],
+			parents: (allProjectIssues ?? []).map((issue) => ({
+				value: issue._id,
+				label: `${projectData?.project.key}-${issue.issueNumber} ${issue.title}`,
+			})),
+		},
 	});
 
 	const groupedIssues = useMemo(
@@ -749,6 +777,13 @@ export function useProjectDetailPage({
 		isCompletingIssueTree,
 		isImportExportMenuOpen: importExport.isImportExportMenuOpen,
 		isImportingTasks: importExport.isImportingTasks,
+		isLoadingIssues,
+		canExportTasks:
+			issueResults !== undefined &&
+			issueLists !== undefined &&
+			assignableUsers !== undefined &&
+			allProjectIssues !== undefined,
+		isExportingExcel: importExport.isExportingExcel,
 		isInviteModalOpen,
 		isMembersModalOpen,
 		isRemovingMember,
@@ -817,6 +852,7 @@ export function useProjectDetailPage({
 		toggleImportExportMenu: importExport.toggleImportExportMenu,
 		updateIssue,
 		exportTasks: importExport.exportTasks,
+		exportTasksToExcel: importExport.exportTasksToExcel,
 	};
 }
 

@@ -90,6 +90,7 @@ Core workflow progress:
 - [ ] Add archived-task visibility within each project
 
 Planning progress:
+- 2026-10-19: Moved task-view loading feedback beside the Tasks title across List, Kanban, Calendar, Gantt, and Sheet. Initial empty/count messages show loading until data arrives; later refetches retain rows without flashing loaders. Removed Sheet editing instructions.
 - 2026-10-19: Added a lazy React Data Grid Sheet view with typed inline edits, custom fields, label selection, sorting, column resizing, keyboard navigation, single-cell copy/paste, fill, and row selection for existing bulk actions. Existing filters, creation, import/export and task-detail actions remain available. Viewer access is read-only, status edits reuse completion confirmation, and failed saves retain server values. Fixed parent-list clearing to propagate to sub-tasks. Live refreshes preserve open drafts, saves use the latest task values by ID, and copied select values handle duplicate names. No formulas or rectangular paste.
 - 2026-09-28: Added a fourth project task view using SVAR React Gantt MIT core. The timeline supports independent task/subtask dates, single-date tasks and inclusive ranges, whole-bar dragging, either-edge resizing, day/week/month scales, Today/Fit controls, a resizable task grid, status colors, and derived progress. Existing filters and Hide done apply; undated tasks have separate links, viewers are read-only, and failed saves revert. Small screens show the timeline with a separate grid toggle. Calendar and Gantt share date-boundary rules and the atomic task update mutation; dependencies and milestones remain future work.
 - 2026-09-28: Added a project task calendar using FullCalendar Standard, with month/week navigation, due-date drag-and-drop through the existing task mutation, compact crowded weeks, truncated titles, and expandable overflow. Calendar honors task/list filters and Hide done; tasks without due dates are counted separately. Viewers retain read-only task links.
@@ -175,6 +176,7 @@ Workflow model progress:
 - [ ] Add calendar sync
 - [ ] Extend import/export from task-level JSON to full project-level import/export
 - [ ] Add CSV / Excel-compatible import and export support
+- 2026-10-19: Added client-side `.xlsx` export from the project Tasks menu using the existing filtered rows (project/list scope, search, status, priority, assignee, date bounds, archived state, and Hide done). Includes readable task metadata and typed custom fields; JSON import/export remains available. Long descriptions are preserved in continuation columns, and parent labels include archived tasks with export waiting for parent metadata. CSV and Excel import remain open.
 - [ ] Add import from other task tools if migration becomes important
 - [x] Add personal, expiring, revocable tokens for scoped agent task access
 - [x] Add local MCP task discovery, claims, and completion handoff to human review

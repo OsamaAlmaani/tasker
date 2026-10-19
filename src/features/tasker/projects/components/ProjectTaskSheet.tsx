@@ -34,6 +34,7 @@ type Props = SheetOptions & {
 	projectKey: string;
 	canWrite: boolean;
 	disabled: boolean;
+	isLoading?: boolean;
 	selectedIssueIds: ReadonlySet<string>;
 	onSelectionChange: (ids: Set<string>) => void;
 	onUpdate: (update: SheetUpdate) => Promise<unknown>;
@@ -142,6 +143,7 @@ export default function ProjectTaskSheet(props: Props) {
 		projectKey,
 		canWrite,
 		disabled,
+		isLoading,
 		selectedIssueIds,
 		onSelectionChange,
 		onUpdate,
@@ -315,19 +317,17 @@ export default function ProjectTaskSheet(props: Props) {
 
 	return (
 		<div className="min-w-0 space-y-2">
-			<p className="m-0 text-xs text-[var(--muted-text)]">
-				{canWrite
-					? "Double-click or press Enter to edit. Enter/Tab saves; Escape cancels. Copy/paste one cell or drag its corner to fill. Use bulk Status for multiple tasks. "
-					: "Read-only sheet. "}
-				Open a task for its description, checklist, comments, and activity.
-			</p>
 			{error && (
 				<p role="alert" className="text-sm text-[var(--danger)]">
 					{error}
 				</p>
 			)}
 			<div role="status" className="text-xs text-[var(--muted-text)]">
-				{saving ? "Saving…" : `${displayRows.length} tasks`}
+				{isLoading
+					? "Loading tasks…"
+					: saving
+						? "Saving…"
+						: `${displayRows.length} tasks`}
 			</div>
 			<DataGrid<SheetRow, unknown, string>
 				aria-label="Task sheet"
