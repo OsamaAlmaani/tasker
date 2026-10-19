@@ -7,6 +7,11 @@ import {
 } from "#/features/tasker/projects/projectSearch";
 
 describe("projectSearchSchema", () => {
+	it("retains the sheet layout in shared URLs", () => {
+		expect(
+			normalizeProjectSearch(projectSearchSchema.parse({ layout: "sheet" })),
+		).toEqual({ layout: "sheet" });
+	});
 	it("preserves unassigned and date ranges through URL normalization", () => {
 		const filters = {
 			assignee: "unassigned",

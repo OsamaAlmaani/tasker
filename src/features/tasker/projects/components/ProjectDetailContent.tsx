@@ -44,6 +44,7 @@ import type { Id } from "#convex/_generated/dataModel";
 
 const ProjectTaskCalendar = lazy(() => import("./ProjectTaskCalendar"));
 const ProjectTaskGantt = lazy(() => import("./ProjectTaskGantt"));
+const ProjectTaskSheet = lazy(() => import("./ProjectTaskSheet"));
 
 type ProjectDetailContentProps = {
 	page: ProjectDetailPageState;
@@ -264,7 +265,7 @@ export function ProjectDetailContent({
 	}, [visibleIssueIds]);
 
 	useEffect(() => {
-		if (issueLayout !== "list") {
+		if (issueLayout !== "list" && issueLayout !== "sheet") {
 			setSelectedIssueIds(new Set());
 		}
 	}, [issueLayout]);
@@ -516,7 +517,9 @@ export function ProjectDetailContent({
 							updateProjectSearch(value, { replace: true })
 						}
 						bulkActions={
-							canWrite && issueLayout === "list" && selectedIssueIds.size ? (
+							canWrite &&
+							(issueLayout === "list" || issueLayout === "sheet") &&
+							selectedIssueIds.size ? (
 								<IssueBulkActionsBar
 									assignableUsers={assignableUsers}
 									isApplying={isApplyingBulkAction}
@@ -551,6 +554,47 @@ export function ProjectDetailContent({
 						isApplyingBulkAction={isApplyingBulkAction}
 						onSelectionChange={changeIssueSelection}
 						selectedIssueIds={selectedIssueIds}
+						sheet={
+							issueLayout === "sheet" ? (
+								<ClientOnly
+									fallback={<div className="page-loading">Loading sheet…</div>}
+								>
+									<Suspense
+										fallback={
+											<div className="page-loading">Loading sheet…</div>
+										}
+									>
+										<ProjectTaskSheet
+											key={projectId}
+											issues={visibleIssues}
+											projectKey={projectData.project.key}
+											canWrite={canWrite}
+											disabled={
+												isApplyingBulkAction ||
+												isCompletingIssueTree ||
+												Boolean(completionConfirm)
+											}
+											statuses={projectStatuses}
+											customFields={projectCustomFields}
+											labels={projectLabels}
+											users={assignableUsers ?? []}
+											lists={issueLists ?? []}
+											parents={parentIssueOptions}
+											selectedIssueIds={selectedIssueIds}
+											onSelectionChange={setSelectedIssueIds}
+											onUpdate={updateIssue}
+											onStatusChange={handleIssueStatusChange}
+											onOpenIssue={(issueId) => {
+												void navigate({
+													to: "/issues/$issueId",
+													params: { issueId },
+												});
+											}}
+										/>
+									</Suspense>
+								</ClientOnly>
+							) : null
+						}
 						calendar={
 							issueLayout === "calendar" ? (
 								<ClientOnly

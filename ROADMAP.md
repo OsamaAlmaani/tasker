@@ -83,12 +83,14 @@ Core workflow progress:
 - [x] Add calendar view
 - [x] Add task start dates, calendar ranges, and resizing from either edge
 - [x] Add Gantt view with task grid, date ranges, drag/resize, and zoom
+- [x] Add editable Sheet view with typed task/custom fields and existing bulk actions
 - [ ] Add workload and capacity planning by assignee
 - [ ] Add timeline view with milestones
 - [ ] Add task dependencies and blocker relationships
 - [ ] Add archived-task visibility within each project
 
 Planning progress:
+- 2026-10-19: Added a lazy React Data Grid Sheet view with typed inline edits, custom fields, label selection, sorting, column resizing, keyboard navigation, single-cell copy/paste, fill, and row selection for existing bulk actions. Existing filters, creation, import/export and task-detail actions remain available. Viewer access is read-only, status edits reuse completion confirmation, and failed saves retain server values. Fixed parent-list clearing to propagate to sub-tasks. Live refreshes preserve open drafts, saves use the latest task values by ID, and copied select values handle duplicate names. No formulas or rectangular paste.
 - 2026-09-28: Added a fourth project task view using SVAR React Gantt MIT core. The timeline supports independent task/subtask dates, single-date tasks and inclusive ranges, whole-bar dragging, either-edge resizing, day/week/month scales, Today/Fit controls, a resizable task grid, status colors, and derived progress. Existing filters and Hide done apply; undated tasks have separate links, viewers are read-only, and failed saves revert. Small screens show the timeline with a separate grid toggle. Calendar and Gantt share date-boundary rules and the atomic task update mutation; dependencies and milestones remain future work.
 - 2026-09-28: Added a project task calendar using FullCalendar Standard, with month/week navigation, due-date drag-and-drop through the existing task mutation, compact crowded weeks, truncated titles, and expandable overflow. Calendar honors task/list filters and Hide done; tasks without due dates are counted separately. Viewers retain read-only task links.
 

@@ -568,7 +568,7 @@ export async function applyIssueUpdate(
   await ctx.db.patch(issue._id, patch)
 
   const nextListId =
-    (patch.listId as Id<'issueLists'> | undefined) ?? issue.listId ?? undefined
+    'listId' in patch ? patch.listId as Id<'issueLists'> | undefined : issue.listId
   if (nextListId !== issue.listId) {
     const descendantIds = await collectIssueDescendants(ctx, issue.projectId, [issue._id])
     const descendantIssues = (

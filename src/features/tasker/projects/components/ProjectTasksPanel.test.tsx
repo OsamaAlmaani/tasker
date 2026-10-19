@@ -222,6 +222,22 @@ describe("list selection", () => {
 	});
 });
 
+describe("sheet layout", () => {
+	it("switches to Sheet, renders its grid and retains bulk controls", () => {
+		const props = panelProps({
+			issueLayout: "sheet",
+			sheet: <div>Sheet grid</div>,
+			bulkActions: <div>Bulk actions</div>,
+		});
+		render(<ProjectTasksPanel {...props} />);
+		fireEvent.click(screen.getByRole("button", { name: "Sheet" }));
+		expect(props.onToggleLayout).toHaveBeenCalledWith("sheet");
+		expect(screen.getByText("Sheet grid")).toBeTruthy();
+		expect(screen.getByText("Bulk actions")).toBeTruthy();
+		expect(screen.queryByText("Group: List")).toBeNull();
+	});
+});
+
 describe("bulk delete control", () => {
 	it("offers deletion only when a delete handler is supplied and disables it during saves", () => {
 		const onDelete = vi.fn();

@@ -90,6 +90,7 @@ type ProjectTasksPanelProps = {
 	bulkActions?: ReactNode;
 	calendar?: ReactNode;
 	gantt?: ReactNode;
+	sheet?: ReactNode;
 	canWrite: boolean;
 	dragOverStatus: ProjectStatusDefinition["key"] | null;
 	emptyStateAction?: ReactNode;
@@ -146,6 +147,7 @@ export function ProjectTasksPanel({
 	bulkActions,
 	calendar,
 	gantt,
+	sheet,
 	canWrite,
 	dragOverStatus,
 	emptyStateAction,
@@ -243,6 +245,16 @@ export function ProjectTasksPanel({
 										onClick={() => onToggleLayout("gantt")}
 									>
 										Gantt
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										variant={issueLayout === "sheet" ? "secondary" : "ghost"}
+										className="h-7 px-3"
+										aria-pressed={issueLayout === "sheet"}
+										onClick={() => onToggleLayout("sheet")}
+									>
+										Sheet
 									</Button>
 								</div>
 								<div className="inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--muted-text)]">
@@ -425,6 +437,8 @@ export function ProjectTasksPanel({
 							</div>
 						) : null}
 					</div>
+				) : issueLayout === "sheet" ? (
+					sheet
 				) : issueLayout === "list" ? (
 					<div className="space-y-4">
 						{groupedIssues.map((group) => (

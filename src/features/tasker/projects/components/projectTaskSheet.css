@@ -1,0 +1,59 @@
+.task-sheet {
+	--rdg-color: var(--text);
+	--rdg-background-color: var(--surface);
+	--rdg-header-background-color: var(--surface-muted);
+	--rdg-row-hover-background-color: var(--surface-muted);
+	--rdg-row-selected-background-color: color-mix(
+		in oklab,
+		var(--accent) 14%,
+		var(--surface)
+	);
+	--rdg-row-selected-hover-background-color: color-mix(
+		in oklab,
+		var(--accent) 20%,
+		var(--surface)
+	);
+	--rdg-border-color: var(--line);
+	--rdg-selection-color: var(--accent);
+	--rdg-font-size: 13px;
+	height: min(65dvh, 720px);
+	min-height: 280px;
+	width: 100%;
+	border: 1px solid var(--line);
+}
+
+.task-sheet .rdg-cell {
+	border-inline-end: 1px solid var(--line);
+	border-block-end: 1px solid var(--line);
+}
+
+.task-sheet-editor {
+	display: flex;
+	align-items: center;
+	height: 100%;
+}
+
+.task-sheet-editor > * {
+	width: 100%;
+}
+
+.task-sheet-label-editor {
+	margin: auto;
+	width: min(400px, 90vw);
+	max-height: 70dvh;
+	overflow: auto;
+	padding: 12px;
+	gap: 10px;
+	border: 1px solid var(--line);
+	background: var(--surface);
+	color: var(--text);
+	box-shadow: 0 4px 12px #0003;
+}
+
+.task-sheet-label-editor[open] {
+	display: grid;
+}
+
+.task-sheet-label-editor::backdrop {
+	background: #0006;
+}

@@ -10,7 +10,13 @@ const ISSUE_SORT_OPTIONS = [
 ] as const;
 const ISSUE_GROUP_OPTIONS = ["list", "status"] as const;
 const PROJECT_VIEW_OPTIONS = ["issues", "activity"] as const;
-const ISSUE_LAYOUT_OPTIONS = ["list", "kanban", "calendar", "gantt"] as const;
+const ISSUE_LAYOUT_OPTIONS = [
+	"list",
+	"kanban",
+	"calendar",
+	"gantt",
+	"sheet",
+] as const;
 const ISSUE_ARCHIVE_OPTIONS = ["active", "archived"] as const;
 
 const calendarDate = z

@@ -3,6 +3,7 @@ import type { MutationCtx } from '../convex/_generated/server'
 import type { Id } from '../convex/_generated/dataModel'
 import * as tasks from '../convex/agentTasks'
 import * as tokens from '../convex/agentTokens'
+import { update as updateIssue } from '../convex/issues'
 import { hashToken } from '../convex/lib/agentTokens'
 import { DEFAULT_PROJECT_STATUSES } from '../convex/lib/projectStatuses'
 
@@ -62,6 +63,17 @@ async function context(role = 'member') {
   const ctx = { auth: { getUserIdentity: async () => ({ subject: 'clerk' }) }, db: { get: async (id: string) => records.get(id) ?? null, query, patch, insert } } as unknown as MutationCtx
   return { ctx, records, patch, insert, reads }
 }
+
+describe('shared task list updates', () => {
+  it('clears inherited sub-task lists when the parent list is cleared', async () => {
+    const { ctx, records } = await context()
+    records.get(issueId).listId = 'list'
+    records.set('issue-child', { ...records.get(issueId), _id: 'issue-child', parentIssueId: issueId })
+    await handler(updateIssue)(ctx, { issueId, listId: null })
+    expect(records.get(issueId).listId).toBeUndefined()
+    expect(records.get('issue-child').listId).toBeUndefined()
+  })
+})
 
 describe('agent token authentication', () => {
   it('rejects invalid, revoked, expired tokens and inactive owners', async () => {
