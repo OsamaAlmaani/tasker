@@ -663,7 +663,7 @@ button:disabled,
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid var(--line);
-  padding: 14px 18px;
+  padding: 8px 18px;
   background: color-mix(in oklab, var(--surface) 92%, transparent 8%);
   backdrop-filter: blur(10px);
 }
@@ -712,6 +712,16 @@ html[data-theme='chaos'] .app-topbar {
 .app-content:has(.project-workspace) {
   display: flex;
   overflow: auto;
+  padding: 12px 18px;
+}
+
+.project-workspace > .page-header {
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.project-workspace > .page-header h1 {
+  font-size: 1.25rem;
 }
 
 .project-workspace,
@@ -2843,7 +2853,35 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
   }
 }
 
+@media (min-width: 1101px) {
+  .app-shell-collapsed {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .app-shell-collapsed .app-sidebar {
+    padding: 18px 8px;
+  }
+
+  .app-shell-collapsed .app-sidebar-expanded-only {
+    display: none;
+  }
+
+  .app-shell-collapsed .app-sidebar-brand,
+  .app-shell-collapsed .nav-item,
+  .app-shell-collapsed .project-item {
+    justify-content: center;
+  }
+
+  .app-shell-collapsed .app-sidebar-projects-scroll {
+    padding-right: 0;
+  }
+}
+
 @media (max-width: 1100px) {
+  .app-sidebar-collapse {
+    display: none;
+  }
+
   .app-shell-grid {
     grid-template-columns: 1fr;
   }

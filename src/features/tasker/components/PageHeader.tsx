@@ -8,7 +8,7 @@ export function PageHeader({
 	actions?: React.ReactNode;
 }) {
 	return (
-		<div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+		<div className="page-header mb-6 flex flex-wrap items-start justify-between gap-3">
 			<div>
 				<h1 className="m-0 text-2xl font-semibold tracking-tight text-[var(--text)]">
 					{title}
@@ -20,7 +20,7 @@ export function PageHeader({
 				) : null}
 			</div>
 			{actions ? (
-				<div className="flex items-center gap-2">{actions}</div>
+				<div className="flex flex-wrap items-center gap-2">{actions}</div>
 			) : null}
 		</div>
 	);

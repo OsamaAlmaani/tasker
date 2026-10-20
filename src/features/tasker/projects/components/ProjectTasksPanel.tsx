@@ -1,8 +1,8 @@
-import { LoaderCircle, Plus } from "lucide-react";
-import type { DragEvent, ReactNode } from "react";
+import { Filter, LoaderCircle, Plus } from "lucide-react";
+import { type DragEvent, type ReactNode, useId, useState } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
+import { Card, CardContent } from "#/components/ui/card";
 import { Input } from "#/components/ui/input";
 import { Select } from "#/components/ui/select";
 import { Switch } from "#/components/ui/switch";
@@ -189,33 +189,22 @@ export function ProjectTasksPanel({
 	statusOptions,
 	statusPicker,
 }: ProjectTasksPanelProps) {
+	const [filtersOpen, setFiltersOpen] = useState(false);
+	const filtersId = useId();
+	const activeFilterCount =
+		Number(Boolean(search.trim())) +
+		selectedStatuses.length +
+		Number(Boolean(priority)) +
+		Number(Boolean(assigneeId)) +
+		Object.values(dateFilters).filter(Boolean).length;
 	const isArchivedView = archiveState === "archived";
 	const isScheduleView = issueLayout === "calendar" || issueLayout === "gantt";
 	const selectableIssues = groupedIssues.flatMap((group) => group.items);
 
 	return (
-		<Card className="project-task-panel">
-			<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-				<CardTitle className="flex items-center gap-2">
-					Tasks
-					{isLoading && (
-						<span role="status" aria-label="Loading tasks">
-							<LoaderCircle
-								aria-hidden="true"
-								className="h-4 w-4 motion-safe:animate-spin"
-							/>
-						</span>
-					)}
-				</CardTitle>
-				{canWrite ? (
-					<Button variant="secondary" onClick={onCreateTask}>
-						<Plus className="mr-2 h-4 w-4" />
-						New Task
-					</Button>
-				) : null}
-			</CardHeader>
-			<CardContent className="project-task-content">
-				<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+		<Card className="project-task-panel" aria-label="Tasks">
+			<CardContent className="project-task-content p-3">
+				<div className="mb-2 flex flex-wrap items-center justify-between gap-2">
 					<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
 						{isArchivedView ? null : (
 							<div className="flex flex-wrap items-center gap-2">
@@ -288,6 +277,24 @@ export function ProjectTasksPanel({
 							</p>
 						) : null}
 					</div>
+					{isLoading && (
+						<span role="status" aria-label="Loading tasks">
+							<LoaderCircle
+								aria-hidden="true"
+								className="h-4 w-4 motion-safe:animate-spin"
+							/>
+						</span>
+					)}
+					<Button
+						type="button"
+						variant={filtersOpen ? "secondary" : "ghost"}
+						aria-expanded={filtersOpen}
+						aria-controls={filtersId}
+						onClick={() => setFiltersOpen((value) => !value)}
+					>
+						<Filter className="mr-2 h-4 w-4" />
+						Filters{activeFilterCount ? ` (${activeFilterCount})` : ""}
+					</Button>
 					<div className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-1">
 						<Button
 							type="button"
@@ -308,89 +315,111 @@ export function ProjectTasksPanel({
 							Archived ({archivedCount})
 						</Button>
 					</div>
+					{canWrite ? (
+						<Button onClick={onCreateTask}>
+							<Plus className="mr-2 h-4 w-4" />
+							New Task
+						</Button>
+					) : null}
 				</div>
 
-				<div
-					className={cn(
-						"mb-3 grid gap-2",
-						issueLayout === "list"
-							? "md:grid-cols-4 xl:grid-cols-7"
-							: isScheduleView
-								? "md:grid-cols-3 xl:grid-cols-5"
-								: "md:grid-cols-3 xl:grid-cols-6",
-					)}
-				>
-					<Input
-						value={search}
-						onChange={(event) => onSearchChange(event.target.value)}
-						placeholder="Search tasks"
-					/>
-					<Select
-						value={statusPicker}
-						onChange={(event) => onAddStatusFilter(event.target.value)}
+				{filtersOpen ? (
+					<div
+						id={filtersId}
+						className={cn(
+							"mb-2 grid gap-2",
+							issueLayout === "list"
+								? "md:grid-cols-4 xl:grid-cols-7"
+								: isScheduleView
+									? "md:grid-cols-3 xl:grid-cols-5"
+									: "md:grid-cols-3 xl:grid-cols-6",
+						)}
 					>
-						<option value="">Add status filter</option>
-						{statusOptions.map((status) => (
-							<option
-								key={status.key}
-								value={status.key}
-								disabled={selectedStatuses.includes(status.key)}
+						<Input
+							value={search}
+							onChange={(event) => onSearchChange(event.target.value)}
+							placeholder="Search tasks"
+						/>
+						<Select
+							value={statusPicker}
+							onChange={(event) => onAddStatusFilter(event.target.value)}
+						>
+							<option value="">Add status filter</option>
+							{statusOptions.map((status) => (
+								<option
+									key={status.key}
+									value={status.key}
+									disabled={selectedStatuses.includes(status.key)}
+								>
+									{status.name}
+								</option>
+							))}
+						</Select>
+						<Select
+							value={priority}
+							onChange={(event) => onPriorityChange(event.target.value)}
+						>
+							<option value="">All priority</option>
+							{ISSUE_PRIORITIES.map((value) => (
+								<option key={value} value={value}>
+									{value}
+								</option>
+							))}
+						</Select>
+						<Select
+							value={assigneeId}
+							aria-label="Assignee filter"
+							onChange={(event) => onAssigneeChange(event.target.value)}
+						>
+							<option value="">All assignees</option>
+							<option value="unassigned">Unassigned</option>
+							{(assignableUsers ?? []).map((user) => (
+								<option key={user._id} value={user._id}>
+									{user.name}
+								</option>
+							))}
+						</Select>
+						<TaskDateFilters
+							value={dateFilters}
+							onChange={onDateFiltersChange}
+						/>
+						{issueLayout === "list" ? (
+							<Select
+								value={groupBy}
+								onChange={(event) => onGroupByChange(event.target.value)}
 							>
-								{status.name}
-							</option>
-						))}
-					</Select>
-					<Select
-						value={priority}
-						onChange={(event) => onPriorityChange(event.target.value)}
-					>
-						<option value="">All priority</option>
-						{ISSUE_PRIORITIES.map((value) => (
-							<option key={value} value={value}>
-								{value}
-							</option>
-						))}
-					</Select>
-					<Select
-						value={assigneeId}
-						aria-label="Assignee filter"
-						onChange={(event) => onAssigneeChange(event.target.value)}
-					>
-						<option value="">All assignees</option>
-						<option value="unassigned">Unassigned</option>
-						{(assignableUsers ?? []).map((user) => (
-							<option key={user._id} value={user._id}>
-								{user.name}
-							</option>
-						))}
-					</Select>
-					<TaskDateFilters value={dateFilters} onChange={onDateFiltersChange} />
-					{issueLayout === "list" ? (
-						<Select
-							value={groupBy}
-							onChange={(event) => onGroupByChange(event.target.value)}
+								<option value="list">Group: List</option>
+								<option value="status">Group: Status</option>
+							</Select>
+						) : null}
+						{!isScheduleView ? (
+							<Select
+								value={sortBy}
+								onChange={(event) => onSortChange(event.target.value)}
+							>
+								<option value="updated_desc">Updated</option>
+								<option value="created_desc">Created</option>
+								<option value="priority_desc">Priority</option>
+								<option value="due_asc">Due date</option>
+							</Select>
+						) : null}
+					</div>
+				) : null}
+				<div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--muted-text)]">
+					{resultSummary ? <p className="m-0">{resultSummary}</p> : null}
+					{canWrite && issueLayout === "list" && selectableIssues.length > 0 ? (
+						<TaskSelectionCheckbox
+							className="text-xs text-[var(--muted-text)]"
+							items={selectableIssues}
+							selectedIssueIds={selectedIssueIds}
+							label="Select all visible tasks"
+							disabled={isApplyingBulkAction}
+							onChange={onSelectionChange}
 						>
-							<option value="list">Group: List</option>
-							<option value="status">Group: Status</option>
-						</Select>
-					) : null}
-					{!isScheduleView ? (
-						<Select
-							value={sortBy}
-							onChange={(event) => onSortChange(event.target.value)}
-						>
-							<option value="updated_desc">Updated</option>
-							<option value="created_desc">Created</option>
-							<option value="priority_desc">Priority</option>
-							<option value="due_asc">Due date</option>
-						</Select>
+							Select all ({selectableIssues.length})
+						</TaskSelectionCheckbox>
 					) : null}
 				</div>
-				{resultSummary ? (
-					<p className="mb-3 text-xs text-[var(--muted-text)]">
-						{resultSummary}
-					</p>
-				) : null}
 
 				{selectedStatuses.length ? (
 					<div className="mb-3 flex flex-wrap items-center gap-2">
@@ -416,18 +445,6 @@ export function ProjectTasksPanel({
 							Clear statuses
 						</Button>
 					</div>
-				) : null}
-				{canWrite && issueLayout === "list" && selectableIssues.length > 0 ? (
-					<TaskSelectionCheckbox
-						className="mb-3 text-sm text-[var(--muted-text)]"
-						items={selectableIssues}
-						selectedIssueIds={selectedIssueIds}
-						label="Select all visible tasks"
-						disabled={isApplyingBulkAction}
-						onChange={onSelectionChange}
-					>
-						Select all ({selectableIssues.length})
-					</TaskSelectionCheckbox>
 				) : null}
 				{bulkActions ? <div className="mb-3">{bulkActions}</div> : null}
 

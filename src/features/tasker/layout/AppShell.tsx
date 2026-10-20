@@ -12,6 +12,8 @@ import {
 	ListChecks,
 	Menu,
 	MoreHorizontal,
+	PanelLeftClose,
+	PanelLeftOpen,
 	Pencil,
 	Settings,
 	Shield,
@@ -55,6 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 		string | null
 	>(null);
 	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 	const [notificationsOpen, setNotificationsOpen] = useState(false);
 	const [commandSearch, setCommandSearch] = useState("");
 	const [listModalProject, setListModalProject] = useState<{
@@ -372,7 +375,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	}
 
 	return (
-		<div className="app-shell-grid min-h-dvh">
+		<div
+			className={`app-shell-grid min-h-dvh ${sidebarCollapsed ? "app-shell-collapsed" : ""}`}
+		>
 			{mobileSidebarOpen ? (
 				<button
 					type="button"
@@ -383,13 +388,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			) : null}
 
 			<aside
+				id="app-navigation"
+				aria-label="Main navigation"
 				className={`app-sidebar ${mobileSidebarOpen ? "app-sidebar-open" : ""}`}
 			>
-				<div className="mb-6 flex items-center gap-2">
-					<div className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--accent)] text-[var(--accent-foreground)]">
+				<div className="app-sidebar-brand mb-4 flex items-center gap-2">
+					<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--accent)] text-[var(--accent-foreground)]">
 						<CircleDot className="h-4 w-4" />
 					</div>
-					<div>
+					<div className="app-sidebar-expanded-only">
 						<p className="m-0 text-sm font-semibold">Tasker</p>
 						<p className="m-0 text-xs text-[var(--muted-text)]">
 							Focused team workspace
@@ -412,30 +419,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 							<Link
 								key={item.to}
 								to={item.to}
+								aria-label={item.label}
+								title={item.label}
 								className="nav-item"
 								activeProps={{ className: "nav-item nav-item-active" }}
 								onClick={() => setMobileSidebarOpen(false)}
 							>
 								<Icon className="h-4 w-4" />
-								<span>{item.label}</span>
+								<span className="app-sidebar-expanded-only">{item.label}</span>
 							</Link>
 						);
 					})}
 					{me && isAdminRole(me.globalRole) ? (
 						<Link
 							to="/admin/users"
+							aria-label="Users"
+							title="Users"
 							className="nav-item"
 							activeProps={{ className: "nav-item nav-item-active" }}
 							onClick={() => setMobileSidebarOpen(false)}
 						>
 							<Shield className="h-4 w-4" />
-							<span>Users</span>
+							<span className="app-sidebar-expanded-only">Users</span>
 						</Link>
 					) : null}
 				</nav>
 
 				<div className="mt-8 flex min-h-0 flex-1 flex-col">
-					<div className="mb-2 flex items-center justify-between">
+					<div className="app-sidebar-expanded-only mb-2 flex items-center justify-between">
 						<p className="m-0 text-xs font-semibold tracking-wide text-[var(--muted-text)] uppercase">
 							Projects
 						</p>
@@ -451,13 +462,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 						</Button>
 					</div>
 
-					<div className="min-h-0 flex-1 space-y-2 overflow-auto pr-4 pb-4">
+					<div className="app-sidebar-projects-scroll min-h-0 flex-1 space-y-2 overflow-auto pr-4 pb-4">
 						{(sidebarProjects ?? []).map((row) => (
 							<div key={row.project._id} className="space-y-1">
 								<div className="flex items-center gap-1">
 									<Link
 										to="/projects/$projectId"
 										params={{ projectId: row.project._id }}
+										aria-label={row.project.name}
+										title={row.project.name}
 										search={(previous) => {
 											const { list: _ignored, ...rest } = previous;
 											return normalizeProjectSearch(rest);
@@ -480,14 +493,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 												backgroundColor: row.project.color ?? "#6b7280",
 											}}
 										/>
-										<span className="truncate">{row.project.name}</span>
+										<span className="app-sidebar-expanded-only truncate">
+											{row.project.name}
+										</span>
 									</Link>
 									{canManageIssueLists ? (
 										<Button
 											type="button"
 											size="sm"
 											variant="ghost"
-											className="h-7 w-7 px-0"
+											className="app-sidebar-expanded-only h-7 w-7 px-0"
 											onClick={() => {
 												setNewListName("");
 												setListError(null);
@@ -502,7 +517,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 									) : null}
 								</div>
 								{row.issueLists.length ? (
-									<div className="ml-6 space-y-0.5">
+									<div className="app-sidebar-expanded-only ml-6 space-y-0.5">
 										{row.issueLists.map((list) => (
 											<div key={list._id} className="flex items-center gap-1">
 												<Link
@@ -608,14 +623,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 							</div>
 						))}
 						{!sidebarProjects?.length ? (
-							<p className="m-0 rounded-md border border-dashed border-[var(--line)] px-3 py-4 text-xs text-[var(--muted-text)]">
+							<p className="app-sidebar-expanded-only m-0 rounded-md border border-dashed border-[var(--line)] px-3 py-4 text-xs text-[var(--muted-text)]">
 								No projects yet.
 							</p>
 						) : null}
 					</div>
 				</div>
 
-				<div className="pt-6">
+				<div className="app-sidebar-expanded-only pt-6">
 					<div className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-3">
 						<p className="m-0 text-sm font-medium">
 							{me?.name ?? "Loading..."}
@@ -636,10 +651,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 						type="button"
 						className="app-sidebar-toggle"
 						aria-label="Open navigation menu"
+						aria-controls="app-navigation"
+						aria-expanded={mobileSidebarOpen}
 						onClick={() => setMobileSidebarOpen(true)}
 					>
 						<Menu className="h-4 w-4" />
 					</button>
+					<Button
+						type="button"
+						variant="ghost"
+						className="app-sidebar-collapse h-9 w-9 shrink-0 px-0"
+						aria-label={
+							sidebarCollapsed
+								? "Expand navigation menu"
+								: "Collapse navigation menu"
+						}
+						title={
+							sidebarCollapsed
+								? "Expand navigation menu"
+								: "Collapse navigation menu"
+						}
+						aria-controls="app-navigation"
+						aria-expanded={!sidebarCollapsed}
+						onClick={() => {
+							setSidebarCollapsed((value) => !value);
+							setListActionMenu(null);
+						}}
+					>
+						{sidebarCollapsed ? (
+							<PanelLeftOpen className="h-4 w-4" />
+						) : (
+							<PanelLeftClose className="h-4 w-4" />
+						)}
+					</Button>
 
 					<button
 						type="button"

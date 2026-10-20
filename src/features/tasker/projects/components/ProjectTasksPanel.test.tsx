@@ -72,6 +72,7 @@ describe("list selection", () => {
 	it("offers an unassigned filter and forwards date ranges", () => {
 		const props = panelProps();
 		render(<ProjectTasksPanel {...props} />);
+		fireEvent.click(screen.getByRole("button", { name: "Filters" }));
 		fireEvent.change(
 			screen.getByRole("combobox", { name: "Assignee filter" }),
 			{ target: { value: "unassigned" } },
@@ -95,6 +96,7 @@ describe("list selection", () => {
 	it("keeps invalid date drafts out of the active filters", () => {
 		const props = panelProps();
 		render(<ProjectTasksPanel {...props} />);
+		fireEvent.click(screen.getByRole("button", { name: "Filters" }));
 		fireEvent.click(screen.getByText("Dates"));
 		fireEvent.change(screen.getByLabelText("Due date from"), {
 			target: { value: "2026-10-06" },
@@ -111,6 +113,7 @@ describe("list selection", () => {
 			dateFilters: { startFrom: "2026-10-01", dueTo: "2026-10-06" },
 		});
 		render(<ProjectTasksPanel {...props} />);
+		fireEvent.click(screen.getByRole("button", { name: "Filters (2)" }));
 		fireEvent.click(screen.getByText("Dates (2)"));
 		fireEvent.click(screen.getByRole("button", { name: "Clear" }));
 		expect(props.onDateFiltersChange).toHaveBeenCalledWith({
@@ -222,6 +225,42 @@ describe("list selection", () => {
 	});
 });
 
+describe("compact toolbar", () => {
+	it("toggles the filter row without clearing filters or remounting the task view", () => {
+		const props = panelProps({
+			search: "waste",
+			assigneeId: "unassigned",
+			dateFilters: { dueTo: "2026-10-20" },
+			resultSummary: '3 tasks match "waste"',
+			renderListIssueNode: () => <span>Task card</span>,
+		});
+		render(<ProjectTasksPanel {...props} />);
+		const toggle = screen.getByRole("button", { name: "Filters (3)" });
+		const taskCard = screen.getAllByText("Task card")[0];
+		expect(toggle.getAttribute("aria-expanded")).toBe("false");
+		expect(screen.queryByPlaceholderText("Search tasks")).toBeNull();
+		expect(screen.getByText('3 tasks match "waste"')).toBeTruthy();
+
+		fireEvent.click(toggle);
+		expect(toggle.getAttribute("aria-expanded")).toBe("true");
+		expect(screen.getByDisplayValue("waste")).toBeTruthy();
+		expect(screen.getByDisplayValue("Unassigned")).toBeTruthy();
+		expect(
+			document.getElementById(toggle.getAttribute("aria-controls") ?? ""),
+		).toBeTruthy();
+
+		fireEvent.click(toggle);
+		expect(screen.queryByPlaceholderText("Search tasks")).toBeNull();
+		expect(taskCard.isConnected).toBe(true);
+		expect(props.onSearchChange).not.toHaveBeenCalled();
+		expect(props.onAssigneeChange).not.toHaveBeenCalled();
+		fireEvent.click(toggle);
+		expect(screen.getByDisplayValue("waste")).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "New Task" }));
+		expect(props.onCreateTask).toHaveBeenCalledOnce();
+	});
+});
+
 describe("sheet layout", () => {
 	it.each([
 		"list",
@@ -229,7 +268,7 @@ describe("sheet layout", () => {
 		"calendar",
 		"gantt",
 		"sheet",
-	] as const)("shows initial loading beside Tasks for %s without false empty messages", (issueLayout) => {
+	] as const)("shows initial loading in the toolbar for %s without false empty messages", (issueLayout) => {
 		const props = panelProps({
 			issueLayout,
 			isLoading: true,
