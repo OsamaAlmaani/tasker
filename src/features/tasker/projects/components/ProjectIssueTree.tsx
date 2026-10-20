@@ -24,6 +24,7 @@ import {
 	type ProjectStatusDefinition,
 } from "#/features/tasker/projectStatuses";
 import { cn } from "#/lib/utils";
+import type { Id } from "#convex/_generated/dataModel";
 
 type ProjectAssignableUser = {
 	_id: string;
@@ -32,7 +33,7 @@ type ProjectAssignableUser = {
 };
 
 type ProjectIssue = {
-	_id: string;
+	_id: Id<"issues">;
 	assigneeId?: string | null;
 	childCompletionRate: number;
 	childIssueCount: number;

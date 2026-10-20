@@ -26,7 +26,9 @@ export const issueFormSchema = z
 		parentIssueId: z.string().trim().optional(),
 		startDate: z.string().trim().optional(),
 		dueDate: z.string().trim().optional(),
-		customFieldValues: z.record(z.union([z.string(), z.boolean()])).default({}),
+		customFieldValues: z
+			.record(z.string(), z.union([z.string(), z.boolean()]))
+			.default({}),
 		labels: z.array(z.string().trim()).default([]),
 	})
 	.refine(

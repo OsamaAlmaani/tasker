@@ -32,6 +32,7 @@ import {
 	NotificationInboxList,
 	type NotificationListItem,
 } from "#/features/tasker/notifications/components/NotificationInboxList";
+import { normalizeProjectSearch } from "#/features/tasker/projects/projectSearch";
 import { getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
@@ -459,7 +460,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 										params={{ projectId: row.project._id }}
 										search={(previous) => {
 											const { list: _ignored, ...rest } = previous;
-											return rest;
+											return normalizeProjectSearch(rest);
 										}}
 										className="project-item min-w-0 flex-1"
 										activeOptions={{
@@ -507,10 +508,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 												<Link
 													to="/projects/$projectId"
 													params={{ projectId: row.project._id }}
-													search={(previous) => ({
-														...previous,
-														list: list._id,
-													})}
+													search={(previous) =>
+														normalizeProjectSearch({
+															...previous,
+															list: list._id,
+														})
+													}
 													className="project-subitem min-w-0 flex-1 truncate"
 													activeOptions={{ exact: true, includeSearch: true }}
 													activeProps={{

@@ -928,66 +928,65 @@ export function IssueMetadataPanel({
 				</div>
 			</div>
 
-			{projectCustomFields.map((field, index) => (
-				<div
-					key={field.key}
-					className={`issue-meta-row${index === projectCustomFields.length - 1 ? " issue-meta-row-last" : ""}`}
-				>
-					<span className="issue-meta-label">{field.name}</span>
-					<div className="issue-meta-value">
-						{canWrite && field.type === "text" ? (
-							editingTextCustomFieldKey === field.key ||
-							!editingCustomFieldValues[field.key] ? (
-								<Textarea
-									autoFocus={editingTextCustomFieldKey === field.key}
-									className="max-w-[260px] text-left"
-									rows={4}
+			{projectCustomFields.map((field, index) => {
+				const draftValue = editingCustomFieldValues[field.key];
+				return (
+					<div
+						key={field.key}
+						className={`issue-meta-row${index === projectCustomFields.length - 1 ? " issue-meta-row-last" : ""}`}
+					>
+						<span className="issue-meta-label">{field.name}</span>
+						<div className="issue-meta-value">
+							{canWrite && field.type === "text" ? (
+								editingTextCustomFieldKey === field.key ||
+								!editingCustomFieldValues[field.key] ? (
+									<Textarea
+										autoFocus={editingTextCustomFieldKey === field.key}
+										className="max-w-[260px] text-left"
+										rows={4}
+										value={typeof draftValue === "string" ? draftValue : ""}
+										placeholder={`Add ${field.name.toLowerCase()}`}
+										onBlur={saveAndCloseTextCustomField}
+										onChange={(event) =>
+											updateCustomFieldValue(field, event.target.value)
+										}
+									/>
+								) : (
+									<button
+										type="button"
+										className="max-w-[260px] cursor-text border-0 bg-transparent p-0 whitespace-pre-wrap text-left text-[0.96rem] text-[var(--text)]"
+										onClick={() => setEditingTextCustomFieldKey(field.key)}
+									>
+										{editingCustomFieldValues[field.key]}
+									</button>
+								)
+							) : canWrite ? (
+								<ProjectCustomFieldInput
+									className="issue-meta-control"
+									field={field}
 									value={
-										typeof editingCustomFieldValues[field.key] === "string"
-											? editingCustomFieldValues[field.key]
-											: ""
+										editingCustomFieldValues[field.key] as
+											| ProjectCustomFieldDraftValue
+											| undefined
 									}
-									placeholder={`Add ${field.name.toLowerCase()}`}
-									onBlur={saveAndCloseTextCustomField}
-									onChange={(event) =>
-										updateCustomFieldValue(field, event.target.value)
-									}
+									onBlur={saveCustomFieldValues}
+									onChange={(value) => updateCustomFieldValue(field, value)}
 								/>
 							) : (
-								<button
-									type="button"
-									className="max-w-[260px] cursor-text border-0 bg-transparent p-0 whitespace-pre-wrap text-left text-[0.96rem] text-[var(--text)]"
-									onClick={() => setEditingTextCustomFieldKey(field.key)}
-								>
-									{editingCustomFieldValues[field.key]}
-								</button>
-							)
-						) : canWrite ? (
-							<ProjectCustomFieldInput
-								className="issue-meta-control"
-								field={field}
-								value={
-									editingCustomFieldValues[field.key] as
-										| ProjectCustomFieldDraftValue
-										| undefined
-								}
-								onBlur={saveCustomFieldValues}
-								onChange={(value) => updateCustomFieldValue(field, value)}
-							/>
-						) : (
-							<span className="issue-meta-static">
-								{formatProjectCustomFieldValue(
-									field,
-									currentIssue.customFieldValues?.[field.key] as
-										| string
-										| boolean
-										| undefined,
-								)}
-							</span>
-						)}
+								<span className="issue-meta-static">
+									{formatProjectCustomFieldValue(
+										field,
+										currentIssue.customFieldValues?.[field.key] as
+											| string
+											| boolean
+											| undefined,
+									)}
+								</span>
+							)}
+						</div>
 					</div>
-				</div>
-			))}
+				);
+			})}
 		</aside>
 	);
 }

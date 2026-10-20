@@ -62,9 +62,9 @@ function MyWorkSection({
 	description: string;
 	emptyMessage: string;
 	issues: MyWorkIssue[];
-	onToggleSelection: (issueId: string) => void;
+	onToggleSelection: (issueId: Id<"issues">) => void;
 	selectionEnabled: boolean;
-	selectedIssueIds: Set<string>;
+	selectedIssueIds: Set<Id<"issues">>;
 	title: string;
 }) {
 	return (
@@ -180,7 +180,7 @@ function MyWorkPage() {
 	const selectedView =
 		search.view ?? me?.myWorkDefaultView ?? me?.myWorkLastView ?? "overview";
 	const canWrite = me ? canWriteRole(me.globalRole) : false;
-	const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(
+	const [selectedIssueIds, setSelectedIssueIds] = useState<Set<Id<"issues">>>(
 		() => new Set(),
 	);
 	const [bulkActionError, setBulkActionError] = useState<string | null>(null);
@@ -315,7 +315,7 @@ function MyWorkPage() {
 			...new Set(
 				selectedIssues
 					.map((issue) => issue.project?._id)
-					.filter((projectId): projectId is string => Boolean(projectId)),
+					.filter((projectId) => projectId !== undefined),
 			),
 		],
 		[selectedIssues],
@@ -336,7 +336,7 @@ function MyWorkPage() {
 		});
 	}, [visibleIssueIds]);
 
-	function toggleIssueSelection(issueId: string) {
+	function toggleIssueSelection(issueId: Id<"issues">) {
 		setSelectedIssueIds((current) => {
 			const next = new Set(current);
 			if (next.has(issueId)) {
@@ -361,7 +361,7 @@ function MyWorkPage() {
 		setIsApplyingBulkAction(true);
 		try {
 			await bulkUpdateIssues({
-				issueIds: [...selectedIssueIds] as Id<"issues">[],
+				issueIds: [...selectedIssueIds],
 				...changes,
 				cascadeDescendantsToDone: changes.status === "done" ? true : undefined,
 			});

@@ -314,12 +314,12 @@ export const PersonalNotesWorkspace = forwardRef<
 			setDraftTitle("");
 			setDraftBody("");
 			setSaveState("idle");
-			editor.setEditable(false);
-			editor.commands.setContent("<p></p>", false);
+			editor.setEditable(false, false);
+			editor.commands.setContent("<p></p>", { emitUpdate: false });
 			return;
 		}
 
-		editor.setEditable(true);
+		editor.setEditable(true, false);
 
 		const nextBody = selectedNote.body;
 		const nextEditorBody = normalizeNoteBody(nextBody);
@@ -330,7 +330,7 @@ export const PersonalNotesWorkspace = forwardRef<
 			setDraftTitle(selectedNote.title);
 			setDraftBody(nextBody);
 			setSaveState("idle");
-			editor.commands.setContent(nextEditorBody, false);
+			editor.commands.setContent(nextEditorBody, { emitUpdate: false });
 			return;
 		}
 
@@ -340,7 +340,7 @@ export const PersonalNotesWorkspace = forwardRef<
 
 		if (!isDirty && draftBody !== nextBody) {
 			setDraftBody(nextBody);
-			editor.commands.setContent(nextEditorBody, false);
+			editor.commands.setContent(nextEditorBody, { emitUpdate: false });
 			setSaveState("idle");
 		}
 	}, [draftBody, draftTitle, editor, isDirty, selectedNote]);

@@ -3,21 +3,34 @@ import {
 	buildDescendantStats,
 	findDoneAncestorIssue,
 } from "#/features/tasker/issues/hierarchy";
+import type { Doc, Id } from "#convex/_generated/dataModel";
 
-type TestIssue = {
-	_id: string;
-	parentIssueId?: string | null;
-	status: "todo" | "in_progress" | "done";
-};
+type TestIssue = Pick<Doc<"issues">, "_id" | "parentIssueId" | "status">;
 
 describe("buildDescendantStats", () => {
 	it("counts unfinished descendants recursively", () => {
 		const issues: TestIssue[] = [
-			{ _id: "root", parentIssueId: null, status: "todo" },
-			{ _id: "child-a", parentIssueId: "root", status: "done" },
-			{ _id: "child-b", parentIssueId: "root", status: "in_progress" },
-			{ _id: "grandchild-a", parentIssueId: "child-a", status: "todo" },
-			{ _id: "grandchild-b", parentIssueId: "child-b", status: "done" },
+			{ _id: "root" as Id<"issues">, status: "todo" },
+			{
+				_id: "child-a" as Id<"issues">,
+				parentIssueId: "root" as Id<"issues">,
+				status: "done",
+			},
+			{
+				_id: "child-b" as Id<"issues">,
+				parentIssueId: "root" as Id<"issues">,
+				status: "in_progress",
+			},
+			{
+				_id: "grandchild-a" as Id<"issues">,
+				parentIssueId: "child-a" as Id<"issues">,
+				status: "todo",
+			},
+			{
+				_id: "grandchild-b" as Id<"issues">,
+				parentIssueId: "child-b" as Id<"issues">,
+				status: "done",
+			},
 		];
 
 		const stats = buildDescendantStats(issues);
@@ -30,7 +43,7 @@ describe("buildDescendantStats", () => {
 
 	it("returns zero unfinished descendants for leaf issues", () => {
 		const stats = buildDescendantStats([
-			{ _id: "solo", parentIssueId: null, status: "done" },
+			{ _id: "solo" as Id<"issues">, status: "done" },
 		]);
 
 		expect(stats.get("solo")).toEqual({ unfinishedDescendantCount: 0 });
@@ -39,15 +52,15 @@ describe("buildDescendantStats", () => {
 
 describe("findDoneAncestorIssue", () => {
 	it("returns the nearest done ancestor", () => {
-		const root = { _id: "root", parentIssueId: null, status: "done" } as const;
+		const root = { _id: "root" as Id<"issues">, status: "done" } as const;
 		const child = {
-			_id: "child",
-			parentIssueId: "root",
+			_id: "child" as Id<"issues">,
+			parentIssueId: "root" as Id<"issues">,
 			status: "todo",
 		} as const;
 		const grandchild = {
-			_id: "grandchild",
-			parentIssueId: "child",
+			_id: "grandchild" as Id<"issues">,
+			parentIssueId: "child" as Id<"issues">,
 			status: "in_progress",
 		} as const;
 
@@ -59,15 +72,15 @@ describe("findDoneAncestorIssue", () => {
 	});
 
 	it("returns null when no ancestor is done or a parent is missing", () => {
-		const root = { _id: "root", parentIssueId: null, status: "todo" } as const;
+		const root = { _id: "root" as Id<"issues">, status: "todo" } as const;
 		const child = {
-			_id: "child",
-			parentIssueId: "root",
+			_id: "child" as Id<"issues">,
+			parentIssueId: "root" as Id<"issues">,
 			status: "in_progress",
 		} as const;
 		const orphan = {
-			_id: "orphan",
-			parentIssueId: "missing",
+			_id: "orphan" as Id<"issues">,
+			parentIssueId: "missing" as Id<"issues">,
 			status: "todo",
 		} as const;
 

@@ -92,6 +92,28 @@ describe("serializeStatusFilters", () => {
 });
 
 describe("normalizeProjectSearch", () => {
+	it.each([
+		"overview",
+		"focus",
+		"due_soon",
+		"overdue",
+		"backlog",
+		"completed",
+	])("removes the My Work view %s while keeping shared project filters", (view) => {
+		const normalized = normalizeProjectSearch({
+			view,
+			list: "list_123",
+			q: " task ",
+			statuses: "todo,done",
+		});
+		expect(normalized).toEqual({
+			list: "list_123",
+			q: "task",
+			statuses: "todo,done",
+		});
+		expect(projectSearchSchema.safeParse(normalized).success).toBe(true);
+	});
+
 	it("trims query text, removes defaults, and normalizes statuses", () => {
 		expect(
 			normalizeProjectSearch({

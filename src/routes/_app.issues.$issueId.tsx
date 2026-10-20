@@ -122,7 +122,7 @@ function IssueDetailPage() {
 		return <div className="page-loading">Loading task…</div>;
 	}
 
-	function goBack() {
+	const goBack = () => {
 		if (typeof window !== "undefined" && window.history.length > 1) {
 			window.history.back();
 			return;
@@ -132,7 +132,7 @@ function IssueDetailPage() {
 			to: "/projects/$projectId",
 			params: { projectId },
 		});
-	}
+	};
 
 	return (
 		<div>

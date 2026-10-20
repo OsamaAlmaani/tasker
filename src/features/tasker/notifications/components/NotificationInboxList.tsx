@@ -21,7 +21,7 @@ export function NotificationInboxList({
 }: {
 	emptyMessage: string;
 	notifications: NotificationListItem[];
-	onMarkRead: (notificationId: string) => void;
+	onMarkRead: (notificationId: Id<"notifications">) => void;
 	onOpen: (notification: NotificationListItem) => void;
 }) {
 	return notifications.length ? (

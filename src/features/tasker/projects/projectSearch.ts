@@ -81,8 +81,13 @@ export function serializeStatusFilters(values: string[]): string | undefined {
 	return [...new Set(values)].join(",");
 }
 
-export function normalizeProjectSearch(search: ProjectSearch): ProjectSearch {
-	const next = { ...search };
+export function normalizeProjectSearch(
+	search: Omit<ProjectSearch, "view"> & { view?: string },
+): ProjectSearch {
+	const next: ProjectSearch = {
+		...search,
+		view: search.view === "activity" ? "activity" : undefined,
+	};
 	next.statuses = serializeStatusFilters(parseStatusFilters(next.statuses));
 
 	if (next.archive === "active" || !next.archive) {
