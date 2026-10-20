@@ -1,5 +1,11 @@
 import { Filter, LoaderCircle, Plus } from "lucide-react";
-import { type DragEvent, type ReactNode, useId, useState } from "react";
+import {
+	type DragEvent,
+	type ReactNode,
+	useEffect,
+	useId,
+	useState,
+} from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent } from "#/components/ui/card";
@@ -13,6 +19,8 @@ import type { ProjectSearch } from "#/features/tasker/projects/projectSearch";
 import { cn } from "#/lib/utils";
 import type { IssueDateFilters } from "#convex/lib/issueFilters";
 import { TaskDateFilters } from "./TaskDateFilters";
+
+const FILTERS_OPEN_STORAGE_KEY = "tasker.projects.filtersOpen";
 
 type ProjectIssueGroup = {
 	key: string;
@@ -190,6 +198,15 @@ export function ProjectTasksPanel({
 	statusPicker,
 }: ProjectTasksPanelProps) {
 	const [filtersOpen, setFiltersOpen] = useState(false);
+	useEffect(() => {
+		try {
+			setFiltersOpen(
+				window.localStorage.getItem(FILTERS_OPEN_STORAGE_KEY) === "1",
+			);
+		} catch {
+			// Keep the default when browser storage is unavailable.
+		}
+	}, []);
 	const filtersId = useId();
 	const activeFilterCount =
 		Number(Boolean(search.trim())) +
@@ -290,7 +307,18 @@ export function ProjectTasksPanel({
 						variant={filtersOpen ? "secondary" : "ghost"}
 						aria-expanded={filtersOpen}
 						aria-controls={filtersId}
-						onClick={() => setFiltersOpen((value) => !value)}
+						onClick={() => {
+							const nextOpen = !filtersOpen;
+							setFiltersOpen(nextOpen);
+							try {
+								window.localStorage.setItem(
+									FILTERS_OPEN_STORAGE_KEY,
+									nextOpen ? "1" : "0",
+								);
+							} catch {
+								// The toggle still works when browser storage is unavailable.
+							}
+						}}
 					>
 						<Filter className="mr-2 h-4 w-4" />
 						Filters{activeFilterCount ? ` (${activeFilterCount})` : ""}

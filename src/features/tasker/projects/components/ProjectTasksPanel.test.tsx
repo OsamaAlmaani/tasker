@@ -1,12 +1,25 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IssueBulkActionsBar } from "#/features/tasker/issues/components/IssueBulkActionsBar";
 import { buildGroupedIssues } from "#/features/tasker/projects/issueGrouping";
 import { ProjectTasksPanel } from "./ProjectTasksPanel";
 
-afterEach(cleanup);
+beforeEach(() => {
+	const stored = new Map<string, string>();
+	vi.stubGlobal("localStorage", {
+		getItem: vi.fn((key: string) => stored.get(key) ?? null),
+		setItem: vi.fn((key: string, value: string) => {
+			stored.set(key, value);
+		}),
+	});
+});
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
+});
 
 const issues = [
 	{ _id: "parent", listId: "a", status: "todo" },
@@ -226,6 +239,53 @@ describe("list selection", () => {
 });
 
 describe("compact toolbar", () => {
+	it("remembers both open and closed filter preferences across mounts", () => {
+		const props = panelProps();
+		const first = render(<ProjectTasksPanel {...props} />);
+		fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+		expect(window.localStorage.getItem("tasker.projects.filtersOpen")).toBe(
+			"1",
+		);
+		first.unmount();
+
+		const second = render(<ProjectTasksPanel {...props} />);
+		expect(
+			screen
+				.getByRole("button", { name: "Filters" })
+				.getAttribute("aria-expanded"),
+		).toBe("true");
+		expect(screen.getByPlaceholderText("Search tasks")).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+		expect(window.localStorage.getItem("tasker.projects.filtersOpen")).toBe(
+			"0",
+		);
+		second.unmount();
+
+		render(<ProjectTasksPanel {...props} />);
+		expect(
+			screen
+				.getByRole("button", { name: "Filters" })
+				.getAttribute("aria-expanded"),
+		).toBe("false");
+		expect(screen.queryByPlaceholderText("Search tasks")).toBeNull();
+	});
+
+	it("keeps the toggle working when storage reads and writes fail", () => {
+		vi.mocked(window.localStorage.getItem).mockImplementation(() => {
+			throw new DOMException("Storage is blocked", "SecurityError");
+		});
+		vi.mocked(window.localStorage.setItem).mockImplementation(() => {
+			throw new DOMException("Storage is blocked", "SecurityError");
+		});
+		render(<ProjectTasksPanel {...panelProps()} />);
+		const toggle = screen.getByRole("button", { name: "Filters" });
+		expect(toggle.getAttribute("aria-expanded")).toBe("false");
+		fireEvent.click(toggle);
+		expect(screen.getByPlaceholderText("Search tasks")).toBeTruthy();
+		fireEvent.click(toggle);
+		expect(screen.queryByPlaceholderText("Search tasks")).toBeNull();
+	});
+
 	it("toggles the filter row without clearing filters or remounting the task view", () => {
 		const props = panelProps({
 			search: "waste",
