@@ -1,7 +1,17 @@
 /* biome-ignore-all lint/complexity/noImportantStyles: native inline raster background needs a theme-aware override. */
+.task-gantt {
+	display: flex;
+	flex-direction: column;
+	overflow: auto;
+}
+
+.task-gantt > * {
+	flex-shrink: 0;
+}
+
 .task-gantt-chart {
-	height: min(640px, 70vh);
-	min-height: 300px;
+	flex: 1;
+	min-height: 200px;
 	overflow: hidden;
 	border: 1px solid var(--line);
 	border-radius: 12px;

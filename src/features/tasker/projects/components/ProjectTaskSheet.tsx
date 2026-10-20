@@ -316,7 +316,7 @@ export default function ProjectTaskSheet(props: Props) {
 	}
 
 	return (
-		<div className="min-w-0 space-y-2">
+		<div className="flex min-h-0 min-w-0 flex-col gap-2">
 			{error && (
 				<p role="alert" className="text-sm text-[var(--danger)]">
 					{error}

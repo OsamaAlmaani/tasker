@@ -16,8 +16,9 @@
 	--rdg-border-color: var(--line);
 	--rdg-selection-color: var(--accent);
 	--rdg-font-size: 13px;
-	height: min(65dvh, 720px);
-	min-height: 280px;
+	flex: 1;
+	height: 100%;
+	min-height: 0;
 	width: 100%;
 	border: 1px solid var(--line);
 }

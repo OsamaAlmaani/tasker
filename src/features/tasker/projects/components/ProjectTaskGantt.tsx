@@ -514,7 +514,7 @@ export default function ProjectTaskGantt({
 					</Willow>
 				</div>
 			) : (
-				<div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface-muted)] px-4 py-10 text-center">
+				<div className="flex-1 rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface-muted)] px-4 py-10 text-center">
 					<p className="m-0 font-semibold">
 						{isLoading ? "Loading tasks…" : "No scheduled tasks"}
 					</p>

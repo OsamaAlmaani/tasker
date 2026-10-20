@@ -194,7 +194,7 @@ export function ProjectTasksPanel({
 	const selectableIssues = groupedIssues.flatMap((group) => group.items);
 
 	return (
-		<Card>
+		<Card className="project-task-panel">
 			<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
 				<CardTitle className="flex items-center gap-2">
 					Tasks
@@ -214,7 +214,7 @@ export function ProjectTasksPanel({
 					</Button>
 				) : null}
 			</CardHeader>
-			<CardContent>
+			<CardContent className="project-task-content">
 				<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
 					<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
 						{isArchivedView ? null : (
@@ -431,105 +431,107 @@ export function ProjectTasksPanel({
 				) : null}
 				{bulkActions ? <div className="mb-3">{bulkActions}</div> : null}
 
-				{issueLayout === "calendar" ? (
-					calendar
-				) : issueLayout === "gantt" ? (
-					gantt
-				) : issueLayout === "sheet" ? (
-					sheet
-				) : showEmptyState ? (
-					<div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface-muted)] px-4 py-8 text-center">
-						<p className="m-0 text-base font-semibold text-[var(--text)]">
-							{isLoading ? "Loading tasks…" : emptyStateTitle}
-						</p>
-						{!isLoading && (
-							<p className="m-0 mt-2 text-sm text-[var(--muted-text)]">
-								{emptyStateDescription}
+				<div className="project-task-view">
+					{issueLayout === "calendar" ? (
+						calendar
+					) : issueLayout === "gantt" ? (
+						gantt
+					) : issueLayout === "sheet" ? (
+						sheet
+					) : showEmptyState ? (
+						<div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface-muted)] px-4 py-8 text-center">
+							<p className="m-0 text-base font-semibold text-[var(--text)]">
+								{isLoading ? "Loading tasks…" : emptyStateTitle}
 							</p>
-						)}
-						{!isLoading && emptyStateAction ? (
-							<div className="mt-4 flex items-center justify-center">
-								{emptyStateAction}
-							</div>
-						) : null}
-					</div>
-				) : issueLayout === "list" ? (
-					<div className="space-y-4">
-						{groupedIssues.map((group) => (
-							<div key={group.key} className="space-y-2">
-								<div className="flex items-center justify-between">
-									{canWrite ? (
-										<TaskSelectionCheckbox
-											className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]"
-											items={group.items}
-											selectedIssueIds={selectedIssueIds}
-											label={`Select all tasks in ${group.title}`}
-											disabled={isApplyingBulkAction}
-											onChange={onSelectionChange}
-										>
-											{group.title}
-										</TaskSelectionCheckbox>
-									) : (
-										<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
-											{group.title}
-										</p>
-									)}
-									<Badge>{group.items.length}</Badge>
+							{!isLoading && (
+								<p className="m-0 mt-2 text-sm text-[var(--muted-text)]">
+									{emptyStateDescription}
+								</p>
+							)}
+							{!isLoading && emptyStateAction ? (
+								<div className="mt-4 flex items-center justify-center">
+									{emptyStateAction}
 								</div>
+							) : null}
+						</div>
+					) : issueLayout === "list" ? (
+						<div className="space-y-4 overflow-auto">
+							{groupedIssues.map((group) => (
+								<div key={group.key} className="space-y-2">
+									<div className="flex items-center justify-between">
+										{canWrite ? (
+											<TaskSelectionCheckbox
+												className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]"
+												items={group.items}
+												selectedIssueIds={selectedIssueIds}
+												label={`Select all tasks in ${group.title}`}
+												disabled={isApplyingBulkAction}
+												onChange={onSelectionChange}
+											>
+												{group.title}
+											</TaskSelectionCheckbox>
+										) : (
+											<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
+												{group.title}
+											</p>
+										)}
+										<Badge>{group.items.length}</Badge>
+									</div>
 
-								{group.tree.map((node) => {
-									const issueNode = node as { issue: { _id: string } };
-									return (
-										<div key={issueNode.issue._id}>
-											{renderListIssueNode(node)}
-										</div>
-									);
-								})}
-							</div>
-						))}
-					</div>
-				) : (
-					<div className="kanban-board">
-						{kanbanColumns.map((column) => (
-							<section
-								key={column.status}
-								aria-label={`${column.title} column`}
-								className={cn(
-									"kanban-column",
-									dragOverStatus === column.status
-										? "kanban-column-active"
-										: "",
-								)}
-								onDragOver={(event) =>
-									onKanbanColumnDragOver(event, column.status)
-								}
-								onDragLeave={() => onKanbanColumnDragLeave(column.status)}
-								onDrop={(event) => onKanbanColumnDrop(event, column.status)}
-							>
-								<div className="kanban-column-header">
-									<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
-										{column.title}
-									</p>
-									<Badge>{column.items.length}</Badge>
+									{group.tree.map((node) => {
+										const issueNode = node as { issue: { _id: string } };
+										return (
+											<div key={issueNode.issue._id}>
+												{renderListIssueNode(node)}
+											</div>
+										);
+									})}
 								</div>
-								<div className="kanban-column-body">
-									{column.items.length ? (
-										column.tree.map((node) => {
-											const issueNode = node as { issue: { _id: string } };
-											return (
-												<div key={issueNode.issue._id}>
-													{renderKanbanIssueNode(node)}
-												</div>
-											);
-										})
-									) : (
-										<p className="kanban-empty">No tasks in this status.</p>
+							))}
+						</div>
+					) : (
+						<div className="kanban-board">
+							{kanbanColumns.map((column) => (
+								<section
+									key={column.status}
+									aria-label={`${column.title} column`}
+									className={cn(
+										"kanban-column",
+										dragOverStatus === column.status
+											? "kanban-column-active"
+											: "",
 									)}
-								</div>
-							</section>
-						))}
-					</div>
-				)}
+									onDragOver={(event) =>
+										onKanbanColumnDragOver(event, column.status)
+									}
+									onDragLeave={() => onKanbanColumnDragLeave(column.status)}
+									onDrop={(event) => onKanbanColumnDrop(event, column.status)}
+								>
+									<div className="kanban-column-header">
+										<p className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-text)]">
+											{column.title}
+										</p>
+										<Badge>{column.items.length}</Badge>
+									</div>
+									<div className="kanban-column-body">
+										{column.items.length ? (
+											column.tree.map((node) => {
+												const issueNode = node as { issue: { _id: string } };
+												return (
+													<div key={issueNode.issue._id}>
+														{renderKanbanIssueNode(node)}
+													</div>
+												);
+											})
+										) : (
+											<p className="kanban-empty">No tasks in this status.</p>
+										)}
+									</div>
+								</section>
+							))}
+						</div>
+					)}
+				</div>
 			</CardContent>
 		</Card>
 	);

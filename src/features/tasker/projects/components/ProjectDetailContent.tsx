@@ -383,7 +383,7 @@ export function ProjectDetailContent({
 	}
 
 	return (
-		<div>
+		<div className={projectView === "issues" ? "project-workspace" : undefined}>
 			<PageHeader
 				title={`${projectData.project.key} · ${projectData.project.name}`}
 				description={projectData.project.description}
@@ -534,7 +534,7 @@ export function ProjectDetailContent({
 				setForm={setProjectForm}
 			/>
 
-			<div className="space-y-4">
+			<div className="project-task-area space-y-4">
 				{projectView === "issues" ? (
 					<ProjectTasksPanel
 						archiveState={archive}

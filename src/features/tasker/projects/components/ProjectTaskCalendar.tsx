@@ -282,111 +282,115 @@ export default function ProjectTaskCalendar({
 					have a start or due date.
 				</p>
 			) : null}
-			<FullCalendar
-				ref={calendarRef}
-				plugins={plugins}
-				initialView="dayGridMonth"
-				views={{
-					dayGridWeek: {
-						titleFormat: { year: "numeric", month: "short", day: "numeric" },
-					},
-				}}
-				headerToolbar={false}
-				height="clamp(620px, 70vh, 840px)"
-				events={events}
-				fixedWeekCount={false}
-				firstDay={0}
-				displayEventTime={false}
-				eventDisplay="block"
-				eventStartEditable={canWrite && !savingIssueId}
-				eventDurationEditable={canWrite && !savingIssueId}
-				eventResizableFromStart={true}
-				eventDragMinDistance={5}
-				longPressDelay={350}
-				dayMaxEvents={true}
-				eventOrder="title"
-				moreLinkClick="popover"
-				moreLinkContent={(info) => (
-					<span>
-						… +{info.num}
-						<span className="task-calendar-more-label"> more</span>
-					</span>
-				)}
-				moreLinkClass="task-calendar-more"
-				popoverClass="task-calendar-popover"
-				dayCellClass="task-calendar-day"
-				dayHeaderClass="task-calendar-day-header"
-				eventInnerClass="task-calendar-event-inner"
-				eventBeforeClass={(info) =>
-					info.isStartResizable
-						? "task-calendar-resize-handle task-calendar-resize-handle-start"
-						: ""
-				}
-				eventAfterClass={(info) =>
-					info.isEndResizable
-						? "task-calendar-resize-handle task-calendar-resize-handle-end"
-						: ""
-				}
-				eventClass={(info) => {
-					const firstWeek = getCalendarWeek(info.event.startStr.slice(0, 10));
-					const lastWeek = getCalendarWeek(
-						calendarDate(calendarTimestamp(info.event.endStr) - 86_400_000),
-					);
-					const compact = [...compactWeeks].some(
-						(week) => week >= firstWeek && week <= lastWeek,
-					);
-					return `task-calendar-event${compact ? " task-calendar-event-compact" : ""}`;
-				}}
-				datesSet={(info) => {
-					setRange(info);
-					setView(info.view.type);
-				}}
-				eventDrop={(info) => {
-					void handleDateChange(info);
-				}}
-				eventResize={(info) => {
-					void handleDateChange(info, true);
-				}}
-				eventClick={(info) => {
-					if (
-						info.jsEvent.ctrlKey ||
-						info.jsEvent.metaKey ||
-						info.jsEvent.shiftKey ||
-						info.jsEvent.altKey
-					) {
-						return;
-					}
-					info.jsEvent.preventDefault();
-					onOpenIssue(info.event.id);
-				}}
-				eventDidMount={(info) => {
-					const label = `${info.event.extendedProps.issueKey}: ${info.event.title} · ${info.event.extendedProps.statusName}`;
-					info.el.title = label;
-					info.el.setAttribute("aria-label", label);
-				}}
-				eventContent={(info) => (
-					<div className="task-calendar-task">
-						{info.isStartResizable ? (
-							<span
-								aria-hidden="true"
-								className="task-calendar-resize-marker task-calendar-resize-start"
-							/>
-						) : null}
-						{info.isEndResizable ? (
-							<span
-								aria-hidden="true"
-								className="task-calendar-resize-marker task-calendar-resize-end"
-							/>
-						) : null}
-						<span className="task-calendar-task-title">{info.event.title}</span>
-						<span className="task-calendar-task-meta">
-							{info.event.extendedProps.issueKey}
-							{info.event.extendedProps.isSubtask ? " · Subtask" : ""} ·{" "}
-							{info.event.extendedProps.statusName}
+			<div className="task-calendar-grid">
+				<FullCalendar
+					ref={calendarRef}
+					plugins={plugins}
+					initialView="dayGridMonth"
+					views={{
+						dayGridWeek: {
+							titleFormat: { year: "numeric", month: "short", day: "numeric" },
+						},
+					}}
+					headerToolbar={false}
+					height="100%"
+					events={events}
+					fixedWeekCount={false}
+					firstDay={0}
+					displayEventTime={false}
+					eventDisplay="block"
+					eventStartEditable={canWrite && !savingIssueId}
+					eventDurationEditable={canWrite && !savingIssueId}
+					eventResizableFromStart={true}
+					eventDragMinDistance={5}
+					longPressDelay={350}
+					dayMaxEvents={true}
+					eventOrder="title"
+					moreLinkClick="popover"
+					moreLinkContent={(info) => (
+						<span>
+							… +{info.num}
+							<span className="task-calendar-more-label"> more</span>
 						</span>
-					</div>
-				)}
-			/>
+					)}
+					moreLinkClass="task-calendar-more"
+					popoverClass="task-calendar-popover"
+					dayCellClass="task-calendar-day"
+					dayHeaderClass="task-calendar-day-header"
+					eventInnerClass="task-calendar-event-inner"
+					eventBeforeClass={(info) =>
+						info.isStartResizable
+							? "task-calendar-resize-handle task-calendar-resize-handle-start"
+							: ""
+					}
+					eventAfterClass={(info) =>
+						info.isEndResizable
+							? "task-calendar-resize-handle task-calendar-resize-handle-end"
+							: ""
+					}
+					eventClass={(info) => {
+						const firstWeek = getCalendarWeek(info.event.startStr.slice(0, 10));
+						const lastWeek = getCalendarWeek(
+							calendarDate(calendarTimestamp(info.event.endStr) - 86_400_000),
+						);
+						const compact = [...compactWeeks].some(
+							(week) => week >= firstWeek && week <= lastWeek,
+						);
+						return `task-calendar-event${compact ? " task-calendar-event-compact" : ""}`;
+					}}
+					datesSet={(info) => {
+						setRange(info);
+						setView(info.view.type);
+					}}
+					eventDrop={(info) => {
+						void handleDateChange(info);
+					}}
+					eventResize={(info) => {
+						void handleDateChange(info, true);
+					}}
+					eventClick={(info) => {
+						if (
+							info.jsEvent.ctrlKey ||
+							info.jsEvent.metaKey ||
+							info.jsEvent.shiftKey ||
+							info.jsEvent.altKey
+						) {
+							return;
+						}
+						info.jsEvent.preventDefault();
+						onOpenIssue(info.event.id);
+					}}
+					eventDidMount={(info) => {
+						const label = `${info.event.extendedProps.issueKey}: ${info.event.title} · ${info.event.extendedProps.statusName}`;
+						info.el.title = label;
+						info.el.setAttribute("aria-label", label);
+					}}
+					eventContent={(info) => (
+						<div className="task-calendar-task">
+							{info.isStartResizable ? (
+								<span
+									aria-hidden="true"
+									className="task-calendar-resize-marker task-calendar-resize-start"
+								/>
+							) : null}
+							{info.isEndResizable ? (
+								<span
+									aria-hidden="true"
+									className="task-calendar-resize-marker task-calendar-resize-end"
+								/>
+							) : null}
+							<span className="task-calendar-task-title">
+								{info.event.title}
+							</span>
+							<span className="task-calendar-task-meta">
+								{info.event.extendedProps.issueKey}
+								{info.event.extendedProps.isSubtask ? " · Subtask" : ""} ·{" "}
+								{info.event.extendedProps.statusName}
+							</span>
+						</div>
+					)}
+				/>
+			</div>
 		</section>
 	);
 }
