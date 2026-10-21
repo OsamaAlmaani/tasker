@@ -11,7 +11,7 @@ const config = defineConfig({
 		devtools(),
 		nitro({
 			rollupConfig: {
-				external: [/^@sentry\//, /^lucide-react(\/.*)?$/],
+				external: [/^@sentry\//],
 			},
 		}),
 		tsconfigPaths({ projects: ["./tsconfig.json"] }),
