@@ -45,8 +45,21 @@ describe("agent connection settings", () => {
 			token: expect.stringMatching(/^tsk_[a-f0-9]{64}$/),
 		});
 		expect(args.expiresAt).toBeGreaterThan(Date.now());
+		const config = JSON.parse(
+			(screen.getByLabelText("MCP client configuration") as HTMLTextAreaElement)
+				.value,
+		);
+		expect(config.mcpServers.tasker.url).toBe(`${window.location.origin}/mcp`);
+		expect(config.mcpServers.tasker.headers.Authorization).toBe(
+			`Bearer ${args.token}`,
+		);
+		expect(config.mcpServers.tasker.command).toBeUndefined();
 		fireEvent.click(screen.getByRole("button", { name: "Hide token" }));
 		expect(screen.queryByLabelText("New agent token")).toBeNull();
+		expect(
+			(screen.getByLabelText("MCP client configuration") as HTMLTextAreaElement)
+				.value,
+		).not.toContain(args.token);
 	});
 	it("reports creation failures without revealing an unusable token", async () => {
 		mocks.create.mockRejectedValue(new Error("Unable to save token"));
