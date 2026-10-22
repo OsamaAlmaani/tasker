@@ -1,5 +1,5 @@
 import { Archive, ArrowDown, ArrowUp, Plus, Trash2, X } from "lucide-react";
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import type { Dispatch, FormEvent, ReactNode, SetStateAction } from "react";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { Input } from "#/components/ui/input";
@@ -44,6 +44,7 @@ export type ProjectSettingsForm = {
 };
 
 type ProjectSettingsCardProps = {
+	githubSettings?: ReactNode;
 	archived: boolean;
 	error?: string | null;
 	form: ProjectSettingsForm;
@@ -57,6 +58,7 @@ type ProjectSettingsCardProps = {
 };
 
 export function ProjectSettingsCard({
+	githubSettings,
 	archived,
 	error,
 	form,
@@ -254,10 +256,10 @@ export function ProjectSettingsCard({
 						</Button>
 					</div>
 				</CardHeader>
-				<CardContent>
+				<CardContent className="max-h-[80vh] overflow-y-auto">
 					<form
 						onSubmit={onSubmit}
-						className="grid max-h-[80vh] gap-4 overflow-y-auto pb-2 pr-2 md:grid-cols-2"
+						className="grid gap-4 pb-2 pr-2 md:grid-cols-2"
 					>
 						{error ? (
 							<p className="m-0 text-sm text-[var(--danger)] md:col-span-2">
@@ -597,6 +599,7 @@ export function ProjectSettingsCard({
 							</div>
 						</div>
 					</form>
+					{githubSettings}
 				</CardContent>
 			</Card>
 		</div>

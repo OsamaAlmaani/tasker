@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import type { MutationCtx } from '../convex/_generated/server'
 import type { Id } from '../convex/_generated/dataModel'
 import * as tasks from '../convex/agentTasks'
+import * as issues from '../convex/issues'
+import * as projects from '../convex/projects'
 import * as tokens from '../convex/agentTokens'
 import { update as updateIssue } from '../convex/issues'
 import { hashToken } from '../convex/lib/agentTokens'
@@ -266,6 +268,60 @@ describe('bounded task discovery', () => {
 })
 
 describe('agent claim and review lifecycle', () => {
+  it('preserves a manual status round trip when an old claim is released', async () => {
+    const { ctx, records } = await context()
+    await handler(tasks.claim)(ctx, { token, issueId, runId: 'run' })
+    await handler(issues.update)(ctx, { issueId, status: 'in_review' })
+    await handler(issues.update)(ctx, { issueId, status: 'in_progress' })
+    await handler(tasks.release)(ctx, { token, issueId, runId: 'run' })
+    expect(records.get(issueId).status).toBe('in_progress')
+    expect(records.get(issueId).agentClaim).toBeUndefined()
+  })
+  it('rejects renewal and submission after a person changes status away and back', async () => {
+    const { ctx, records, patch, insert } = await context()
+    await handler(tasks.claim)(ctx, { token, issueId, runId: 'run' })
+    await handler(issues.update)(ctx, { issueId, status: 'in_review' })
+    await handler(issues.update)(ctx, { issueId, status: 'in_progress' })
+    const claimBefore = structuredClone(records.get(issueId).agentClaim)
+    patch.mockClear(); insert.mockClear()
+    await expect(handler(tasks.claim)(ctx, { token, issueId, runId: 'run' })).rejects.toThrow(/status changed/i)
+    await expect(handler(tasks.submitReview)(ctx, { token, issueId, runId: 'run', summary: 'Old result' })).rejects.toThrow(/status changed/i)
+    expect(records.get(issueId).status).toBe('in_progress')
+    expect(records.get(issueId).agentClaim).toEqual(claimBefore)
+    expect([...records.values()].some(row => row.body?.includes('Old result'))).toBe(false)
+    expect(patch).not.toHaveBeenCalled()
+    expect(insert).not.toHaveBeenCalled()
+  })
+  it('keeps the claim usable after a title edit or unchanged status update', async () => {
+    const { ctx, records } = await context()
+    await handler(tasks.claim)(ctx, { token, issueId, runId: 'run' })
+    await handler(issues.update)(ctx, { issueId, title: 'Updated task', status: 'in_progress' })
+    await handler(tasks.claim)(ctx, { token, issueId, runId: 'run' })
+    await handler(tasks.submitReview)(ctx, { token, issueId, runId: 'run', summary: 'Current result' })
+    expect(records.get(issueId).status).toBe('in_review')
+    expect(records.get(issueId).title).toBe('Updated task')
+  })
+  it('preserves status after a claimed child is completed through its parent and reopened', async () => {
+    const { ctx, records } = await context()
+    records.set('issue-parent', { ...records.get(issueId), _id: 'issue-parent' })
+    records.get(issueId).parentIssueId = 'issue-parent'
+    await handler(tasks.claim)(ctx, { token, issueId, runId: 'run' })
+    await handler(issues.update)(ctx, { issueId: 'issue-parent', status: 'done', cascadeDescendantsToDone: true })
+    await handler(issues.update)(ctx, { issueId: 'issue-parent', status: 'in_progress' })
+    await handler(issues.update)(ctx, { issueId, status: 'in_progress' })
+    await handler(tasks.release)(ctx, { token, issueId, runId: 'run' })
+    expect(records.get(issueId).status).toBe('in_progress')
+  })
+  it('rejects an old claim after a workflow transfer even when its work status is recreated', async () => {
+    const { ctx, records } = await context()
+    await handler(tasks.claim)(ctx, { token, issueId, runId: 'run' })
+    await handler(projects.deleteStatus)(ctx, { projectId, statusKey: 'in_progress', transferToStatusKey: 'backlog' })
+    await handler(projects.update)(ctx, { projectId, statuses: DEFAULT_PROJECT_STATUSES })
+    await handler(issues.update)(ctx, { issueId, status: 'in_progress' })
+    await expect(handler(tasks.submitReview)(ctx, { token, issueId, runId: 'run', summary: 'Obsolete run' })).rejects.toThrow(/status changed/i)
+    await handler(tasks.release)(ctx, { token, issueId, runId: 'run' })
+    expect(records.get(issueId).status).toBe('in_progress')
+  })
   it('checks token revocation, role changes, and project access again before submission', async () => {
     const { ctx, records, patch } = await context()
     await handler(tasks.claim)(ctx, { token, issueId, runId: 'run' })

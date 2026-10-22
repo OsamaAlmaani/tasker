@@ -120,11 +120,19 @@ Both list tools use database pagination with bounded reads (up to 100 candidate 
 
 Claims preserve the human assignee. All calls check the token owner's current account state, role, and project access. Viewers can read but cannot claim or submit. Competing live claims fail atomically. If a claim expires, reacquire it before submitting; if a response is lost, inspect `get_task` before retrying. Status changes and result comments appear in the existing task timeline.
 
+Manual status changes invalidate a live claim even if the task later returns to its work status. Renewal and submission then fail; release the claim, read the task again, and acquire a new claim. Release preserves the latest task status after an intervening change. Title edits and unchanged status updates keep the claim usable.
+
 Example agent request:
 
 > Find one unassigned task in my project using Tasker. Read its details, claim it with a unique run ID, implement the work, and verify the result. Renew the claim if needed. Submit a summary with the verification results and relevant links for review. If blocked, release the task and explain the blocker.
 
 For a direct launch, set `TASKER_CONVEX_URL` and `TASKER_API_TOKEN` in the process environment and run `pnpm mcp`. Run `pnpm mcp:check` to type-check the adapter. Implementation references: [MCP SDK server documentation](https://ts.sdk.modelcontextprotocol.io/server) and [Convex runtime APIs](https://docs.convex.dev/functions/runtimes).
+
+## GitHub branch workflow
+
+Project owners/admins can connect a GitHub repository and map work/review statuses. Issue writers can create or link a branch from the issue page; PR draft, review, close, and merge events update task status. Manual status edits pause automation, and merging respects unfinished-subtask rules.
+
+This requires a deployment-owned GitHub App and server credentials. See [GitHub integration setup and lifecycle](docs/github-integration.md) for configuration, permissions, recovery, and current limits.
 
 ## Local Setup (Required)
 
