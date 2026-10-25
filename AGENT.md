@@ -154,6 +154,7 @@ Notable schema choices:
 - `issues.deletedAt` is used for soft delete.
 - `issues.archived` exists separately from `deletedAt`.
 - Task search is backed by `issues.searchText` plus Convex `searchIndex`, though current query logic mainly filters in memory.
+- Project task search shares `matchesIssueSearch` between the backend and immediate page filtering: title/description substring matching plus exact task numbers entered as `123` or `#123`.
 - Project issue numbering is per project via `projectCounters.nextIssueNumber`.
 - `projects.customFields` stores project-owned custom task field definitions, including field type, order, and select options when applicable.
 - `projects.statuses` stores the per-project workflow definitions, including display color. `todo` and `done` are protected fixed statuses with built-in colors; all other statuses are project-owned and can be added, renamed, recolored, reordered, or removed.

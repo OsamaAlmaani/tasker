@@ -42,7 +42,10 @@ import { issueFormSchema } from "#/features/tasker/validation";
 import { getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Doc, Id } from "#convex/_generated/dataModel";
-import type { IssueDateFilters } from "#convex/lib/issueFilters";
+import {
+	type IssueDateFilters,
+	matchesIssueSearch,
+} from "#convex/lib/issueFilters";
 
 export type ProjectIssueRow = Doc<"issues"> & {
 	childIssueCount: number;
@@ -159,7 +162,7 @@ export function useProjectDetailPage({
 		}
 
 		return (issues ?? []).filter((issue) =>
-			issue.searchText.includes(normalizedSearchInput),
+			matchesIssueSearch(issue, normalizedSearchInput),
 		);
 	}, [issues, normalizedSearchInput]);
 	const hiddenDoneTaskCount = useMemo(

@@ -20,7 +20,7 @@ import {
 } from './lib/auth'
 import { createActivity } from './lib/activity'
 import { shouldNotifyAssigneeChange } from './lib/notifications'
-import { matchesIssueFilters, validateDateFilters } from './lib/issueFilters'
+import { matchesIssueFilters, matchesIssueSearch, validateDateFilters } from './lib/issueFilters'
 import { buildDescriptionFields, descriptionDocValidator, type DescriptionDoc } from './lib/issueDescriptions'
 import {
   ensureProjectCustomFieldsExist,
@@ -767,10 +767,8 @@ export const listByProject = query({
           return false
         }
       }
-      if (search) {
-        if (!issue.searchText.includes(search)) {
-          return false
-        }
+      if (search && !matchesIssueSearch(issue, search)) {
+        return false
       }
       if (args.onlyMine && issue.assigneeId !== user._id) {
         return false

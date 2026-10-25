@@ -1,5 +1,10 @@
 const DAY_MS = 86_400_000;
 
+export function matchesIssueSearch(issue: { issueNumber: number; searchText: string }, search: string) {
+  return issue.searchText.includes(search) ||
+    (/^#?\d+$/.test(search) && issue.issueNumber === Number(search.replace(/^#/, "")));
+}
+
 export const DATE_FILTER_KEYS = ["startFrom", "startTo", "dueFrom", "dueTo"] as const;
 export type IssueDateFilters = Partial<Record<(typeof DATE_FILTER_KEYS)[number], string>>;
 
