@@ -204,5 +204,6 @@ Workflow model progress:
 
 - [x] Implement locally: non-user-management workspace tools, complete pagination/search, shared business handlers, scoped token enforcement, idempotent writes, revision checks and audit attribution.
 - [x] Add synthetic authorization/retry/concurrency/protocol tests and operation coverage documentation.
-- [ ] Deploy expanded Convex schema/functions after separate approval.
-- [ ] Configure and verify the user's intended MCP client after separate approval; no persistent connection is installed by implementation.
+- [x] Deploy expanded Convex schema/functions (user deployment confirmed by authenticated workspace reads, 2026-10-25).
+- [x] Configure the approved local Codex MCP connection and verify 41-tool discovery plus live identity/project reads (2026-10-25). This verifies that host's stdio connection, not direct availability in a parent cloud chat.
+- [x] Document workspace operation rules, secure setup and client boundaries in the agent entry points and workspace guide (2026-10-25).

@@ -101,9 +101,11 @@ Tasker includes a local stdio MCP server. Your agent can discover tasks assigned
 }
 ```
 
-Use the `.convex.cloud` deployment URL, not the `.convex.site` HTTP-action URL. `TASKER_API_TOKEN` belongs in the MCP client's environment; never prefix it with `VITE_`. Settings provides this configuration with the backend URL and newly created token filled in.
+Use the Convex cloud `.convex.cloud` deployment URL or the approved self-hosted API URL, not the `.convex.site` HTTP-action URL. `TASKER_API_TOKEN` belongs in the MCP client's environment; never prefix it with `VITE_`. Settings provides this configuration with the backend URL and newly created token filled in.
 
-The server exposes six tools:
+The server exposes **41 tools**. See the [workspace MCP guide](docs/agent-workspace.md)
+for full coverage, secure startup, scopes, guarded writes and local/cloud client
+limits. The six original queue/claim tools are:
 
 | Tool | Purpose |
 | --- | --- |
@@ -114,7 +116,7 @@ The server exposes six tools:
 | `submit_task_for_review` | Pass `issueId`, the claiming `runId`, and a nonempty `summary` containing results, verification, and artifact links. Atomically adds a comment, moves to `in_review`, and releases the claim. |
 | `release_task` | Abandon a claim and restore the previous status if a person has not changed the status. |
 
-By default, discovery excludes archived/deleted/completed tasks, archived projects, tasks already in `in_review`, and live claims. Set `includeClaimed: true` to inspect claimed tasks. For custom workflows, filter `statuses` explicitly and pass existing `workStatus` / `reviewStatus` keys to the corresponding tools. Missing workflow keys fail without modifying the task; `todo` and `done` cannot be work/review targets.
+By default, legacy queue discovery excludes archived/deleted/completed tasks, archived projects, tasks already in `in_review`, and live claims. Set `includeClaimed: true` to inspect claimed tasks. For custom workflows, filter `statuses` explicitly and pass existing `workStatus` / `reviewStatus` keys to the corresponding tools. Missing workflow keys fail without modifying the task; `todo` and `done` cannot be work/review targets.
 
 Both list tools use database pagination with bounded reads (up to 100 candidate rows and a 1 MiB issue-read budget per call). Filtering and access checks can produce short or empty pages. Continue passing `nextCursor` as `cursor` until it is `null`; an empty `tasks` array does not mean discovery is finished. Keep the same tool and filters for each continuation. Cursors are opaque database cursors, not task IDs; restart any pagination started before this update. `list_done_tasks` maps to the Convex query `agentTasks.listDone` and does not make completed tasks claimable. Deploy the updated schema, including the `issues.by_status` index, before using the new endpoint.
 

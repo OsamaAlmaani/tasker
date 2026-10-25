@@ -126,6 +126,40 @@ The original claim tools also enforce configured read/write/project scopes.
 Claims renew leases and are intentionally not exactly-once operations. Existing
 claim/review workflow semantics remain distinct from ordinary task editing.
 
+## Local startup and client configuration
+
+Use the repository's Node 25.x and pnpm 11.x toolchain and installed dependencies.
+With both required variables already supplied securely to the process, launch:
+
+```sh
+pnpm --dir /absolute/path/to/tasker exec tsx mcp/index.ts
+```
+
+`pnpm mcp` is equivalent when run from the repository. Set `TASKER_CONVEX_URL`
+to the intended Convex API endpoint: either a cloud `.convex.cloud` deployment
+or the approved self-hosted API URL, not the `.convex.site` HTTP-actions URL.
+Set `TASKER_API_TOKEN` to an existing personal agent token. Never substitute a
+Convex admin/deployment key. The MCP entrypoint does **not** load `.env.local`.
+
+Use the client's secret facility or a private local launcher to supply the token
+as an environment variable. If local entry is needed, use a masked terminal
+prompt and owner-only storage outside the repository. Do not paste tokens into
+chat, command arguments, shell history, logs or committed client examples. Do not
+fetch credentials from another machine or create a replacement without permission.
+
+For local Codex, register the stdio command in the client's MCP settings or its
+`mcp_servers.tasker` configuration. Use the actual checkout path and an executable
+that the client can resolve; a GUI client's environment may differ from a terminal.
+A private launcher can provide the environment without embedding secrets in shared
+configuration. Preserve unrelated entries and obtain permission before installing
+persistent access. Restart/reconnect the client after configuration changes as needed.
+
+This is a **local stdio** server, not an HTTP MCP endpoint. Its Convex API URL is
+not a remote MCP server URL. Registration in local Codex does not make tools appear
+in a parent cloud chat: that caller must have an authorized local execution path
+or a separately configured remote integration. Check tools available to the actual
+caller rather than assuming that a successful local test establishes cloud access.
+
 ## Activation and validation
 
 1. Review/test the source changes locally.
@@ -135,8 +169,18 @@ claim/review workflow semantics remain distinct from ordinary task editing.
    and approved personal token. Do not commit secrets or install persistent access
    without permission. Local stdio requires a client that can launch the process
    on that machine; a cloud-only client needs a separately designed remote transport.
-4. Smoke-test initialize/list-tools and a bounded read only. Never create/delete
-   a production test task to prove connectivity.
+4. Initialize and call `tools/list` (currently 41 tools). Discovery proves local
+   startup only and does not authenticate to Convex. With credential use authorized,
+   call `whoami` with `{"input":{}}`, then `list_projects` with
+   `{"input":{"limit":100}}`. A successful identity and project response verifies
+   live authentication and access. Follow cursors within an explicit read budget;
+   report an incomplete list if the budget is reached. Never create/delete a
+   production test task to prove connectivity.
+
+For local implementation validation, run `pnpm mcp:check` and
+`pnpm exec vitest run tests/mcp.test.ts tests/agentWorkspace.test.ts tests/agentTasks.test.ts`.
+A backend deployment or client registration on one host does not activate every
+other installation; verify each intended endpoint/client independently.
 
 Tests use synthetic records and in-memory MCP transport. Stdio launch tests only
 initialize and discover tools with dummy credentials; they do not query production.
