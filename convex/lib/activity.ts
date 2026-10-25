@@ -1,3 +1,4 @@
+import { getAgentIdentity } from './agentContext'
 import type { Id } from '../_generated/dataModel'
 import type { MutationCtx } from '../_generated/server'
 import type { ActivityAction, ActivityEntityType } from '../constants'
@@ -14,6 +15,7 @@ export async function createActivity(
     metadata?: unknown
   },
 ) {
+  const agent = getAgentIdentity(ctx)
   await ctx.db.insert('activities', {
     actorId: args.actorId,
     projectId: args.projectId,
@@ -21,7 +23,7 @@ export async function createActivity(
     entityType: args.entityType,
     entityId: args.entityId,
     action: args.action,
-    metadata: args.metadata,
+    metadata: agent ? { ...(args.metadata as object ?? {}), source: 'mcp', tokenId: agent.credential._id, requestId: agent.requestId } : args.metadata,
     createdAt: Date.now(),
   })
 }

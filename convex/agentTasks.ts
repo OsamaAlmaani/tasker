@@ -1,3 +1,4 @@
+import { agentContext, requireAgentScope } from './lib/agentContext'
 import { ConvexError, v, type Infer } from 'convex/values'
 import type { Doc, Id } from './_generated/dataModel'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
@@ -17,6 +18,8 @@ function fail(code: string, message: string): never {
 
 async function taskAccess(ctx: QueryCtx | MutationCtx, token: string, issueId: Id<'issues'>, write = false) {
   const { user, credential } = await requireAgentUser(ctx, token)
+  requireAgentScope(credential, write ? 'write' : 'read')
+  ctx = agentContext(ctx, { user, credential })
   const issue = await ctx.db.get(issueId)
   if (!issue || issue.deletedAt !== undefined) fail('NOT_FOUND', 'Task not found.')
   const { project } = await requireProjectViewAccessForUser(ctx, issue.projectId, user)
@@ -24,7 +27,7 @@ async function taskAccess(ctx: QueryCtx | MutationCtx, token: string, issueId: I
   if (write && (project.archived || issue.archived || issue.status === 'done')) {
     fail('VALIDATION_ERROR', 'Archived or completed work cannot be consumed.')
   }
-  return { issue, project, user, credential }
+  return { issue, project, user, credential, scoped: ctx as MutationCtx }
 }
 
 function validateRunId(runId: string) {
@@ -57,7 +60,9 @@ const activeListArgs = v.object({
 })
 
 async function listTasks(ctx: QueryCtx, args: Infer<typeof activeListArgs>, done: boolean) {
-  const { user } = await requireAgentUser(ctx, args.token)
+  const { user, credential } = await requireAgentUser(ctx, args.token)
+  requireAgentScope(credential, 'read')
+  ctx = agentContext(ctx, { user, credential })
   const assignment = args.assignment ?? 'mine'
   if (assignment === 'assignee' && !args.assigneeId) fail('VALIDATION_ERROR', 'assigneeId is required for the assignee filter.')
   if (args.assigneeId && assignment !== 'assignee') fail('VALIDATION_ERROR', 'Use assignment="assignee" with assigneeId.')
@@ -108,6 +113,7 @@ async function listTasks(ctx: QueryCtx, args: Infer<typeof activeListArgs>, done
       )
       projects.set(issue.projectId, accessible ? project : null)
     }
+    if (credential.projectIds && !credential.projectIds.includes(issue.projectId)) continue
     const project = projects.get(issue.projectId)
     if (!project) continue
     tasks.push({ issue, project: { _id: project._id, name: project.name, key: project.key }, canWrite: canWrite(user.globalRole) })
@@ -147,7 +153,8 @@ export const claim = mutation({
   args: { ...runArgs, workStatus: v.optional(v.string()) },
   handler: async (ctx, args) => {
     validateRunId(args.runId)
-    const { issue, project, user, credential } = await taskAccess(ctx, args.token, args.issueId, true)
+    const { issue, project, user, credential, scoped } = await taskAccess(ctx, args.token, args.issueId, true)
+    ctx = agentContext(scoped, { user, credential, requestId: args.runId })
     const now = Date.now()
     const current = issue.agentClaim
     if (current && current.expiresAt > now && (current.tokenId !== credential._id || current.runId !== args.runId)) {
@@ -175,7 +182,8 @@ export const submitReview = mutation({
   handler: async (ctx, args) => {
     const summary = args.summary.trim()
     if (!summary || summary.length > 20000) fail('VALIDATION_ERROR', 'Provide a result summary up to 20,000 characters, including verification and relevant links.')
-    const { issue, project, user, credential } = await taskAccess(ctx, args.token, args.issueId, true)
+    const { issue, project, user, credential, scoped } = await taskAccess(ctx, args.token, args.issueId, true)
+    ctx = agentContext(scoped, { user, credential, requestId: args.runId })
     const activeClaim = requireClaim(issue, credential._id, args.runId)
     const reviewStatus = args.reviewStatus ?? 'in_review'
     validateStatus(project, reviewStatus)
@@ -192,7 +200,8 @@ export const submitReview = mutation({
 export const release = mutation({
   args: runArgs,
   handler: async (ctx, args) => {
-    const { issue, project, user, credential } = await taskAccess(ctx, args.token, args.issueId, true)
+    const { issue, project, user, credential, scoped } = await taskAccess(ctx, args.token, args.issueId, true)
+    ctx = agentContext(scoped, { user, credential, requestId: args.runId })
     validateRunId(args.runId)
     const activeClaim = issue.agentClaim
     if (!activeClaim || activeClaim.tokenId !== credential._id || activeClaim.runId !== args.runId) fail('CONFLICT', 'This run does not own the claim.')

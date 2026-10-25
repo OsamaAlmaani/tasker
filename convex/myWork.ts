@@ -1,3 +1,5 @@
+import { getAgentIdentity } from './lib/agentContext'
+import { defineQuery } from './lib/definitions'
 import { query } from './_generated/server'
 import { getAccessibleProjectIds, isAdmin, requireCurrentUser } from './lib/auth'
 import {
@@ -19,7 +21,7 @@ function sortByDueDateThenUpdated<
   return right.updatedAt - left.updatedAt
 }
 
-export const overview = query({
+export const overviewDefinition = defineQuery({
   args: {},
   handler: async (ctx) => {
     const user = await requireCurrentUser(ctx)
@@ -38,6 +40,7 @@ export const overview = query({
     const visibleProjects = accessibleProjects
       .filter((project): project is NonNullable<typeof project> => Boolean(project))
       .filter((project) => !project.archived)
+      .filter((project) => !getAgentIdentity(ctx)?.credential.projectIds || getAgentIdentity(ctx)!.credential.projectIds!.includes(project._id))
 
     const projectById = new Map(
       visibleProjects.map((project) => {
@@ -112,3 +115,4 @@ export const overview = query({
     }
   },
 })
+export const overview = query(overviewDefinition)

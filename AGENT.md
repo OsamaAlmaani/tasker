@@ -444,3 +444,13 @@ If the task is about:
 ## Short Summary
 
 This repo is a full-stack task manager where most business rules live in Convex and the biggest UI state lives in the project and issue route files. The critical invariants are server-side auth, one-level sub-task rules, soft-delete/cascade behavior, invite flow split between Convex and Clerk, and preservation of the custom multi-theme UI system.
+
+## Expanded workspace MCP (local implementation)
+
+- `convex/agentWorkspace.ts` is an allowlisted token-authenticated gateway; never expose arbitrary function names or user-management handlers.
+- `convex/lib/agentOperations.ts` defines tool coverage and uses shared `*Definition` handlers; normal Convex UI exports still wrap those same definitions.
+- `convex/lib/agentContext.ts` carries a server-resolved identity in a WeakMap. Never accept identity/account IDs as authentication input or synthesize Clerk credentials.
+- `convex/agentReads.ts` provides bounded complete discovery. MCP schemas derive from native Convex validators via `mcp/validators.ts`.
+- All new writes have transactional `agentRequests` receipts, record revision preconditions and explicit destructive confirmations. Receipts persist; do not expire them without defining late-retry behavior.
+- Optional token scopes/project restrictions apply to the workspace gateway and legacy agent tools. No user, membership, invitation, credential or access-policy management is exposed.
+- Coverage, activation and limits: `docs/agent-workspace.md`. Local code does not mean the backend is deployed or a persistent client connection is installed.

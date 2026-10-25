@@ -194,3 +194,12 @@ pnpm dev
 ```
 
 7. Open `http://localhost:3000`, sign in, and optionally seed demo data from `/settings`.
+
+### Full workspace operations
+
+The expanded local MCP adapter also supports projects, task CRUD and bulk actions,
+workflow/labels/custom fields, lists, comments, private notes, inbox, summaries and
+personal work preferences. User administration, credentials, invitations and access
+changes are excluded. See [the coverage matrix and guarded-write protocol](docs/agent-workspace.md)
+for all tools, scopes, pagination, revision checks, idempotency and deployment steps.
+Deploy the new backend/schema before using these additional tools.

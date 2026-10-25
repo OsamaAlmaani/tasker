@@ -1,3 +1,4 @@
+import { defineMutation } from './lib/definitions'
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import {
@@ -45,7 +46,7 @@ export const listByIssue = query({
   },
 })
 
-export const create = mutation({
+export const createDefinition = defineMutation({
   args: {
     issueId: v.id('issues'),
     body: v.string(),
@@ -86,8 +87,9 @@ export const create = mutation({
     return await ctx.db.get(commentId)
   },
 })
+export const create = mutation(createDefinition)
 
-export const update = mutation({
+export const updateDefinition = defineMutation({
   args: {
     commentId: v.id('comments'),
     body: v.string(),
@@ -127,3 +129,4 @@ export const update = mutation({
     return await ctx.db.get(args.commentId)
   },
 })
+export const update = mutation(updateDefinition)

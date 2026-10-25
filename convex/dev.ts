@@ -1,10 +1,13 @@
+import { defineMutation } from './lib/definitions'
 import { mutation } from './_generated/server'
-import { requireCurrentUser } from './lib/auth'
+import { requireCurrentUser, canWrite } from './lib/auth'
+import { ConvexError } from 'convex/values'
 
-export const seedDemoData = mutation({
+export const seedDemoDataDefinition = defineMutation({
   args: {},
   handler: async (ctx) => {
     const user = await requireCurrentUser(ctx)
+    if (!canWrite(user.globalRole)) throw new ConvexError({ code: 'FORBIDDEN', message: 'Viewer accounts cannot seed projects.' })
 
     const existing = await ctx.db.query('projects').first()
     if (existing) {
@@ -94,3 +97,4 @@ export const seedDemoData = mutation({
     return { seeded: true, projectId }
   },
 })
+export const seedDemoData = mutation(seedDemoDataDefinition)

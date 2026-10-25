@@ -1,3 +1,4 @@
+import { defineMutation } from './lib/definitions'
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import {
@@ -173,7 +174,7 @@ export const getById = query({
   },
 })
 
-export const create = mutation({
+export const createDefinition = defineMutation({
   args: {
     name: v.string(),
     key: v.string(),
@@ -275,8 +276,9 @@ export const create = mutation({
     return project ? normalizeProject(project) : null
   },
 })
+export const create = mutation(createDefinition)
 
-export const update = mutation({
+export const updateDefinition = defineMutation({
   args: {
     projectId: v.id('projects'),
     name: v.optional(v.string()),
@@ -426,8 +428,9 @@ export const update = mutation({
     }
   },
 })
+export const update = mutation(updateDefinition)
 
-export const deleteStatus = mutation({
+export const deleteStatusDefinition = defineMutation({
   args: {
     projectId: v.id('projects'),
     statusKey: v.string(),
@@ -519,8 +522,9 @@ export const deleteStatus = mutation({
     }
   },
 })
+export const deleteStatus = mutation(deleteStatusDefinition)
 
-export const archive = mutation({
+export const archiveDefinition = defineMutation({
   args: {
     projectId: v.id('projects'),
     archived: v.boolean(),
@@ -547,6 +551,7 @@ export const archive = mutation({
     return await ctx.db.get(args.projectId)
   },
 })
+export const archive = mutation(archiveDefinition)
 
 export const addMember = mutation({
   args: {

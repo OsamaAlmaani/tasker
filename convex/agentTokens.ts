@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
-import { requireCurrentUser } from './lib/auth'
+import { requireCurrentUser, requireProjectViewAccess } from './lib/auth'
 import { hashToken, validateTokenFormat } from './lib/agentTokens'
 
 export const list = query({
@@ -13,9 +13,10 @@ export const list = query({
 })
 
 export const create = mutation({
-  args: { name: v.string(), token: v.string(), expiresAt: v.optional(v.number()) },
+  args: { name: v.string(), token: v.string(), expiresAt: v.optional(v.number()), scopes: v.optional(v.array(v.union(v.literal('read'),v.literal('write'),v.literal('delete'),v.literal('notes'),v.literal('inbox')))), projectIds: v.optional(v.array(v.id('projects'))) },
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx)
+    for (const projectId of args.projectIds ?? []) await requireProjectViewAccess(ctx, projectId)
     validateTokenFormat(args.token)
     const name = args.name.trim()
     if (!name || name.length > 100 || (args.expiresAt !== undefined && (!Number.isFinite(args.expiresAt) || args.expiresAt <= Date.now()))) {
@@ -26,7 +27,7 @@ export const create = mutation({
     if (existing) {
       throw new ConvexError({ code: 'VALIDATION_ERROR', message: 'Generate a new token and try again.' })
     }
-    return await ctx.db.insert('agentTokens', { userId: user._id, name, tokenHash, tokenPrefix: args.token.slice(0, 12), createdAt: Date.now(), expiresAt: args.expiresAt })
+    return await ctx.db.insert('agentTokens', { userId: user._id, name, tokenHash, tokenPrefix: args.token.slice(0, 12), createdAt: Date.now(), expiresAt: args.expiresAt, scopes: args.scopes, projectIds: args.projectIds })
   },
 })
 

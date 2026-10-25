@@ -1,3 +1,4 @@
+import { defineMutation } from './lib/definitions'
 import { ConvexError, v } from 'convex/values'
 import type { Doc, Id } from './_generated/dataModel'
 import { mutation, query } from './_generated/server'
@@ -110,7 +111,7 @@ export const listByProject = query({
   },
 })
 
-export const create = mutation({
+export const createDefinition = defineMutation({
   args: {
     projectId: v.id('projects'),
     name: v.string(),
@@ -167,8 +168,9 @@ export const create = mutation({
     return await ctx.db.get(issueListId)
   },
 })
+export const create = mutation(createDefinition)
 
-export const update = mutation({
+export const updateDefinition = defineMutation({
   args: {
     issueListId: v.id('issueLists'),
     name: v.optional(v.string()),
@@ -236,8 +238,9 @@ export const update = mutation({
     return await ctx.db.get(issueList._id)
   },
 })
+export const update = mutation(updateDefinition)
 
-export const remove = mutation({
+export const removeDefinition = defineMutation({
   args: {
     issueListId: v.id('issueLists'),
     mode: v.union(v.literal('delete_tasks'), v.literal('move_tasks')),
@@ -342,3 +345,4 @@ export const remove = mutation({
     }
   },
 })
+export const remove = mutation(removeDefinition)

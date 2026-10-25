@@ -199,3 +199,10 @@ Workflow model progress:
 - [ ] Validate which notification channels users actually want
 - [ ] Validate whether time tracking belongs in the core product or should stay out
 - [ ] Validate whether guest access is more valuable than deeper internal permission controls
+
+## Workspace MCP expansion
+
+- [x] Implement locally: non-user-management workspace tools, complete pagination/search, shared business handlers, scoped token enforcement, idempotent writes, revision checks and audit attribution.
+- [x] Add synthetic authorization/retry/concurrency/protocol tests and operation coverage documentation.
+- [ ] Deploy expanded Convex schema/functions after separate approval.
+- [ ] Configure and verify the user's intended MCP client after separate approval; no persistent connection is installed by implementation.

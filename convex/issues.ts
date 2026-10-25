@@ -1,3 +1,4 @@
+import { defineMutation } from './lib/definitions'
 import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
@@ -883,7 +884,7 @@ export const getById = query({
   },
 })
 
-export const create = mutation({
+export const createDefinition = defineMutation({
   args: {
     projectId: v.id('projects'),
     title: v.string(),
@@ -1020,7 +1021,7 @@ export const create = mutation({
       reporterId: user._id,
       createdBy: user._id,
       labels: nextLabels,
-      checklistItems: [],
+      checklistItems: normalizeIssueChecklistItems(args.checklistItems ?? []),
       customFieldValues: nextCustomFieldValues,
       startDate: args.startDate,
       dueDate: args.dueDate,
@@ -1065,8 +1066,9 @@ export const create = mutation({
     return await ctx.db.get(issueId)
   },
 })
+export const create = mutation(createDefinition)
 
-export const update = mutation({
+export const updateDefinition = defineMutation({
   args: {
     issueId: v.id('issues'),
     title: v.optional(v.string()),
@@ -1096,8 +1098,9 @@ export const update = mutation({
     })
   },
 })
+export const update = mutation(updateDefinition)
 
-export const bulkUpdate = mutation({
+export const bulkUpdateDefinition = defineMutation({
   args: {
     issueIds: v.array(v.id('issues')),
     status: v.optional(issueStatusValidator),
@@ -1185,8 +1188,9 @@ export const bulkUpdate = mutation({
     }
   },
 })
+export const bulkUpdate = mutation(bulkUpdateDefinition)
 
-export const remove = mutation({
+export const removeDefinition = defineMutation({
   args: {
     issueId: v.id('issues'),
   },
@@ -1235,8 +1239,9 @@ export const remove = mutation({
     }
   },
 })
+export const remove = mutation(removeDefinition)
 
-export const bulkRemove = mutation({
+export const bulkRemoveDefinition = defineMutation({
   args: {
     projectId: v.id('projects'),
     issueIds: v.array(v.id('issues')),
@@ -1296,6 +1301,7 @@ export const bulkRemove = mutation({
     return { deletedIssueCount: issueIdsToDelete.length, deletedAt: now }
   },
 })
+export const bulkRemove = mutation(bulkRemoveDefinition)
 
 export const activity = query({
   args: {

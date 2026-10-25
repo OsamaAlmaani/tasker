@@ -39,6 +39,8 @@ export default defineSchema({
     userId: v.id('users'),
     name: v.string(),
     tokenHash: v.string(),
+    scopes: v.optional(v.array(v.union(v.literal('read'), v.literal('write'), v.literal('delete'), v.literal('notes'), v.literal('inbox')))),
+    projectIds: v.optional(v.array(v.id('projects'))),
     tokenPrefix: v.string(),
     createdAt: v.number(),
     expiresAt: v.optional(v.number()),
@@ -46,6 +48,12 @@ export default defineSchema({
   })
     .index('by_userId', ['userId'])
     .index('by_tokenHash', ['tokenHash']),
+
+  agentRequests: defineTable({
+    tokenId: v.id('agentTokens'), userId: v.id('users'), requestId: v.string(),
+    operation: v.string(), inputHash: v.string(), result: v.any(),
+    projectIds: v.array(v.id('projects')), createdAt: v.number(),
+  }).index('by_tokenId_requestId', ['tokenId', 'requestId']),
 
   userNotes: defineTable({
     ownerId: v.id('users'),

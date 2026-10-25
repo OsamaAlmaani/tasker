@@ -1,3 +1,5 @@
+import { getAgentIdentity } from './lib/agentContext'
+import { defineQuery } from './lib/definitions'
 import { query } from './_generated/server'
 import { getAccessibleProjectIds, isAdmin, requireCurrentUser } from './lib/auth'
 import {
@@ -6,7 +8,7 @@ import {
   normalizeProject,
 } from './lib/projectStatuses'
 
-export const overview = query({
+export const overviewDefinition = defineQuery({
   args: {},
   handler: async (ctx) => {
     const user = await requireCurrentUser(ctx)
@@ -24,6 +26,7 @@ export const overview = query({
     const projects = accessibleProjects
       .filter((project): project is NonNullable<typeof project> => Boolean(project))
       .filter((project) => !project.archived)
+      .filter((project) => !getAgentIdentity(ctx)?.credential.projectIds || getAgentIdentity(ctx)!.credential.projectIds!.includes(project._id))
       .map((project) => normalizeProject(project))
 
     const projectIds = new Set(projects.map((project) => project._id))
@@ -113,3 +116,4 @@ export const overview = query({
     }
   },
 })
+export const overview = query(overviewDefinition)

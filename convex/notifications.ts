@@ -1,3 +1,5 @@
+import { checkAgentProject, getAgentIdentity } from './lib/agentContext'
+import { defineMutation } from './lib/definitions'
 import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
 import type { Doc } from './_generated/dataModel'
@@ -53,7 +55,7 @@ export const unreadCount = query({
   },
 })
 
-export const markRead = mutation({
+export const markReadDefinition = defineMutation({
   args: {
     notificationId: v.id('notifications'),
   },
@@ -67,6 +69,7 @@ export const markRead = mutation({
       })
     }
 
+    if (notification.projectId) checkAgentProject(ctx, notification.projectId)
     if (notification.readAt) {
       return notification
     }
@@ -80,8 +83,9 @@ export const markRead = mutation({
     return await ctx.db.get(notification._id)
   },
 })
+export const markRead = mutation(markReadDefinition)
 
-export const markAllRead = mutation({
+export const markAllReadDefinition = defineMutation({
   args: {},
   handler: async (ctx) => {
     const user = await requireCurrentUser(ctx)
@@ -92,7 +96,8 @@ export const markAllRead = mutation({
       )
       .collect()
 
-    const unreadNotifications = notifications.filter((row) => !row.readAt)
+    const allowedProjects = getAgentIdentity(ctx)?.credential.projectIds
+    const unreadNotifications = notifications.filter((row) => !row.readAt && (!allowedProjects || (row.projectId && allowedProjects.includes(row.projectId))))
     if (!unreadNotifications.length) {
       return { updatedCount: 0 }
     }
@@ -112,6 +117,7 @@ export const markAllRead = mutation({
     }
   },
 })
+export const markAllRead = mutation(markAllReadDefinition)
 
 export const createAssignmentNotification = internalMutation({
   args: {

@@ -1,3 +1,4 @@
+import { getAgentIdentity, checkAgentProject } from './agentContext'
 import { ConvexError } from 'convex/values'
 import type { Doc, Id } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
@@ -28,6 +29,8 @@ export async function requireAuth(ctx: Ctx) {
 }
 
 export async function requireCurrentUser(ctx: Ctx) {
+  const agent = getAgentIdentity(ctx)
+  if (agent) return agent.user
   const identity = await requireAuth(ctx)
   const user = await ctx.db
     .query('users')
@@ -119,6 +122,7 @@ export async function requireProjectViewAccessForUser(
   projectId: Id<'projects'>,
   user: Doc<'users'>,
 ) {
+  checkAgentProject(ctx, projectId)
   const project = await ctx.db.get(projectId)
 
   if (!project) {

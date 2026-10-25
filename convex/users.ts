@@ -1,3 +1,4 @@
+import { defineMutation } from './lib/definitions'
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { Id } from './_generated/dataModel'
@@ -168,7 +169,7 @@ export const me = query({
   },
 })
 
-export const updateMyWorkPreferences = mutation({
+export const updateMyWorkPreferencesDefinition = defineMutation({
   args: {
     lastView: myWorkViewValidator,
     defaultView: v.optional(v.union(myWorkViewValidator, v.null())),
@@ -196,6 +197,7 @@ export const updateMyWorkPreferences = mutation({
     return await ctx.db.get(user._id)
   },
 })
+export const updateMyWorkPreferences = mutation(updateMyWorkPreferencesDefinition)
 
 export const list = query({
   args: {
