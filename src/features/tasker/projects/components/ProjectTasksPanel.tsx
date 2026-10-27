@@ -222,10 +222,28 @@ export function ProjectTasksPanel({
 		<Card className="project-task-panel" aria-label="Tasks">
 			<CardContent className="project-task-content p-3">
 				<div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-					<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+					<div className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2 xl:basis-auto">
 						{isArchivedView ? null : (
-							<div className="flex flex-wrap items-center gap-2">
-								<div className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-1">
+							<div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
+								<Select
+									aria-label="Task view"
+									className="min-w-0 flex-1 sm:hidden"
+									value={issueLayout}
+									onChange={(event) =>
+										onToggleLayout(
+											event.target.value as NonNullable<
+												ProjectSearch["layout"]
+											>,
+										)
+									}
+								>
+									<option value="list">List</option>
+									<option value="kanban">Kanban</option>
+									<option value="calendar">Calendar</option>
+									<option value="gantt">Gantt</option>
+									<option value="sheet">Sheet</option>
+								</Select>
+								<div className="hidden shrink-0 items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-1 sm:inline-flex">
 									<Button
 										type="button"
 										size="sm"
@@ -275,13 +293,17 @@ export function ProjectTasksPanel({
 										Sheet
 									</Button>
 								</div>
-								<div className="inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--muted-text)]">
+								<label
+									htmlFor={`${filtersId}-hide-done`}
+									className="inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--muted-text)] sm:min-h-0"
+								>
 									<Switch
+										id={`${filtersId}-hide-done`}
 										checked={hideDoneTasks}
 										onChange={onHideDoneTasksChange}
 									/>
 									Hide done
-								</div>
+								</label>
 							</div>
 						)}
 						{isArchivedView ? (
@@ -500,7 +522,7 @@ export function ProjectTasksPanel({
 							) : null}
 						</div>
 					) : issueLayout === "list" ? (
-						<div className="space-y-4 overflow-auto">
+						<div className="project-task-list space-y-4 overflow-auto">
 							{groupedIssues.map((group) => (
 								<div key={group.key} className="space-y-2">
 									<div className="flex items-center justify-between">

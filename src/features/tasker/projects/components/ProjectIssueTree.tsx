@@ -236,7 +236,7 @@ export function ProjectIssueListTree({
 										<Badge className="issue-row-id-badge">
 											#{issue.issueNumber}
 										</Badge>
-										<p className="m-0 truncate whitespace-nowrap text-sm font-medium text-[var(--text)]">
+										<p className="issue-row-title m-0 truncate whitespace-nowrap text-sm font-medium text-[var(--text)]">
 											{issue.title}
 										</p>
 									</div>

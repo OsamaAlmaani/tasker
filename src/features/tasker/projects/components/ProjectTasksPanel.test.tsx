@@ -82,6 +82,28 @@ function panelProps(
 }
 
 describe("list selection", () => {
+	it.each([
+		"list",
+		"kanban",
+		"calendar",
+		"gantt",
+		"sheet",
+	])("switches to %s from the mobile view picker", (layout) => {
+		const props = panelProps();
+		render(<ProjectTasksPanel {...props} />);
+		fireEvent.change(screen.getByRole("combobox", { name: "Task view" }), {
+			target: { value: layout },
+		});
+		expect(props.onToggleLayout).toHaveBeenCalledWith(layout);
+	});
+
+	it("labels the done toggle and preserves its action", () => {
+		const props = panelProps();
+		render(<ProjectTasksPanel {...props} />);
+		fireEvent.click(screen.getByRole("switch", { name: "Hide done" }));
+		expect(props.onHideDoneTasksChange).toHaveBeenCalledWith(true);
+	});
+
 	it("offers an unassigned filter and forwards date ranges", () => {
 		const props = panelProps();
 		render(<ProjectTasksPanel {...props} />);

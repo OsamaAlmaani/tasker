@@ -1,6 +1,7 @@
 import { cn } from "#/lib/utils";
 
 type SwitchProps = {
+	id?: string;
 	checked: boolean;
 	onChange: (next: boolean) => void;
 	disabled?: boolean;
@@ -8,6 +9,7 @@ type SwitchProps = {
 };
 
 export function Switch({
+	id,
 	checked,
 	onChange,
 	disabled,
@@ -15,6 +17,7 @@ export function Switch({
 }: SwitchProps) {
 	return (
 		<button
+			id={id}
 			type="button"
 			role="switch"
 			aria-checked={checked}

@@ -634,6 +634,7 @@ button:disabled,
   justify-content: center;
   height: 36px;
   width: 36px;
+  flex-shrink: 0;
   border-radius: 9px;
   border: 1px solid var(--line);
   background: var(--surface-muted);
@@ -1568,14 +1569,14 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
 
 .issue-row-compact {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) 40px 92px 126px 120px;
+  grid-template-columns: minmax(0, 1fr) 40px 92px 126px 120px;
   align-items: center;
   column-gap: 10px;
   row-gap: 8px;
 }
 
 .issue-row-selectable {
-  grid-template-columns: 28px minmax(260px, 1fr) 40px 92px 126px 120px;
+  grid-template-columns: 28px minmax(0, 1fr) 40px 92px 126px 120px;
 }
 
 .issue-row-subissue {
@@ -1734,6 +1735,7 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
 
 .issue-tree-node {
   position: relative;
+  min-width: 0;
 }
 
 .issue-tree-node-child {
@@ -2878,6 +2880,16 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
 }
 
 @media (max-width: 1100px) {
+  .app-inbox-popover {
+    position: fixed;
+    top: 60px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: calc(100dvh - 84px);
+    overflow-y: auto;
+  }
+
   .app-sidebar-collapse {
     display: none;
   }
@@ -3095,6 +3107,140 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
     justify-content: center;
     text-align: center;
     padding: 16px;
+  }
+}
+
+@media (max-width: 639px) {
+  .app-topbar {
+    gap: 4px;
+    padding: 8px 12px;
+  }
+
+  .app-topbar button,
+  .app-sidebar-close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .app-topbar > button,
+  .app-topbar > div > div > button {
+    width: 44px;
+    height: 44px;
+    padding-inline: 0;
+  }
+
+  .app-theme-popover {
+    position: fixed;
+    top: 60px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: calc(100dvh - 84px);
+    overflow-y: auto;
+  }
+
+  .app-content,
+  .app-content:has(.project-workspace) {
+    padding: 12px;
+  }
+
+  /* Let the document scroll when phone controls or the keyboard use the viewport. */
+  .app-main:has(.project-workspace) {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .app-content:has(.project-workspace),
+  .project-task-content {
+    overflow: visible;
+  }
+
+  .project-task-view {
+    flex: none;
+  }
+
+  .project-task-view > .project-task-list {
+    height: auto;
+    overflow: visible;
+  }
+
+  .project-task-view:not(:has(> .project-task-list)) {
+    height: 70dvh;
+    min-height: 420px;
+  }
+
+  .project-workspace button:not([role='switch']),
+  .project-workspace select:not(.issue-inline-select-native),
+  .project-workspace input:not([type='checkbox']),
+  .task-date-filters > summary {
+    min-height: 44px;
+  }
+
+  .app-content input:not([type='checkbox']),
+  .app-content select,
+  .app-content textarea {
+    font-size: 16px;
+  }
+
+  .modal-overlay {
+    padding: 12px;
+  }
+
+  .modal-overlay > * {
+    max-height: calc(100dvh - 24px);
+    min-width: 0;
+    overflow-y: auto;
+  }
+
+  .issue-row-compact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .issue-row-main {
+    flex: 1 1 100%;
+  }
+
+  .issue-row-selectable .issue-row-main {
+    flex-basis: calc(100% - 36px);
+  }
+
+  .issue-row-selectable .issue-row-selection {
+    width: 28px;
+    min-height: 44px;
+  }
+
+  .issue-row-col {
+    max-width: 100%;
+  }
+
+  .issue-row-col-assignee,
+  .issue-inline-select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .issue-row-col-due {
+    min-height: 44px;
+  }
+
+  .issue-row-title {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .issue-tree-children {
+    margin-left: 8px;
+    padding-left: 8px;
+  }
+
+  .issue-tree-node-child::before {
+    left: -8px;
+    width: 8px;
   }
 }
 

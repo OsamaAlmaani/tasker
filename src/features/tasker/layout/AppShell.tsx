@@ -687,12 +687,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 					<button
 						type="button"
-						className="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 text-sm text-[var(--muted-text)]"
+						className="inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[var(--line)] bg-[var(--surface-muted)] text-sm text-[var(--muted-text)] sm:h-9 sm:w-auto sm:px-3"
+						title="Command Bar"
 						onClick={() => setCommandOpen(true)}
 					>
 						<Command className="h-4 w-4" />
-						Command Bar
-						<kbd className="ml-2 rounded border border-[var(--line)] px-1.5 py-0.5 text-[11px] text-[var(--muted-text)]">
+						<span className="sr-only sm:not-sr-only">Command Bar</span>
+						<kbd className="ml-2 hidden rounded border border-[var(--line)] px-1.5 py-0.5 text-[11px] text-[var(--muted-text)] md:inline">
 							Ctrl K
 						</kbd>
 					</button>
@@ -700,14 +701,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 					<Button
 						type="button"
 						variant="ghost"
-						className="h-9 px-3"
+						className="h-11 w-11 px-0 sm:h-9 sm:w-auto sm:px-3"
+						title="Notes"
 						onClick={() => setNotesOpen(true)}
 					>
-						<FileText className="mr-2 h-4 w-4" />
-						Notes
+						<FileText className="h-4 w-4 sm:mr-2" />
+						<span className="sr-only sm:not-sr-only">Notes</span>
 					</Button>
 
-					<div className="ml-auto flex items-center gap-2">
+					<div className="ml-auto flex shrink-0 items-center gap-2">
 						<div className="relative" ref={notificationsMenuRef}>
 							<Button
 								type="button"
@@ -727,7 +729,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 								) : null}
 							</Button>
 							{notificationsOpen ? (
-								<div className="absolute right-0 z-20 mt-2 w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 shadow-[0_24px_64px_rgba(0,0,0,0.25)]">
+								<div className="app-inbox-popover absolute right-0 z-20 mt-2 w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 shadow-[0_24px_64px_rgba(0,0,0,0.25)]">
 									<div className="mb-3 flex items-center justify-between gap-3">
 										<div>
 											<p className="m-0 text-sm font-semibold text-[var(--text)]">
@@ -777,6 +779,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 					className="fixed inset-0 z-50 flex items-start justify-center bg-[rgba(8,12,26,0.42)] px-4 pt-[12vh]"
 					role="dialog"
 					aria-modal="true"
+					aria-label="Command Bar"
 					tabIndex={-1}
 					onMouseDown={(event) => {
 						if (event.target === event.currentTarget) {

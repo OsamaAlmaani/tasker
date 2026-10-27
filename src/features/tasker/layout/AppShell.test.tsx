@@ -100,6 +100,13 @@ it("collapses and expands navigation while retaining named links and page conten
 	expect(workspace.isConnected).toBe(true);
 });
 
+it("keeps compact header actions named and opens the command palette", () => {
+	render(<AppShell>Task workspace</AppShell>);
+	expect(screen.getByRole("button", { name: "Notes" })).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: /Command Bar/ }));
+	expect(screen.getByRole("dialog", { name: /command/i })).toBeTruthy();
+});
+
 it("keeps the mobile drawer independent of desktop collapse and closes it on navigation", () => {
 	const { container } = render(
 		<AppShell>

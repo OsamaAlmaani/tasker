@@ -438,7 +438,7 @@ export function ProjectDetailContent({
 								</>
 							)}
 						</Button>
-						<div className="relative" ref={importExportMenuRef}>
+						<div className="sm:relative" ref={importExportMenuRef}>
 							<Button
 								type="button"
 								variant="secondary"
@@ -454,7 +454,7 @@ export function ProjectDetailContent({
 							{isImportExportMenuOpen ? (
 								<div
 									role="menu"
-									className="absolute right-0 z-20 mt-2 min-w-[180px] rounded-md border border-[var(--line)] bg-[var(--surface)] p-1 shadow-[0_20px_50px_rgba(8,12,26,0.2)]"
+									className="absolute right-0 z-20 mt-2 min-w-[180px] max-w-full rounded-md border border-[var(--line)] bg-[var(--surface)] p-1 shadow-[0_20px_50px_rgba(8,12,26,0.2)]"
 								>
 									<button
 										type="button"

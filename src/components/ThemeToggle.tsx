@@ -255,7 +255,7 @@ export default function ThemeToggle() {
 			{menuOpen ? (
 				<div
 					role="menu"
-					className="absolute right-0 z-30 mt-2 w-72 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1.5 shadow-[0_20px_50px_rgba(8,12,26,0.2)] backdrop-blur"
+					className="app-theme-popover absolute right-0 z-30 mt-2 max-h-[70dvh] w-72 overflow-y-auto rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1.5 shadow-[0_20px_50px_rgba(8,12,26,0.2)] backdrop-blur"
 				>
 					{themeOptions.map((option) => {
 						const Icon = option.Icon;

@@ -60,7 +60,7 @@ function BulkActionMenu({
 	options: BulkMenuOption[];
 }) {
 	return (
-		<div className="relative">
+		<div className="sm:relative">
 			<Button
 				type="button"
 				size="sm"
@@ -79,7 +79,7 @@ function BulkActionMenu({
 			{isOpen ? (
 				<div
 					role="menu"
-					className="absolute left-0 z-30 mt-2 min-w-[220px] rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1.5 shadow-[0_20px_50px_rgba(8,12,26,0.2)] backdrop-blur"
+					className="absolute left-0 z-30 mt-2 max-h-[60dvh] w-56 max-w-full overflow-y-auto rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1.5 shadow-[0_20px_50px_rgba(8,12,26,0.2)] backdrop-blur"
 				>
 					{options.map((option) => (
 						<button
@@ -166,7 +166,7 @@ export function IssueBulkActionsBar({
 	return (
 		<div
 			ref={menuRef}
-			className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-[var(--line)] bg-[color-mix(in_oklab,var(--surface-muted)_88%,transparent_12%)] px-3 py-2"
+			className="relative flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-[var(--line)] bg-[color-mix(in_oklab,var(--surface-muted)_88%,transparent_12%)] px-3 py-2"
 		>
 			<div className="mr-1 inline-flex h-8 items-center rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm font-medium text-[var(--text)]">
 				{selectedCount} selected

@@ -9,7 +9,7 @@ export function PageHeader({
 }) {
 	return (
 		<div className="page-header mb-6 flex flex-wrap items-start justify-between gap-3">
-			<div>
+			<div className="min-w-0 break-words">
 				<h1 className="m-0 text-2xl font-semibold tracking-tight text-[var(--text)]">
 					{title}
 				</h1>
@@ -20,7 +20,9 @@ export function PageHeader({
 				) : null}
 			</div>
 			{actions ? (
-				<div className="flex flex-wrap items-center gap-2">{actions}</div>
+				<div className="relative flex min-w-0 max-w-full flex-wrap items-center gap-2">
+					{actions}
+				</div>
 			) : null}
 		</div>
 	);

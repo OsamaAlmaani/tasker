@@ -65,7 +65,7 @@ export function ConfirmDialog({
 
 				<p className="m-0 text-sm text-[var(--muted-text)]">{description}</p>
 
-				<div className="mt-5 flex items-center justify-end gap-2">
+				<div className="mt-5 flex flex-wrap items-center justify-end gap-2">
 					<Button
 						type="button"
 						variant="ghost"
