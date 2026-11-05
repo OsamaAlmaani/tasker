@@ -1,5 +1,5 @@
 import { ClientOnly, Link, useNavigate } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import {
 	Download,
 	GitPullRequest,
@@ -17,6 +17,7 @@ import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { ActivityFeed } from "#/features/tasker/components/ActivityFeed";
 import { MemberAvatarStack } from "#/features/tasker/components/MemberAvatarStack";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
+import { useRepositoryAccess } from "#/features/tasker/github/useRepositoryAccess";
 import { IssueBulkActionsBar } from "#/features/tasker/issues/components/IssueBulkActionsBar";
 import { IssueDraftDialog } from "#/features/tasker/issues/components/IssueDraftDialog";
 import { findDoneAncestorIssue } from "#/features/tasker/issues/hierarchy";
@@ -79,6 +80,11 @@ export function ProjectDetailContent({
 	const navigate = useNavigate();
 	const bulkUpdateIssues = useMutation(api.issues.bulkUpdate);
 	const bulkDeleteIssues = useMutation(api.issues.bulkRemove);
+	const pullRequestLinks = useQuery(api.githubLinks.listForProject, {
+		projectId,
+	});
+	useRepositoryAccess(projectId, pullRequestLinks?.access);
+	const pullRequestsByIssueId = pullRequestLinks?.byIssue;
 	const {
 		addMember,
 		addStatusFilter,
@@ -652,6 +658,7 @@ export function ProjectDetailContent({
 											canWrite={canWrite}
 											issues={visibleIssues}
 											projectKey={projectData.project.key}
+											pullRequestsByIssueId={pullRequestsByIssueId}
 											statuses={projectStatuses}
 											onDatesChange={(issueId, dates) =>
 												updateIssue({
@@ -681,6 +688,7 @@ export function ProjectDetailContent({
 											canWrite={canWrite}
 											issues={visibleIssues}
 											projectKey={projectData.project.key}
+											pullRequestsByIssueId={pullRequestsByIssueId}
 											statuses={projectStatuses}
 											onDatesChange={(issueId, dates) =>
 												updateIssue({
@@ -826,6 +834,7 @@ export function ProjectDetailContent({
 								nodes={[node as ProjectIssueTreeNode]}
 								onDragEnd={handleKanbanDragEnd}
 								onDragStart={handleKanbanDragStart}
+								pullRequestsByIssueId={pullRequestsByIssueId}
 							/>
 						)}
 						renderListIssueNode={(node) => (
@@ -853,6 +862,7 @@ export function ProjectDetailContent({
 									);
 								}}
 								onToggleSelection={toggleIssueSelection}
+								pullRequestsByIssueId={pullRequestsByIssueId}
 								selectedIssueIds={selectedIssueIds}
 								selectionEnabled={canWrite}
 								selectionDisabled={isApplyingBulkAction}

@@ -4,9 +4,14 @@ import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
 import type { Doc } from './_generated/dataModel'
 import { internalMutation, internalQuery, mutation, query } from './_generated/server'
-import { notificationEmailStatusValidator } from './constants'
+import { notificationEmailStatusValidator, notificationTypeValidator } from './constants'
 import { requireCurrentUser } from './lib/auth'
-import { buildAssignmentNotificationContent } from './lib/notifications'
+import {
+  buildAssignmentNotificationContent,
+  buildGitHubNotificationContent,
+  type GitHubNotificationMetadata,
+  type GitHubNotificationType,
+} from './lib/notifications'
 
 type AssignmentNotificationMetadata = {
   actorName: string
@@ -177,6 +182,63 @@ export const createAssignmentNotification = internalMutation({
   },
 })
 
+const RECENT_NOTIFICATION_WINDOW = 200
+
+/**
+ * Inbox row for a GitHub signal. Skipped when the recipient already has a
+ * notification with the same dedupe key, so one failing commit or one review
+ * request never produces two rows.
+ */
+export const createGitHubNotification = internalMutation({
+  args: {
+    recipientUserId: v.id('users'),
+    actorUserId: v.optional(v.id('users')),
+    type: notificationTypeValidator,
+    projectId: v.id('projects'),
+    issueId: v.optional(v.id('issues')),
+    metadata: v.any(),
+  },
+  handler: async (ctx, args) => {
+    if (args.type === 'issue_assigned') return null
+    const metadata = args.metadata as GitHubNotificationMetadata
+    const recipient = await ctx.db.get(args.recipientUserId)
+    if (!recipient || !recipient.isActive) return null
+
+    const recent = await ctx.db
+      .query('notifications')
+      .withIndex('by_recipientUserId_createdAt', (q) => q.eq('recipientUserId', args.recipientUserId))
+      .order('desc')
+      .take(RECENT_NOTIFICATION_WINDOW)
+    if (
+      recent.some(
+        (row) => (row.metadata as { dedupeKey?: string } | undefined)?.dedupeKey === metadata.dedupeKey,
+      )
+    ) {
+      return null
+    }
+
+    const now = Date.now()
+    const content = buildGitHubNotificationContent(args.type as GitHubNotificationType, metadata, 'http://localhost')
+    const notificationId = await ctx.db.insert('notifications', {
+      recipientUserId: args.recipientUserId,
+      actorUserId: args.actorUserId,
+      projectId: args.projectId,
+      issueId: args.issueId,
+      type: args.type,
+      title: content.title,
+      body: content.body,
+      link: content.link,
+      metadata,
+      emailStatus: 'pending',
+      emailAttempts: 0,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await ctx.scheduler.runAfter(0, internal.notificationsActions.deliverNotificationEmail, { notificationId })
+    return notificationId
+  },
+})
+
 export const getDeliveryPayload = internalQuery({
   args: {
     notificationId: v.id('notifications'),
@@ -200,7 +262,7 @@ export const getDeliveryPayload = internalQuery({
         isActive: recipient.isActive,
         name: recipient.name,
       },
-      metadata: notification.metadata as AssignmentNotificationMetadata | undefined,
+      metadata: notification.metadata as AssignmentNotificationMetadata | GitHubNotificationMetadata | undefined,
     }
   },
 })

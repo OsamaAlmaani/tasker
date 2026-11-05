@@ -95,6 +95,8 @@ export const getIntegration = query({
             private: link.private,
             linkedAt: link.linkedAt,
             linkedByName: linkedBy?.name ?? null,
+            liveVersion: link.liveVersion ?? 0,
+            webhookActive: Boolean(link.webhook),
           }
         : null,
     }
@@ -138,6 +140,7 @@ export const unlinkRepository = mutation({
 export type GitHubAccessContext = {
   connection: Doc<'githubConnections'> | null
   repository: Doc<'githubRepositoryLinks'> | null
+  projectKey: string
 }
 
 export const resolveAccess = internalQuery({
@@ -146,13 +149,14 @@ export const resolveAccess = internalQuery({
     level: v.union(v.literal('view'), v.literal('write')),
   },
   handler: async (ctx, args): Promise<GitHubAccessContext> => {
-    const { user } =
+    const { user, project } =
       args.level === 'write'
         ? await requireProjectWriteAccess(ctx, args.projectId)
         : await requireProjectViewAccess(ctx, args.projectId)
     return {
       connection: await getConnectionRow(ctx, user._id),
       repository: await getRepositoryLink(ctx, args.projectId),
+      projectKey: project.key,
     }
   },
 })

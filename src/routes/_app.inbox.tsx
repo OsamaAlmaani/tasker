@@ -36,7 +36,7 @@ function InboxPage() {
 		<div>
 			<PageHeader
 				title="Inbox"
-				description="Keep track of task assignments and unread notifications."
+				description="Task assignments and GitHub signals: review requests, approvals, failing checks and merges."
 				actions={
 					unreadCount ? (
 						<Button

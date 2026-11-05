@@ -17,6 +17,10 @@ import {
 	useState,
 } from "react";
 import { Button } from "#/components/ui/button";
+import {
+	describePullRequestChip,
+	type PullRequestChipData,
+} from "#/features/tasker/github/linkDisplay";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 import { calendarTimestamp } from "#/features/tasker/projects/taskCalendarDates";
 import {
@@ -46,6 +50,7 @@ type ProjectTaskGanttProps = {
 	canWrite: boolean;
 	isLoading?: boolean;
 	issues: GanttIssue[];
+	pullRequestsByIssueId?: Record<string, PullRequestChipData[]>;
 	onDatesChange: (
 		issueId: string,
 		dates: { startDate?: number; dueDate?: number },
@@ -57,6 +62,7 @@ type ProjectTaskGanttProps = {
 
 type TaskRow = ITask & {
 	issueKey: string;
+	pullRequestLabel: string | null;
 	statusName: string;
 	statusColor: string;
 	startLabel: string;
@@ -98,6 +104,7 @@ function TaskCell({ row: gridRow }: GridCellProps) {
 			<span className="task-gantt-key">
 				{row.issueKey}
 				{row.isSubtask ? " · Subtask" : ""}
+				{row.pullRequestLabel ? ` · PR ${row.pullRequestLabel}` : ""}
 			</span>
 			<span className="task-gantt-title">{row.text}</span>
 		</button>
@@ -171,6 +178,7 @@ export default function ProjectTaskGantt({
 	onDatesChange,
 	onOpenIssue,
 	projectKey,
+	pullRequestsByIssueId,
 	statuses,
 }: ProjectTaskGanttProps) {
 	const apiRef = useRef<IApi | null>(null);
@@ -234,6 +242,9 @@ export default function ProjectTaskGantt({
 								? (issue.checklistCompletionRate ?? 0)
 								: 0,
 				issueKey: `${projectKey}-${issue.issueNumber}`,
+				pullRequestLabel: pullRequestsByIssueId?.[issue._id]?.length
+					? describePullRequestChip(pullRequestsByIssueId[issue._id][0]).label
+					: null,
 				isSubtask: Boolean(issue.parentIssueId),
 				statusName: status?.name ?? issue.status,
 				statusColor: status?.color ?? "#64748b",
@@ -259,7 +270,15 @@ export default function ProjectTaskGantt({
 		start.setDate(start.getDate() - 7);
 		end.setDate(end.getDate() + 14);
 		return { tasks, undated, bounds: { start, end } };
-	}, [issues, statuses, projectKey, onOpenIssue, today, includeToday]);
+	}, [
+		issues,
+		statuses,
+		projectKey,
+		onOpenIssue,
+		today,
+		includeToday,
+		pullRequestsByIssueId,
+	]);
 	const latest = useRef({ canWrite, issues, onDatesChange, onOpenIssue });
 	latest.current = { canWrite, issues, onDatesChange, onOpenIssue };
 	const pending = useRef<{ issue: GanttIssue; resize: boolean } | null>(null);

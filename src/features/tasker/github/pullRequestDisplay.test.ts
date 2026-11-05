@@ -20,6 +20,7 @@ function pullRequest(
 		author: { login: "octocat", avatarUrl: null, url: null, isBot: false },
 		headRefName: "fix/login",
 		baseRefName: "main",
+		headSha: "abc123",
 		createdAt: 1,
 		updatedAt: 2,
 		closedAt: null,

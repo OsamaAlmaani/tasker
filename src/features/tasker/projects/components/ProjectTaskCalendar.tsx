@@ -11,6 +11,10 @@ import themePlugin from "@fullcalendar/react/themes/classic";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
+import {
+	describePullRequestChip,
+	type PullRequestChipData,
+} from "#/features/tasker/github/linkDisplay";
 import type { ProjectStatusDefinition } from "#/features/tasker/projectStatuses";
 import {
 	calendarDate,
@@ -37,6 +41,7 @@ type ProjectTaskCalendarProps = {
 	canWrite: boolean;
 	isLoading?: boolean;
 	issues: CalendarIssue[];
+	pullRequestsByIssueId?: Record<string, PullRequestChipData[]>;
 	onDatesChange: (
 		issueId: string,
 		dates: { startDate?: number; dueDate?: number },
@@ -61,6 +66,7 @@ export default function ProjectTaskCalendar({
 	onDatesChange,
 	onOpenIssue,
 	projectKey,
+	pullRequestsByIssueId,
 	statuses,
 }: ProjectTaskCalendarProps) {
 	const calendarRef = useRef<CalendarRef>(null);
@@ -123,11 +129,14 @@ export default function ProjectTaskCalendar({
 					issueKey: `${projectKey}-${issue.issueNumber}`,
 					statusName: status?.name ?? issue.status,
 					isSubtask: Boolean(issue.parentIssueId),
+					pullRequestLabel: pullRequestsByIssueId?.[issue._id]?.length
+						? describePullRequestChip(pullRequestsByIssueId[issue._id][0]).label
+						: null,
 				},
 			});
 		}
 		return { events, compactWeeks };
-	}, [issues, projectKey, statusByKey, range]);
+	}, [issues, projectKey, statusByKey, range, pullRequestsByIssueId]);
 	const undatedCount = issues.length - events.length;
 	const rangeCount = range
 		? events.filter((event) => {
@@ -386,6 +395,9 @@ export default function ProjectTaskCalendar({
 								{info.event.extendedProps.issueKey}
 								{info.event.extendedProps.isSubtask ? " · Subtask" : ""} ·{" "}
 								{info.event.extendedProps.statusName}
+								{info.event.extendedProps.pullRequestLabel
+									? ` · PR ${info.event.extendedProps.pullRequestLabel}`
+									: ""}
 							</span>
 						</div>
 					)}

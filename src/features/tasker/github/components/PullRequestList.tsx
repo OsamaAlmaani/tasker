@@ -62,7 +62,7 @@ export function PullRequestList({
 	onStateFilterChange,
 }: {
 	projectId: Id<"projects">;
-	repository: { fullName: string; htmlUrl: string };
+	repository: { fullName: string; htmlUrl: string; liveVersion?: number };
 	stateFilter: PullRequestStateFilter;
 	onStateFilterChange: (state: PullRequestStateFilter) => void;
 }) {
@@ -77,6 +77,7 @@ export function PullRequestList({
 		`pulls:${projectId}:${repository.fullName}:${stateFilter}`,
 		() => listPullRequests({ projectId, state: stateFilter }),
 		"Could not load pull requests from GitHub.",
+		repository.liveVersion,
 	);
 
 	// Each fresh first page restarts pagination.

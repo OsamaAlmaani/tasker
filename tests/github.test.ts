@@ -193,7 +193,7 @@ describe('GitHub pull request actions', () => {
         ? null
         : { _id: 'connection', userId: 'user', accessToken: await encryptSecret(key, 'ghp_mine') }
     const repository = { owner: 'acme', name: 'app', fullName: 'acme/app', defaultBranch: 'main' }
-    const runQuery = vi.fn(async (_ref: unknown, _args: unknown) => ({ connection, repository }))
+    const runQuery = vi.fn(async (_ref: unknown, _args: unknown) => ({ connection, repository, projectKey: 'ACME' }))
     const runMutation = vi.fn(async (_ref: unknown, _args: unknown) => null)
     return { ctx: { runQuery, runMutation }, runQuery, runMutation }
   }

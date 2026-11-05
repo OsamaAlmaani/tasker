@@ -175,10 +175,13 @@ Workflow model progress:
 - [ ] Add operations integrations such as GitHub
   - [x] Personal GitHub token per Tasker account (no shared credentials) and a linked repository per project
   - [x] Project pull request list and detail pages with checks, reviews, comments, merges, close/reopen, draft state and branch updates
-  - [ ] Link pull requests to Tasker tasks and show PR status on task details
-  - [ ] GitHub webhooks for live updates and task status automation
+  - [x] Link pull requests to Tasker tasks and show PR status on task details
+  - [x] GitHub webhooks for live updates and task status automation
+  - [x] GitHub signals (review requests, approvals, changes requested, failing checks, conflicts, merges, failed default-branch workflows) in the inbox and by email
   - [ ] Inline diff viewer and line review comments
   - [ ] Expose pull request reads and actions through the Tasker MCP workspace
+  - [ ] Later phases from `plan/github-integration-vision.md`: My Work code sections, releases and deployments, Tasker status checks, repository setup PR, multi-repo UI, GitHub App identity
+- 2026-11-06: Phase 2 "links and signals" (`plan/github-phase2-links-and-signals-plan.md`): tasks and pull requests are linked automatically from `KEY-123` references in branches, titles and bodies, manually from either side, or by creating a branch or pull request from the task with per-project templates. Tasks show a Development panel (branches, live PR state, checkout commands, create/link/unlink); rows, cards, calendar and Gantt show PR chips; PR pages show linked tasks with inline status changes and the task's description and checklist. Projects can register a GitHub webhook (or set one up manually) so PR, workflow and run pages refresh live and status rules move tasks (branch pushed -> in progress, PR opened -> in review, merged -> done, closed -> previous status; review rules optional), always as the mapped GitHub user with every change in the activity. Review requests, approvals, changes requested, failing checks, conflicts, merges and failed default-branch workflows land in the inbox and email. Webhook-derived details are shown only to users whose own token can read the repository.
 - 2026-11-05: Added a project GitHub section (`/projects/$projectId/github`) for linking one repository per project, and a Pull requests page (`/projects/$projectId/pulls`) with open/merged/closed/all lists, CI check, review and conflict status, plus a detail page for comments, reviews, merges (merge/squash/rebase with optional branch deletion), close/reopen, ready-for-review/draft and branch updates. Each user adds their own GitHub personal access token (Settings or the project GitHub tab); every read and action uses only that user's token, so there are no shared credentials or shared GitHub data. Tokens are AES-GCM encrypted and never reach the client; PR data is fetched live from GitHub. Plan: `plan/github-integration-plan.md`.
 - [ ] Add calendar sync
 - [ ] Extend import/export from task-level JSON to full project-level import/export

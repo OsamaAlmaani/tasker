@@ -37,6 +37,7 @@ import {
 	toneTextClasses,
 } from "./GitHubBadges";
 import { MarkdownEditor } from "./GitHubContent";
+import { LinkedTasksCard } from "./LinkedTasksCard";
 import {
 	type ConversationFilters,
 	ConversationsCard,
@@ -304,6 +305,10 @@ export function PullRequestDetail({
 				</div>
 
 				<div className="min-w-0 space-y-4">
+					<LinkedTasksCard
+						projectId={projectId}
+						pullNumber={pullRequest.number}
+					/>
 					<ReviewSummary pullRequest={pullRequest} />
 					<ConversationsCard
 						pullRequest={pullRequest}

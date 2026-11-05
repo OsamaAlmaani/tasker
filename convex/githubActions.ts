@@ -36,6 +36,7 @@ import {
   repoPath,
 } from './lib/githubAccess'
 import { encryptSecret, getEncryptionKey } from './lib/githubCrypto'
+import { linkCandidatesFromSummaries } from './lib/githubLinkSync'
 
 // GitHub network calls for the project GitHub section and pull request pages.
 // Every call uses the signed-in user's own token, loaded after Tasker checks
@@ -181,7 +182,7 @@ export const listPullRequests = action({
     items: PullRequestSummary[]
     nextCursor: string | null
   }> => {
-    const { token, repository } = await loadLinkedClient(ctx, args.projectId, 'view')
+    const { token, repository, projectKey } = await loadLinkedClient(ctx, args.projectId, 'view')
     // Keep the list when GitHub hides fields inside individual pull requests.
     const { data } = await githubGraphqlPartial<{
       repository: {
@@ -207,12 +208,20 @@ export const listPullRequests = action({
       throw githubError('GITHUB_NOT_FOUND', `Repository ${repository.fullName} was not found.`)
     }
     const connection = data.repository.pullRequests
+    const items = (connection.nodes ?? [])
+      .filter((node): node is RawPullRequestSummary => node !== null)
+      .map(normalizePullRequestSummary)
+    // Record task references found in titles and branch names so tasks show
+    // their pull requests even before webhooks are set up.
+    await ctx.runMutation(internal.githubLinks.syncPullRequestLinks, {
+      projectId: args.projectId,
+      source: 'title',
+      items: linkCandidatesFromSummaries(items, projectKey),
+    })
     return {
       repository: repository.fullName,
       totalCount: connection.totalCount,
-      items: (connection.nodes ?? [])
-        .filter((node): node is RawPullRequestSummary => node !== null)
-        .map(normalizePullRequestSummary),
+      items,
       nextCursor: connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null,
     }
   },
@@ -222,7 +231,7 @@ export const getPullRequest = action({
   args: { projectId: v.id('projects'), number: v.number() },
   handler: async (ctx, args): Promise<{ repository: string; pullRequest: PullRequestDetail }> => {
     assertPullNumber(args.number)
-    const { token, repository } = await loadLinkedClient(ctx, args.projectId, 'view')
+    const { token, repository, projectKey } = await loadLinkedClient(ctx, args.projectId, 'view')
     // Fine-grained tokens cannot read some nested data (notably check runs),
     // so keep whatever GitHub returns below the pull request itself.
     const { data, hiddenPaths } = await githubGraphqlPartial<{
@@ -237,14 +246,13 @@ export const getPullRequest = action({
       throw githubError('GITHUB_NOT_FOUND', `Pull request #${args.number} was not found.`)
     }
     const { pullRequest, ...settings } = data.repository
-    return {
-      repository: repository.fullName,
-      pullRequest: normalizePullRequestDetail(
-        pullRequest,
-        settings,
-        hiddenPaths.map((path) => path.slice(2)),
-      ),
-    }
+    const detail = normalizePullRequestDetail(pullRequest, settings, hiddenPaths.map((path) => path.slice(2)))
+    await ctx.runMutation(internal.githubLinks.syncPullRequestLinks, {
+      projectId: args.projectId,
+      source: 'body',
+      items: linkCandidatesFromSummaries([detail], projectKey, detail.bodyText),
+    })
+    return { repository: repository.fullName, pullRequest: detail }
   },
 })
 

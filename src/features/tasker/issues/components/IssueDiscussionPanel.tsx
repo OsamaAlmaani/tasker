@@ -10,6 +10,7 @@ import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader } from "#/components/ui/card";
 import { Textarea } from "#/components/ui/textarea";
 import { formatRelative } from "#/features/tasker/format";
+import { describeGitHubActivity } from "#/features/tasker/github/linkDisplay";
 
 const activityLabel: Record<string, string> = {
 	"project.created": "Created project",
@@ -34,6 +35,24 @@ const activityLabel: Record<string, string> = {
 	"comment.edited": "Edited comment",
 };
 
+function ActivityLine({
+	action,
+	metadata,
+}: {
+	action: string;
+	metadata?: unknown;
+}) {
+	const github = describeGitHubActivity(action, metadata);
+	return (
+		<p className="m-0 break-words text-sm text-[var(--text)]">
+			{github?.label ?? activityLabel[action] ?? action}
+			{github?.detail ? (
+				<span className="ml-1 text-[var(--muted-text)]">{github.detail}</span>
+			) : null}
+		</p>
+	);
+}
+
 type TimelineItem =
 	| {
 			type: "comment";
@@ -54,6 +73,7 @@ type TimelineItem =
 			activity: {
 				action: string;
 				createdAt: number;
+				metadata?: unknown;
 			};
 	  };
 
@@ -257,10 +277,10 @@ export function IssueDiscussionPanel({
 																)
 															) : (
 																<div>
-																	<p className="m-0 break-words text-sm text-[var(--text)]">
-																		{activityLabel[item.activity.action] ??
-																			item.activity.action}
-																	</p>
+																	<ActivityLine
+																		action={item.activity.action}
+																		metadata={item.activity.metadata}
+																	/>
 																	<p className="m-0 mt-1 text-xs text-[var(--muted-text)]">
 																		{formatRelative(item.activity.createdAt)}
 																	</p>

@@ -71,6 +71,16 @@ export const ACTIVITY_ACTIONS = [
   'github.pr_closed',
   'github.pr_reopened',
   'github.workflows_started',
+  'github.pr_linked',
+  'github.pr_unlinked',
+  'github.branch_created',
+  'github.pr_created',
+  'github.pr_event',
+  'github.automation_applied',
+  'github.automation_skipped',
+  'github.webhook_registered',
+  'github.webhook_removed',
+  'github.automation_settings_changed',
 ] as const
 
 export const INVITE_STATUSES = [
@@ -87,7 +97,17 @@ export const MY_WORK_VIEWS = [
   'backlog',
   'completed',
 ] as const
-export const NOTIFICATION_TYPES = ['issue_assigned'] as const
+export const NOTIFICATION_TYPES = [
+  'issue_assigned',
+  'github_review_requested',
+  'github_changes_requested',
+  'github_approved',
+  'github_checks_failed',
+  'github_merge_conflict',
+  'github_pr_merged',
+  'github_workflow_failed',
+] as const
+
 export const NOTIFICATION_EMAIL_STATUSES = [
   'pending',
   'sent',
@@ -231,6 +251,16 @@ export const activityActionValidator = v.union(
   v.literal('github.pr_closed'),
   v.literal('github.pr_reopened'),
   v.literal('github.workflows_started'),
+  v.literal('github.pr_linked'),
+  v.literal('github.pr_unlinked'),
+  v.literal('github.branch_created'),
+  v.literal('github.pr_created'),
+  v.literal('github.pr_event'),
+  v.literal('github.automation_applied'),
+  v.literal('github.automation_skipped'),
+  v.literal('github.webhook_registered'),
+  v.literal('github.webhook_removed'),
+  v.literal('github.automation_settings_changed'),
 )
 
 export const inviteStatusValidator = v.union(
@@ -249,7 +279,115 @@ export const myWorkViewValidator = v.union(
   v.literal('completed'),
 )
 
-export const notificationTypeValidator = v.union(v.literal('issue_assigned'))
+export const notificationTypeValidator = v.union(
+  v.literal('issue_assigned'),
+  v.literal('github_review_requested'),
+  v.literal('github_changes_requested'),
+  v.literal('github_approved'),
+  v.literal('github_checks_failed'),
+  v.literal('github_merge_conflict'),
+  v.literal('github_pr_merged'),
+  v.literal('github_workflow_failed'),
+)
+
+export const GITHUB_AUTOMATION_TRIGGERS = [
+  'branch_pushed',
+  'pr_opened',
+  'pr_draft',
+  'pr_merged',
+  'pr_closed',
+  'review_approved',
+  'changes_requested',
+] as const
+export type GitHubAutomationTrigger = (typeof GITHUB_AUTOMATION_TRIGGERS)[number]
+
+export const githubAutomationTriggerValidator = v.union(
+  v.literal('branch_pushed'),
+  v.literal('pr_opened'),
+  v.literal('pr_draft'),
+  v.literal('pr_merged'),
+  v.literal('pr_closed'),
+  v.literal('review_approved'),
+  v.literal('changes_requested'),
+)
+
+/** One project automation rule: when `trigger` fires, move the task to `targetStatus`. */
+export const githubAutomationRuleValidator = v.object({
+  trigger: githubAutomationTriggerValidator,
+  enabled: v.boolean(),
+  // Omitted for `pr_closed`, which restores the status the automation replaced.
+  targetStatus: v.optional(v.string()),
+  // Only move tasks currently in one of these statuses; empty means any open status.
+  fromStatuses: v.optional(v.array(v.string())),
+})
+export type GitHubAutomationRule = {
+  trigger: GitHubAutomationTrigger
+  enabled: boolean
+  targetStatus?: string
+  fromStatuses?: string[]
+}
+
+export const githubTemplatesValidator = v.object({
+  branch: v.string(),
+  pullRequestTitle: v.string(),
+  pullRequestBody: v.string(),
+})
+export type GitHubTemplates = { branch: string; pullRequestTitle: string; pullRequestBody: string }
+
+export const GITHUB_LINK_SOURCES = [
+  'branch',
+  'title',
+  'body',
+  'commit',
+  'manual',
+  'created_from_task',
+  'webhook',
+] as const
+export const githubLinkSourceValidator = v.union(
+  v.literal('branch'),
+  v.literal('title'),
+  v.literal('body'),
+  v.literal('commit'),
+  v.literal('manual'),
+  v.literal('created_from_task'),
+  v.literal('webhook'),
+)
+export type GitHubLinkSource = (typeof GITHUB_LINK_SOURCES)[number]
+
+/** Webhook-sourced pull request state. Shown only to users whose own token can read the repository. */
+export const githubPullRequestSnapshotValidator = v.object({
+  title: v.string(),
+  url: v.string(),
+  state: v.union(v.literal('open'), v.literal('closed'), v.literal('merged')),
+  isDraft: v.boolean(),
+  headRefName: v.string(),
+  baseRefName: v.string(),
+  headSha: v.string(),
+  authorLogin: v.union(v.string(), v.null()),
+  reviewDecision: v.union(
+    v.literal('approved'),
+    v.literal('changes_requested'),
+    v.literal('review_required'),
+    v.null(),
+  ),
+  checks: v.union(v.literal('success'), v.literal('failure'), v.literal('pending'), v.null()),
+  mergeable: v.union(v.literal('mergeable'), v.literal('conflicting'), v.literal('unknown')),
+  updatedAt: v.number(),
+})
+export type GitHubPullRequestSnapshot = {
+  title: string
+  url: string
+  state: 'open' | 'closed' | 'merged'
+  isDraft: boolean
+  headRefName: string
+  baseRefName: string
+  headSha: string
+  authorLogin: string | null
+  reviewDecision: 'approved' | 'changes_requested' | 'review_required' | null
+  checks: 'success' | 'failure' | 'pending' | null
+  mergeable: 'mergeable' | 'conflicting' | 'unknown'
+  updatedAt: number
+}
 
 export const notificationEmailStatusValidator = v.union(
   v.literal('pending'),

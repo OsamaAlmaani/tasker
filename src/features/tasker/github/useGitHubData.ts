@@ -17,6 +17,8 @@ export function useGitHubData<T>(
 	key: string | null,
 	load: () => Promise<T>,
 	fallbackError = "Failed to load data from GitHub.",
+	/** Bumped by webhooks; a change refetches with the viewer's own token. */
+	liveVersion?: number,
 ) {
 	const loadRef = useRef(load);
 	loadRef.current = load;
@@ -54,6 +56,18 @@ export function useGitHubData<T>(
 	useEffect(() => {
 		void refetch();
 	}, [refetch]);
+
+	// Webhook deliveries bump the repository's live version; refetch shortly
+	// after so GitHub has finished computing derived state such as mergeability.
+	const lastLiveVersion = useRef(liveVersion);
+	useEffect(() => {
+		if (liveVersion === undefined || liveVersion === lastLiveVersion.current)
+			return;
+		lastLiveVersion.current = liveVersion;
+		if (key === null) return;
+		const timer = window.setTimeout(() => void refetch(), 1500);
+		return () => window.clearTimeout(timer);
+	}, [liveVersion, key, refetch]);
 
 	// GitHub changes outside Tasker, so refresh when the tab regains focus.
 	useEffect(() => {

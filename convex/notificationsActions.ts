@@ -4,7 +4,12 @@ import { ConvexError, v } from 'convex/values'
 import nodemailer from 'nodemailer'
 import { internal } from './_generated/api'
 import { internalAction } from './_generated/server'
-import { buildAssignmentNotificationContent } from './lib/notifications'
+import {
+  buildAssignmentNotificationContent,
+  buildGitHubNotificationContent,
+  type GitHubNotificationMetadata,
+  type GitHubNotificationType,
+} from './lib/notifications'
 
 function getRequiredEnv(key: string) {
   const value = process.env[key]
@@ -33,6 +38,38 @@ function getAppBaseUrl() {
   return process.env.APP_BASE_URL ?? 'http://localhost:3000'
 }
 
+type EmailContent = { emailSubject: string; emailText: string; emailHtml: string }
+
+function buildEmailContent(type: string, issueId: string, metadata: unknown): EmailContent | null {
+  if (!metadata || typeof metadata !== 'object') return null
+  if (type === 'issue_assigned') {
+    const meta = metadata as {
+      actorName: string
+      issueNumber: number
+      issueTitle: string
+      projectKey: string
+      projectName: string
+    }
+    return buildAssignmentNotificationContent({
+      actorName: meta.actorName,
+      appBaseUrl: getAppBaseUrl(),
+      issueId,
+      issueNumber: meta.issueNumber,
+      issueTitle: meta.issueTitle,
+      projectKey: meta.projectKey,
+      projectName: meta.projectName,
+    })
+  }
+  if (type.startsWith('github_')) {
+    return buildGitHubNotificationContent(
+      type as GitHubNotificationType,
+      metadata as GitHubNotificationMetadata,
+      getAppBaseUrl(),
+    )
+  }
+  return null
+}
+
 export const deliverNotificationEmail = internalAction({
   args: {
     notificationId: v.id('notifications'),
@@ -59,7 +96,8 @@ export const deliverNotificationEmail = internalAction({
       return { status: 'skipped', reason: 'recipient_inactive' as const }
     }
 
-    if (payload.notification.type !== 'issue_assigned' || !payload.metadata) {
+    const content = buildEmailContent(payload.notification.type, payload.notification.issueId ?? '', payload.metadata)
+    if (!content) {
       await ctx.runMutation(internal.notifications.recordEmailDeliveryResult, {
         notificationId: args.notificationId,
         status: 'skipped',
@@ -78,15 +116,6 @@ export const deliverNotificationEmail = internalAction({
           user: smtp.user,
           pass: smtp.pass,
         },
-      })
-      const content = buildAssignmentNotificationContent({
-        actorName: payload.metadata.actorName,
-        appBaseUrl: getAppBaseUrl(),
-        issueId: payload.notification.issueId ?? '',
-        issueNumber: payload.metadata.issueNumber,
-        issueTitle: payload.metadata.issueTitle,
-        projectKey: payload.metadata.projectKey,
-        projectName: payload.metadata.projectName,
       })
 
       await transport.sendMail({

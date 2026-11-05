@@ -7,6 +7,8 @@ import {
 	IssueStatusBadge,
 } from "#/features/tasker/components/IssueBadges";
 import { formatDate } from "#/features/tasker/format";
+import { PullRequestChips } from "#/features/tasker/github/components/PullRequestChip";
+import type { PullRequestChipData } from "#/features/tasker/github/linkDisplay";
 import {
 	formatChecklistProgress,
 	type IssueChecklistItem,
@@ -163,6 +165,7 @@ type ProjectIssueListTreeProps = {
 		nextStatus: ProjectStatusDefinition["key"],
 	) => void;
 	onToggleSelection?: (issueId: string) => void;
+	pullRequestsByIssueId?: Record<string, PullRequestChipData[]>;
 	selectedIssueIds?: Set<string>;
 	selectionEnabled?: boolean;
 	selectionDisabled?: boolean;
@@ -179,6 +182,7 @@ export function ProjectIssueListTree({
 	onPriorityChange,
 	onStatusChange,
 	onToggleSelection,
+	pullRequestsByIssueId,
 	selectedIssueIds,
 	selectionEnabled = false,
 	selectionDisabled = false,
@@ -243,7 +247,8 @@ export function ProjectIssueListTree({
 									<p className="m-0 truncate whitespace-nowrap text-xs text-[var(--muted-text)]">
 										{issue.description?.trim() || "No description"}
 									</p>
-									{issue.labels.length ? (
+									{issue.labels.length ||
+									pullRequestsByIssueId?.[issue._id]?.length ? (
 										<div className="mt-1 flex flex-wrap items-center gap-1.5">
 											{issue.labels.map((label) => (
 												<IssueLabelBadge
@@ -252,6 +257,9 @@ export function ProjectIssueListTree({
 													label={getProjectLabelName(labelOptions, label)}
 												/>
 											))}
+											<PullRequestChips
+												chips={pullRequestsByIssueId?.[issue._id]}
+											/>
 										</div>
 									) : null}
 									{progressLabel ? (
@@ -428,6 +436,7 @@ type ProjectIssueKanbanTreeProps = {
 	nodes: ProjectIssueTreeNode[];
 	onDragEnd: () => void;
 	onDragStart: (event: DragEvent<HTMLElement>, issue: ProjectIssue) => void;
+	pullRequestsByIssueId?: Record<string, PullRequestChipData[]>;
 };
 
 export function ProjectIssueKanbanTree({
@@ -437,6 +446,7 @@ export function ProjectIssueKanbanTree({
 	nodes,
 	onDragEnd,
 	onDragStart,
+	pullRequestsByIssueId,
 }: ProjectIssueKanbanTreeProps) {
 	return (
 		<>
@@ -486,6 +496,10 @@ export function ProjectIssueKanbanTree({
 									{issue.description?.trim() || "No description"}
 								</p>
 								<div className="mt-2 flex flex-wrap items-center gap-1.5">
+									<PullRequestChips
+										chips={pullRequestsByIssueId?.[issue._id]}
+										max={2}
+									/>
 									{progressLabel ? (
 										<Badge className="issue-progress-badge">
 											{progressLabel} ({completionRate}%)
@@ -546,6 +560,7 @@ export function ProjectIssueKanbanTree({
 									nodes={children}
 									onDragEnd={onDragEnd}
 									onDragStart={onDragStart}
+									pullRequestsByIssueId={pullRequestsByIssueId}
 								/>
 							</div>
 						) : null}

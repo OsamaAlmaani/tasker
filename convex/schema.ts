@@ -15,6 +15,10 @@ import {
   issueCustomFieldValueValidator,
   notificationEmailStatusValidator,
   notificationTypeValidator,
+  githubAutomationRuleValidator,
+  githubLinkSourceValidator,
+  githubPullRequestSnapshotValidator,
+  githubTemplatesValidator,
 } from './constants'
 
 export default defineSchema({
@@ -111,7 +115,9 @@ export default defineSchema({
     githubProfileUrl: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index('by_userId', ['userId']),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_githubLogin', ['githubLogin']),
 
   // Which repository a project tracks. Holds no credentials or GitHub data;
   // each member reads it with their own token.
@@ -126,7 +132,93 @@ export default defineSchema({
     private: v.boolean(),
     linkedBy: v.id('users'),
     linkedAt: v.number(),
-  }).index('by_projectId', ['projectId']),
+    // Bumped on every accepted webhook delivery so open pages refetch with
+    // their own token. Never carries GitHub data itself.
+    liveVersion: v.optional(v.number()),
+    // Webhook registered on the repository. The secret is encrypted with
+    // GITHUB_TOKEN_ENCRYPTION_KEY and only used to verify deliveries.
+    webhook: v.optional(
+      v.object({
+        hookId: v.union(v.number(), v.null()),
+        secret: v.string(),
+        url: v.string(),
+        registeredBy: v.id('users'),
+        registeredAt: v.number(),
+        lastDeliveryAt: v.optional(v.number()),
+        lastDeliveryEvent: v.optional(v.string()),
+        lastError: v.optional(v.string()),
+      }),
+    ),
+    // Status automation rules mapped to this project's own statuses.
+    automationRules: v.optional(v.array(githubAutomationRuleValidator)),
+    // A project writer who opted in to act for automations that write to
+    // GitHub. Every such action is labelled with their login in activity.
+    automationUserId: v.optional(v.id('users')),
+    templates: v.optional(githubTemplatesValidator),
+  })
+    .index('by_projectId', ['projectId'])
+    .index('by_repositoryId', ['repositoryId']),
+
+  // A pull request that belongs to a task. Only identifiers are stored, plus a
+  // webhook-sourced snapshot that queries reveal only to users whose own token
+  // can read the repository.
+  githubPullRequestLinks: defineTable({
+    projectId: v.id('projects'),
+    repositoryId: v.number(),
+    issueId: v.id('issues'),
+    pullNumber: v.number(),
+    source: githubLinkSourceValidator,
+    linkedBy: v.optional(v.id('users')),
+    linkedAt: v.number(),
+    snapshot: v.optional(githubPullRequestSnapshotValidator),
+    // Status the last automation moved the task from, restored when the pull
+    // request closes without merging.
+    automationPreviousStatus: v.optional(v.string()),
+  })
+    .index('by_issueId', ['issueId'])
+    .index('by_projectId', ['projectId'])
+    .index('by_projectId_pullNumber', ['projectId', 'pullNumber'])
+    .index('by_repositoryId_pullNumber', ['repositoryId', 'pullNumber']),
+
+  // A branch that belongs to a task, known before any pull request exists.
+  githubBranchLinks: defineTable({
+    projectId: v.id('projects'),
+    repositoryId: v.number(),
+    issueId: v.id('issues'),
+    branchName: v.string(),
+    source: v.union(v.literal('push'), v.literal('created_from_task'), v.literal('manual')),
+    createdBy: v.optional(v.id('users')),
+    createdAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  })
+    .index('by_issueId', ['issueId'])
+    .index('by_projectId', ['projectId'])
+    .index('by_repositoryId_branchName', ['repositoryId', 'branchName']),
+
+  // Whether a user's own token could read a repository, checked at most once
+  // per day. Gates what webhook-sourced metadata that user may see.
+  githubRepositoryAccess: defineTable({
+    userId: v.id('users'),
+    repositoryId: v.number(),
+    canRead: v.boolean(),
+    checkedAt: v.number(),
+  }).index('by_userId_repositoryId', ['userId', 'repositoryId']),
+
+  // Delivery log for debugging and replay protection. Never stores bodies.
+  githubWebhookDeliveries: defineTable({
+    repositoryId: v.number(),
+    deliveryId: v.string(),
+    event: v.string(),
+    action: v.union(v.string(), v.null()),
+    pullNumber: v.optional(v.number()),
+    ref: v.optional(v.string()),
+    sha: v.optional(v.string()),
+    senderLogin: v.optional(v.string()),
+    receivedAt: v.number(),
+    outcome: v.string(),
+  })
+    .index('by_deliveryId', ['deliveryId'])
+    .index('by_repositoryId_receivedAt', ['repositoryId', 'receivedAt']),
 
   // Named sets of workflows a project runs together. A workflow may be in any
   // number of groups. Workflow names are read live from GitHub; only ids and

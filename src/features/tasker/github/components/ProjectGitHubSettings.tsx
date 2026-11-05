@@ -15,6 +15,7 @@ import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
 import { useGitHubData } from "../useGitHubData";
 import { GitHubAccountCard } from "./GitHubAccountCard";
+import { GitHubAutomationSettings } from "./GitHubAutomationSettings";
 
 export type ProjectGitHubIntegration = NonNullable<
 	FunctionReturnType<typeof api.github.getIntegration>
@@ -37,14 +38,19 @@ export function ProjectGitHubSettings({
 	integration: ProjectGitHubIntegration;
 }) {
 	return (
-		<div className="grid gap-4 lg:grid-cols-2">
-			<RepositoryCard
-				projectId={projectId}
-				canManage={integration.canManage}
-				connected={Boolean(integration.account)}
-				repository={integration.repository}
-			/>
-			<GitHubAccountCard />
+		<div className="space-y-4">
+			<div className="grid gap-4 lg:grid-cols-2">
+				<RepositoryCard
+					projectId={projectId}
+					canManage={integration.canManage}
+					connected={Boolean(integration.account)}
+					repository={integration.repository}
+				/>
+				<GitHubAccountCard />
+			</div>
+			{integration.repository ? (
+				<GitHubAutomationSettings projectId={projectId} />
+			) : null}
 		</div>
 	);
 }

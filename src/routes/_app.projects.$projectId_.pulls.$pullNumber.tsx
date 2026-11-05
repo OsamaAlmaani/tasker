@@ -40,6 +40,7 @@ function ProjectPullRequestPage() {
 							repository={integration.repository.fullName}
 							pullNumber={pullNumber}
 							canWrite={integration.canManage}
+							liveVersion={integration.repository.liveVersion}
 						/>
 					) : (
 						<GitHubSetupPrompt
@@ -58,11 +59,13 @@ function PullRequestLoader({
 	repository,
 	pullNumber,
 	canWrite,
+	liveVersion,
 }: {
 	projectId: Id<"projects">;
 	repository: string;
 	pullNumber: number;
 	canWrite: boolean;
+	liveVersion?: number;
 }) {
 	const getPullRequest = useAction(api.githubActions.getPullRequest);
 	const isValidNumber = Number.isInteger(pullNumber) && pullNumber > 0;
@@ -70,6 +73,7 @@ function PullRequestLoader({
 		isValidNumber ? `pull:${projectId}:${repository}:${pullNumber}` : null,
 		() => getPullRequest({ projectId, number: pullNumber }),
 		"Could not load the pull request from GitHub.",
+		liveVersion,
 	);
 
 	if (!isValidNumber) {

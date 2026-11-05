@@ -292,6 +292,8 @@ export type PullRequestSummary = {
   author: GitHubActor | null
   headRefName: string
   baseRefName: string
+  /** Head commit, empty when GitHub hid it. */
+  headSha: string
   createdAt: number
   updatedAt: number
   closedAt: number | null
@@ -371,6 +373,8 @@ export type PullRequestTimelineItem =
 
 export type PullRequestDetail = PullRequestSummary & {
   nodeId: string
+  /** Raw markdown body, used for task references; the UI renders `bodyHtml`. */
+  bodyText: string
   bodyHtml: string
   reactions: GitHubReaction[]
   headSha: string
@@ -403,12 +407,13 @@ export type PullRequestDetail = PullRequestSummary & {
 const ACTOR_FIELDS = `__typename login avatarUrl url`
 const REACTION_FIELDS = `reactionGroups { content viewerHasReacted reactors { totalCount } }`
 
-const PULL_REQUEST_SUMMARY_FIELDS = `
+export const PULL_REQUEST_SUMMARY_FIELDS = `
   number
   title
   url
   state
   isDraft
+  headRefOid
   createdAt
   updatedAt
   closedAt
@@ -462,9 +467,9 @@ export const GET_PULL_REQUEST_QUERY = `
       pullRequest(number: $number) {
         ${PULL_REQUEST_SUMMARY_FIELDS}
         id
+        body
         bodyHTML
         ${REACTION_FIELDS}
-        headRefOid
         headRepository { nameWithOwner }
         isCrossRepository
         mergeStateStatus
@@ -676,6 +681,7 @@ export type RawPullRequestSummary = {
   author: RawActor
   headRefName: string
   baseRefName: string
+  headRefOid?: string | null
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null
   mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
   additions: number
@@ -705,6 +711,7 @@ export type RawPullRequestSummary = {
 export type RawPullRequestDetail = RawPullRequestSummary &
   RawReactions & {
     id: string
+    body?: string | null
     bodyHTML: string
     headRefOid: string
     headRepository: { nameWithOwner: string } | null
@@ -965,6 +972,7 @@ export function normalizePullRequestSummary(raw: RawPullRequestSummary): PullReq
     author: normalizeActor(raw.author),
     headRefName: raw.headRefName,
     baseRefName: raw.baseRefName,
+    headSha: raw.headRefOid ?? '',
     createdAt: toTimestamp(raw.createdAt) ?? 0,
     updatedAt: toTimestamp(raw.updatedAt) ?? 0,
     closedAt: toTimestamp(raw.closedAt),
@@ -1029,6 +1037,7 @@ export function normalizePullRequestDetail(
   return {
     ...summary,
     nodeId: raw.id,
+    bodyText: raw.body ?? '',
     bodyHtml: raw.bodyHTML ?? '',
     reactions: normalizeReactions(raw),
     headSha: raw.headRefOid,

@@ -22,6 +22,7 @@ It supports:
 - Local MCP workspace reads/writes plus renewable agent claims and result submission for human review.
 - Project archive state and issue soft-delete behavior.
 - Per-project linked GitHub repository with a pull request list/detail workspace (comments, reviews, merges) and a GitHub Actions workspace (workflow groups, releases, change-aware runs, logs), using each user's own GitHub personal access token.
+- Task <-> pull request links (automatic from `KEY-123` references, manual, or created from the task), a Development panel on tasks, PR chips on rows, cards, calendar and Gantt, linked tasks on PR pages, GitHub webhooks with live refresh, per-project status automation, and GitHub signals (review requests, approvals, failing checks, merges) in the inbox and by email.
 
 ## Working Rule For Future Agents
 
@@ -77,6 +78,7 @@ From code and README, local dev expects:
   - `SMTP_FROM_NAME`
   - optional `CLERK_API_URL`
   - `GITHUB_TOKEN_ENCRYPTION_KEY` (base64, 32 bytes) before any user can save a GitHub token
+  - `CONVEX_SITE_URL` (set automatically on Convex cloud; set it on self-hosted deployments) or `GITHUB_WEBHOOK_URL` for the GitHub webhook endpoint `POST /github/webhook`
 
 Important auth wiring:
 
@@ -152,6 +154,12 @@ Core tables in [`convex/schema.ts`](./convex/schema.ts):
 - `notifications`
 - `githubConnections`
 - `githubRepositoryLinks`
+- `githubPullRequestLinks`
+- `githubBranchLinks`
+- `githubRepositoryAccess`
+- `githubWebhookDeliveries`
+- `githubWorkflowGroups`
+- `githubWorkflowReleases`
 
 Notable schema choices:
 
@@ -166,7 +174,7 @@ Notable schema choices:
 - `issues.customFieldValues` stores task values keyed by the owning project’s custom field keys.
 - `issues.checklistItems` stores ordered per-task checklist items with completion state.
 - `issues.labels` stores project label keys, not freeform label strings.
-- `notifications` stores durable per-user inbox rows plus async email delivery state; notification history is separate from project activity history.
+- `notifications` stores durable per-user inbox rows plus async email delivery state; notification history is separate from project activity history. Types are `issue_assigned` plus the `github_*` signals; GitHub rows carry a `dedupeKey` in metadata so one commit or review request never produces two rows.
 - `users.myWorkDefaultView` and `users.myWorkLastView` persist the current user’s preferred preset view for the `My Work` page.
 - `userNotes` are owner-scoped and private; they are not tied to any project and are only readable/writable by the owning user.
 
@@ -447,6 +455,22 @@ Plan and later phases: [`plan/github-integration-plan.md`](./plan/github-integra
 - The pull request timeline (`buildTimeline`) holds comments, commits, reviews with the inline review threads they started, and threads whose review is not loaded. Threads from the viewer's pending review are left out. `replyToReviewThread` and `setReviewThreadResolved` first confirm the thread belongs to the pull request in the linked repository; `previewMarkdown` renders drafts with GitHub's markdown API.
 - Repository link/unlink, merge, close and reopen write `github.*` project activity entries.
 - Coverage: `tests/github.test.ts` and `src/features/tasker/github/pullRequestDisplay.test.ts`.
+
+### Task links, webhooks and automation (phase 2)
+
+Plan: [`plan/github-phase2-links-and-signals-plan.md`](./plan/github-phase2-links-and-signals-plan.md); direction: [`plan/github-integration-vision.md`](./plan/github-integration-vision.md).
+
+- Task references: `convex/lib/githubReferences.ts` (pure, tested) parses `KEY-123` (case-insensitive, the project's own key only) and Tasker task URLs. Bare `#123` is never a task reference because on GitHub it names a GitHub issue or pull request. It also renders branch, PR title and PR body templates (`{key}`, `{key.lower}`, `{number}`, `{slug}`, `{title}`, `{description}`, `{checklist}`, `{url}`, `{login}`) and sanitizes branch names. Defaults: `feat/{key}-{slug}`, `{key}: {title}`.
+- `convex/githubLinks.ts` owns link persistence and queries: `listForIssue` (Development panel), `listForProject` (chips keyed by task id), `listForPullRequest` (linked tasks with statuses), `searchLinkableIssues`, `getSettings`, `unlinkPullRequest`, `updateAutomationSettings`, `setAutomationIdentity`, and internal upserts shared with webhook processing. `githubPullRequestLinks` and `githubBranchLinks` store identifiers plus a webhook-sourced `snapshot` (title, state, draft, branch, head SHA, author login, checks, review decision, mergeability).
+- Visibility rule: snapshots are returned only when `githubRepositoryAccess` says the viewer's own token read the repository within 24 hours (`getRepositoryAccess` returns `ok` / `none` / `unknown`). `useRepositoryAccess` on the client runs `githubLinkActions.verifyRepositoryAccess` once when the answer is `unknown`. Everyone else sees the pull request number only.
+- `convex/githubLinkActions.ts` holds user-driven GitHub calls: `renderTemplates`, `getIssuePullRequests` (one batched GraphQL query with aliases, refreshes snapshots), `linkPullRequest`, `createBranch` (from the default branch; 422 means it exists), `createPullRequest`, `registerWebhook`, `createManualWebhook`, `removeWebhook`. `listPullRequests` and `getPullRequest` in `githubActions.ts` call `githubLinks.syncPullRequestLinks` after loading, so tasks learn about their pull requests even without webhooks (`convex/lib/githubLinkSync.ts`).
+- Webhooks: `convex/http.ts` serves `POST /github/webhook`. It finds every `githubRepositoryLinks` row for the payload's repository id, verifies `X-Hub-Signature-256` against each row's encrypted secret (constant-time; unknown repositories get the same 401 as bad signatures), processes only the matching rows, deduplicates by `X-GitHub-Delivery` in `githubWebhookDeliveries` (never stores bodies; a delivery whose processing failed answers 500 and is accepted again on redelivery), and bumps `githubRepositoryLinks.liveVersion` for pull request, review, check and workflow events. `useGitHubData` accepts that version and refetches with the viewer's token; `getIntegration` exposes it. Registration uses the registering user's token and the `Webhooks` repository permission; manual setup returns the URL and secret once.
+- Processing (`convex/githubWebhooks.ts`, pure parts in `convex/lib/githubAutomation.ts`): pull request events upsert links and snapshots, write `github.pr_event` task activity, run status rules and notify; reviews update the snapshot's review decision for the same head SHA; pushes create branch links for `KEY-123` branches and run `branch_pushed`; check suites and workflow runs set `checks` for the matching head SHA (a red commit stays red) and notify; a failed workflow on the default branch notifies the mapped actor. Only linked pull requests get check notifications, because the payload carries no author.
+- Automation rules live on `githubRepositoryLinks.automationRules`, one per trigger (`branch_pushed`, `pr_opened`, `pr_draft`, `pr_merged`, `pr_closed`, `review_approved`, `changes_requested`), on by default except the two review rules, mapped to the project's own status keys. `resolveTransition` never moves a task out of `done`; `pr_closed` restores `automationPreviousStatus` recorded on the link. Transitions go through `applyIssueUpdate` with an actor who could make the change in the UI: the mapped sender if they are an active project writer, else the opted-in automation identity, else the person who linked the repository (`resolveActor`); with no eligible actor the delivery updates links and snapshots only; a `ConvexError` (for example a parent with open sub-tasks) is recorded as `github.automation_skipped` instead of failing the delivery. Rules whose target status no longer exists are inactive and flagged in the UI.
+- Automation identity: `githubRepositoryLinks.automationUserId` is a writer who opted in. Today it is the fallback actor for Tasker-side automation when the GitHub sender is not a project writer; nothing writes to GitHub with it yet, and that stays so until status checks or comments are designed around it.
+- Notifications: `notifications.createGitHubNotification` (dedupe by `metadata.dedupeKey`, skips inactive recipients) and `buildGitHubNotificationContent` in `convex/lib/notifications.ts`; email delivery in `notificationsActions.ts` builds content per type. People are not notified about their own actions except failures (checks, workflows), and only recipients who can view the project receive anything. Recipients are resolved through `githubConnections.by_githubLogin`. Automatic links created while someone merely loads a page carry no actor.
+- Frontend: `IssueDevelopmentPanel` (task page, right column under metadata), `PullRequestChips` (plain spans inside row/card links; calendar and Gantt show the first chip's label), `LinkedTasksCard` (PR page sidebar with inline status select and task intent), `GitHubAutomationSettings` (GitHub tab: webhook, identity, rules, templates), `linkDisplay.ts` (chip ranking, checkout commands, activity wording shared by `ActivityFeed` and `IssueDiscussionPanel`).
+- Coverage: `tests/githubLinks.test.ts`, `tests/githubWebhooks.test.ts`, `tests/githubWebhookProcessing.test.ts` (in-memory db, full opened -> closed -> reopened -> merged flow) and `src/features/tasker/github/linkDisplay.test.ts`.
 
 ### Workflows (GitHub Actions)
 

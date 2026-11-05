@@ -55,7 +55,12 @@ export function WorkflowsWorkspace({
 	highlightReleaseId,
 }: {
 	projectId: Id<"projects">;
-	repository: { fullName: string; htmlUrl: string; defaultBranch: string };
+	repository: {
+		fullName: string;
+		htmlUrl: string;
+		defaultBranch: string;
+		liveVersion?: number;
+	};
 	view: WorkflowsView;
 	onViewChange: (view: WorkflowsView) => void;
 	groupFilter: string | null;
@@ -80,6 +85,7 @@ export function WorkflowsWorkspace({
 		`workflows:${projectId}:${repository.fullName}`,
 		() => getOverview({ projectId }),
 		"Could not load workflows from GitHub.",
+		repository.liveVersion,
 	);
 
 	// Runs from every source, newest data wins.

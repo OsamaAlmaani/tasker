@@ -1763,6 +1763,9 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
 .issue-detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  /* Row 1 fits the metadata panel; the overview spans into the flexible row 2
+     so the development panel sits right under the metadata. */
+  grid-template-rows: auto 1fr auto;
   gap: 22px;
   align-items: start;
 }
@@ -1855,6 +1858,18 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
 .issue-meta-panel {
   border-left: 1px solid var(--line);
   padding-left: 16px;
+}
+
+/* The overview spans both rows so the development panel sits directly under
+   the metadata panel instead of leaving an empty slot beside it. */
+.issue-detail-main {
+  grid-row: 1 / span 2;
+}
+
+.issue-development-panel {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
 }
 
 .issue-meta-row {
@@ -2900,6 +2915,16 @@ html[data-theme='dont_use_me'] .app-sidebar > * {
 
   .issue-detail-layout {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+  }
+
+  .issue-detail-main {
+    grid-row: auto;
+  }
+
+  .issue-development-panel {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .issue-meta-panel {

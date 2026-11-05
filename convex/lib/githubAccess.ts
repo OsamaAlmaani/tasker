@@ -25,6 +25,7 @@ export async function decryptToken(connection: Doc<'githubConnections'>) {
 export type LinkedGitHubClient = {
   token: string
   repository: Doc<'githubRepositoryLinks'>
+  projectKey: string
 }
 
 export async function loadLinkedClient(
@@ -32,7 +33,7 @@ export async function loadLinkedClient(
   projectId: Id<'projects'>,
   level: 'view' | 'write',
 ): Promise<LinkedGitHubClient> {
-  const { connection, repository } = await ctx.runQuery(internal.github.resolveAccess, {
+  const { connection, repository, projectKey } = await ctx.runQuery(internal.github.resolveAccess, {
     projectId,
     level,
   })
@@ -43,7 +44,7 @@ export async function loadLinkedClient(
     })
   }
   if (!connection) throw notConnected()
-  return { token: await decryptToken(connection), repository }
+  return { token: await decryptToken(connection), repository, projectKey: projectKey ?? '' }
 }
 
 export function repoPath(repository: LinkedGitHubClient['repository']) {

@@ -191,6 +191,7 @@ pnpm dlx convex env set GITHUB_TOKEN_ENCRYPTION_KEY "$(openssl rand -base64 32)"
 
 - Each user adds their own GitHub personal access token in **Settings** or on a project's **GitHub** tab. Tokens are never shared: every pull request read and action uses only the signed-in user's token.
 - Changing `GITHUB_TOKEN_ENCRYPTION_KEY` makes stored tokens unreadable; users must add their tokens again.
+- GitHub webhooks are received at `<Convex site URL>/github/webhook`. Convex cloud sets `CONVEX_SITE_URL` automatically; on self-hosted deployments set it (or `GITHUB_WEBHOOK_URL`) with `pnpm dlx convex env set CONVEX_SITE_URL https://convex-site.yourcompany.com` before registering webhooks from a project's GitHub tab.
 
 5. Verify Convex auth provider values for your Clerk instance in `/convex/auth.config.ts`.
 

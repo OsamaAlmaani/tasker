@@ -23,9 +23,9 @@ Phase 1 (this change):
 
 Later phases:
 
-- [ ] Link PRs to Tasker tasks (branch/title key detection, e.g. `ABC-12`) and
-      show PR status on task details.
-- [ ] Webhooks for live PR updates and automation (move task to `in_review`
+- [x] Link PRs to Tasker tasks (branch/title key detection, e.g. `ABC-12`) and
+      show PR status on task details. See `github-phase2-links-and-signals-plan.md`.
+- [x] Webhooks for live PR updates and automation (move task to `in_review`
       when a PR opens, to `done` when it merges).
 - [ ] Inline diff viewer and review comments on lines.
 - [ ] Optional "Sign in with GitHub" (OAuth) as another way to get a personal
