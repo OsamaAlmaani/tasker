@@ -113,6 +113,43 @@ export async function githubRequest<T>(
   return { data: data as T, headers: response.headers, status: response.status }
 }
 
+/**
+ * Downloads a text file that GitHub serves through a redirect (job logs).
+ * The redirect target is a signed URL, so the token is not sent to it.
+ * Returns at most `maxBytes` from the end of the file.
+ */
+export async function githubDownloadText(token: string, path: string, maxBytes: number) {
+  let response: Response
+  try {
+    response = await fetch(`${GITHUB_API_URL}${path}`, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'User-Agent': 'Tasker',
+        'X-GitHub-Api-Version': GITHUB_API_VERSION,
+      },
+      redirect: 'manual',
+    })
+    const location = response.headers.get('location')
+    if (response.status >= 300 && response.status < 400 && location) {
+      response = await fetch(location, { headers: { 'User-Agent': 'Tasker' } })
+    }
+  } catch {
+    throw githubError('GITHUB_UNAVAILABLE', 'Could not reach GitHub. Try again in a moment.')
+  }
+  if (!response.ok) {
+    const text = await response.text()
+    throw toGitHubError(response.status, response.headers, text ? parseJson(text) : null)
+  }
+  const buffer = new Uint8Array(await response.arrayBuffer())
+  const truncated = buffer.byteLength > maxBytes
+  const slice = truncated ? buffer.subarray(buffer.byteLength - maxBytes) : buffer
+  let text = new TextDecoder().decode(slice)
+  // Start at a whole line when the head was cut off.
+  if (truncated) text = text.slice(text.indexOf('\n') + 1)
+  return { text, truncated, totalBytes: buffer.byteLength }
+}
+
 /** Renders GitHub Flavored Markdown exactly as GitHub would in `repository`. */
 export async function githubRenderMarkdown(token: string, text: string, repository: string) {
   const { text: html } = await sendGitHubRequest(token, 'POST', '/markdown', {

@@ -27,6 +27,7 @@ const activityLabel: Record<string, string> = {
 	"github.pr_merged": "Merged pull request",
 	"github.pr_closed": "Closed pull request",
 	"github.pr_reopened": "Reopened pull request",
+	"github.workflows_started": "Started workflows",
 };
 
 function githubActivityDetail(activity: Doc<"activities">) {
@@ -39,6 +40,7 @@ function githubActivityDetail(activity: Doc<"activities">) {
 	if (metadata.number && metadata.title) {
 		return `#${metadata.number} ${metadata.title}`;
 	}
+	if (metadata.title) return metadata.title;
 	return metadata.repository ?? null;
 }
 

@@ -8,6 +8,7 @@ import {
 	MoreHorizontal,
 	Settings2,
 	Upload,
+	Workflow,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Button } from "#/components/ui/button";
@@ -424,6 +425,16 @@ export function ProjectDetailContent({
 							<Button variant="secondary">
 								<GitPullRequest className="mr-2 h-4 w-4" />
 								Pull requests
+							</Button>
+						</Link>
+						<Link
+							to="/projects/$projectId/workflows"
+							params={{ projectId }}
+							className="no-underline"
+						>
+							<Button variant="secondary">
+								<Workflow className="mr-2 h-4 w-4" />
+								Workflows
 							</Button>
 						</Link>
 						<Button

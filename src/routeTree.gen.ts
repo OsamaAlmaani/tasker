@@ -26,8 +26,10 @@ import { Route as AppProjectsProjectIdRouteImport } from './routes/_app.projects
 import { Route as AppIssuesIssueIdRouteImport } from './routes/_app.issues.$issueId'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
 import { Route as AppProjectsProjectIdGithubRouteImport } from './routes/_app.projects.$projectId_.github'
+import { Route as AppProjectsProjectIdWorkflowsIndexRouteImport } from './routes/_app.projects.$projectId_.workflows.index'
 import { Route as AppProjectsProjectIdPullsIndexRouteImport } from './routes/_app.projects.$projectId_.pulls.index'
 import { Route as AppProjectsProjectIdPullsPullNumberRouteImport } from './routes/_app.projects.$projectId_.pulls.$pullNumber'
+import { Route as AppProjectsProjectIdWorkflowsRunsRunIdRouteImport } from './routes/_app.projects.$projectId_.workflows.runs.$runId'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
   id: '/unauthorized',
@@ -114,6 +116,12 @@ const AppProjectsProjectIdGithubRoute =
     path: '/projects/$projectId/github',
     getParentRoute: () => AppRoute,
   } as any)
+const AppProjectsProjectIdWorkflowsIndexRoute =
+  AppProjectsProjectIdWorkflowsIndexRouteImport.update({
+    id: '/projects/$projectId_/workflows/',
+    path: '/projects/$projectId/workflows/',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppProjectsProjectIdPullsIndexRoute =
   AppProjectsProjectIdPullsIndexRouteImport.update({
     id: '/projects/$projectId_/pulls/',
@@ -124,6 +132,12 @@ const AppProjectsProjectIdPullsPullNumberRoute =
   AppProjectsProjectIdPullsPullNumberRouteImport.update({
     id: '/projects/$projectId_/pulls/$pullNumber',
     path: '/projects/$projectId/pulls/$pullNumber',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppProjectsProjectIdWorkflowsRunsRunIdRoute =
+  AppProjectsProjectIdWorkflowsRunsRunIdRouteImport.update({
+    id: '/projects/$projectId_/workflows/runs/$runId',
+    path: '/projects/$projectId/workflows/runs/$runId',
     getParentRoute: () => AppRoute,
   } as any)
 
@@ -146,6 +160,8 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/github': typeof AppProjectsProjectIdGithubRoute
   '/projects/$projectId/pulls/$pullNumber': typeof AppProjectsProjectIdPullsPullNumberRoute
   '/projects/$projectId/pulls/': typeof AppProjectsProjectIdPullsIndexRoute
+  '/projects/$projectId/workflows/': typeof AppProjectsProjectIdWorkflowsIndexRoute
+  '/projects/$projectId/workflows/runs/$runId': typeof AppProjectsProjectIdWorkflowsRunsRunIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -166,6 +182,8 @@ export interface FileRoutesByTo {
   '/projects/$projectId/github': typeof AppProjectsProjectIdGithubRoute
   '/projects/$projectId/pulls/$pullNumber': typeof AppProjectsProjectIdPullsPullNumberRoute
   '/projects/$projectId/pulls': typeof AppProjectsProjectIdPullsIndexRoute
+  '/projects/$projectId/workflows': typeof AppProjectsProjectIdWorkflowsIndexRoute
+  '/projects/$projectId/workflows/runs/$runId': typeof AppProjectsProjectIdWorkflowsRunsRunIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -188,6 +206,8 @@ export interface FileRoutesById {
   '/_app/projects/$projectId_/github': typeof AppProjectsProjectIdGithubRoute
   '/_app/projects/$projectId_/pulls/$pullNumber': typeof AppProjectsProjectIdPullsPullNumberRoute
   '/_app/projects/$projectId_/pulls/': typeof AppProjectsProjectIdPullsIndexRoute
+  '/_app/projects/$projectId_/workflows/': typeof AppProjectsProjectIdWorkflowsIndexRoute
+  '/_app/projects/$projectId_/workflows/runs/$runId': typeof AppProjectsProjectIdWorkflowsRunsRunIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -210,6 +230,8 @@ export interface FileRouteTypes {
     | '/projects/$projectId/github'
     | '/projects/$projectId/pulls/$pullNumber'
     | '/projects/$projectId/pulls/'
+    | '/projects/$projectId/workflows/'
+    | '/projects/$projectId/workflows/runs/$runId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -230,6 +252,8 @@ export interface FileRouteTypes {
     | '/projects/$projectId/github'
     | '/projects/$projectId/pulls/$pullNumber'
     | '/projects/$projectId/pulls'
+    | '/projects/$projectId/workflows'
+    | '/projects/$projectId/workflows/runs/$runId'
   id:
     | '__root__'
     | '/'
@@ -251,6 +275,8 @@ export interface FileRouteTypes {
     | '/_app/projects/$projectId_/github'
     | '/_app/projects/$projectId_/pulls/$pullNumber'
     | '/_app/projects/$projectId_/pulls/'
+    | '/_app/projects/$projectId_/workflows/'
+    | '/_app/projects/$projectId_/workflows/runs/$runId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -384,6 +410,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsProjectIdGithubRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/projects/$projectId_/workflows/': {
+      id: '/_app/projects/$projectId_/workflows/'
+      path: '/projects/$projectId/workflows'
+      fullPath: '/projects/$projectId/workflows/'
+      preLoaderRoute: typeof AppProjectsProjectIdWorkflowsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/projects/$projectId_/pulls/': {
       id: '/_app/projects/$projectId_/pulls/'
       path: '/projects/$projectId/pulls'
@@ -396,6 +429,13 @@ declare module '@tanstack/react-router' {
       path: '/projects/$projectId/pulls/$pullNumber'
       fullPath: '/projects/$projectId/pulls/$pullNumber'
       preLoaderRoute: typeof AppProjectsProjectIdPullsPullNumberRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/projects/$projectId_/workflows/runs/$runId': {
+      id: '/_app/projects/$projectId_/workflows/runs/$runId'
+      path: '/projects/$projectId/workflows/runs/$runId'
+      fullPath: '/projects/$projectId/workflows/runs/$runId'
+      preLoaderRoute: typeof AppProjectsProjectIdWorkflowsRunsRunIdRouteImport
       parentRoute: typeof AppRoute
     }
   }
@@ -414,6 +454,8 @@ interface AppRouteChildren {
   AppProjectsProjectIdGithubRoute: typeof AppProjectsProjectIdGithubRoute
   AppProjectsProjectIdPullsPullNumberRoute: typeof AppProjectsProjectIdPullsPullNumberRoute
   AppProjectsProjectIdPullsIndexRoute: typeof AppProjectsProjectIdPullsIndexRoute
+  AppProjectsProjectIdWorkflowsIndexRoute: typeof AppProjectsProjectIdWorkflowsIndexRoute
+  AppProjectsProjectIdWorkflowsRunsRunIdRoute: typeof AppProjectsProjectIdWorkflowsRunsRunIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -430,6 +472,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppProjectsProjectIdPullsPullNumberRoute:
     AppProjectsProjectIdPullsPullNumberRoute,
   AppProjectsProjectIdPullsIndexRoute: AppProjectsProjectIdPullsIndexRoute,
+  AppProjectsProjectIdWorkflowsIndexRoute:
+    AppProjectsProjectIdWorkflowsIndexRoute,
+  AppProjectsProjectIdWorkflowsRunsRunIdRoute:
+    AppProjectsProjectIdWorkflowsRunsRunIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

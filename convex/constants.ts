@@ -70,6 +70,7 @@ export const ACTIVITY_ACTIONS = [
   'github.pr_merged',
   'github.pr_closed',
   'github.pr_reopened',
+  'github.workflows_started',
 ] as const
 
 export const INVITE_STATUSES = [
@@ -229,6 +230,7 @@ export const activityActionValidator = v.union(
   v.literal('github.pr_merged'),
   v.literal('github.pr_closed'),
   v.literal('github.pr_reopened'),
+  v.literal('github.workflows_started'),
 )
 
 export const inviteStatusValidator = v.union(

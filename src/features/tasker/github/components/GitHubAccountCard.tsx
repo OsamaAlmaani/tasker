@@ -86,8 +86,8 @@ export function GitHubAccountCard({ className }: { className?: string }) {
 					fine-grained token
 				</a>{" "}
 				for the repositories you work on, with read and write access to{" "}
-				<em>Pull requests</em> and <em>Contents</em>, and read access to{" "}
-				<em>Commit statuses</em> and <em>Checks</em>. A classic token needs the{" "}
+				<em>Pull requests</em>, <em>Contents</em> and <em>Actions</em>, and read
+				access to <em>Commit statuses</em>. A classic token needs the{" "}
 				<code>repo</code> scope. Tasker encrypts the token and never shows it
 				again.
 			</p>

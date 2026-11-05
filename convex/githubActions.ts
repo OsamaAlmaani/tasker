@@ -1,6 +1,5 @@
 import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
-import type { Doc, Id } from './_generated/dataModel'
 import { type ActionCtx, action } from './_generated/server'
 import {
   CONVERT_TO_DRAFT_MUTATION,
@@ -28,7 +27,15 @@ import {
   type RawPullRequestSummary,
   type RawRepositoryMergeSettings,
 } from './lib/githubApi'
-import { decryptSecret, encryptSecret, getEncryptionKey } from './lib/githubCrypto'
+import {
+  decryptToken,
+  invalidInput,
+  type LinkedGitHubClient,
+  loadLinkedClient,
+  notConnected,
+  repoPath,
+} from './lib/githubAccess'
+import { encryptSecret, getEncryptionKey } from './lib/githubCrypto'
 
 // GitHub network calls for the project GitHub section and pull request pages.
 // Every call uses the signed-in user's own token, loaded after Tasker checks
@@ -44,17 +51,6 @@ const pullRequestStateFilterValidator = v.union(
   v.literal('all'),
 )
 
-function invalidInput(message: string) {
-  return new ConvexError({ code: 'INVALID_INPUT', message })
-}
-
-function notConnected() {
-  return new ConvexError({
-    code: 'GITHUB_NOT_CONNECTED',
-    message: 'Connect your GitHub account with a personal access token first.',
-  })
-}
-
 function assertPullNumber(number: number) {
   if (!Number.isInteger(number) || number <= 0) {
     throw invalidInput('Pull request number must be a positive integer.')
@@ -66,46 +62,11 @@ function assertPullNumber(number: number) {
 
 type GitHubUser = { id: number; login: string; avatar_url?: string; html_url?: string }
 
-async function decryptToken(connection: Doc<'githubConnections'>) {
-  return await decryptSecret(await getEncryptionKey(), connection.accessToken)
-}
-
 async function loadOwnToken(ctx: ActionCtx) {
   const connection = await ctx.runQuery(internal.github.getOwnConnection, {})
   if (!connection) throw notConnected()
   return await decryptToken(connection)
 }
-
-type LinkedGitHubClient = {
-  token: string
-  repository: Doc<'githubRepositoryLinks'>
-}
-
-async function loadLinkedClient(
-  ctx: ActionCtx,
-  projectId: Id<'projects'>,
-  level: 'view' | 'write',
-): Promise<LinkedGitHubClient> {
-  const { connection, repository } = await ctx.runQuery(internal.github.resolveAccess, {
-    projectId,
-    level,
-  })
-  if (!repository) {
-    throw new ConvexError({
-      code: 'GITHUB_REPO_NOT_LINKED',
-      message: 'Link a GitHub repository to this project first.',
-    })
-  }
-  if (!connection) throw notConnected()
-  return { token: await decryptToken(connection), repository }
-}
-
-function repoPath(repository: LinkedGitHubClient['repository']) {
-  return `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}`
-}
-
-// ---------------------------------------------------------------------------
-// Personal connection
 
 export const connectAccount = action({
   args: { token: v.string() },

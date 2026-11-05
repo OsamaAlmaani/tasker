@@ -128,6 +128,50 @@ export default defineSchema({
     linkedAt: v.number(),
   }).index('by_projectId', ['projectId']),
 
+  // Named sets of workflows a project runs together. A workflow may be in any
+  // number of groups. Workflow names are read live from GitHub; only ids and
+  // paths (as a fallback label) are stored.
+  githubWorkflowGroups: defineTable({
+    projectId: v.id('projects'),
+    repositoryId: v.number(),
+    name: v.string(),
+    workflows: v.array(v.object({ id: v.number(), path: v.string() })),
+    createdBy: v.id('users'),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_projectId', ['projectId']),
+
+  // Workflows started together from Tasker. GitHub records each as a separate
+  // run, so this row is what ties them into one release. Run state is always
+  // read live from GitHub with the viewer's own token.
+  githubWorkflowReleases: defineTable({
+    projectId: v.id('projects'),
+    repositoryId: v.number(),
+    name: v.string(),
+    ref: v.string(),
+    headSha: v.string(),
+    groupIds: v.array(v.id('githubWorkflowGroups')),
+    runs: v.array(
+      v.object({
+        workflowId: v.number(),
+        workflowName: v.string(),
+        workflowPath: v.string(),
+        runId: v.union(v.number(), v.null()),
+        error: v.union(v.string(), v.null()),
+      }),
+    ),
+    skipped: v.array(
+      v.object({
+        workflowId: v.number(),
+        workflowName: v.string(),
+        reason: v.union(v.literal('unchanged'), v.literal('removed')),
+      }),
+    ),
+    status: v.union(v.literal('starting'), v.literal('started')),
+    startedBy: v.id('users'),
+    startedAt: v.number(),
+  }).index('by_projectId_startedAt', ['projectId', 'startedAt']),
+
   projectCounters: defineTable({
     projectId: v.id('projects'),
     nextIssueNumber: v.number(),

@@ -21,7 +21,7 @@ It supports:
 - Comments and activity history.
 - Local MCP workspace reads/writes plus renewable agent claims and result submission for human review.
 - Project archive state and issue soft-delete behavior.
-- Per-project linked GitHub repository and a pull request list/detail workspace (comments, reviews, merges), using each user's own GitHub personal access token.
+- Per-project linked GitHub repository with a pull request list/detail workspace (comments, reviews, merges) and a GitHub Actions workspace (workflow groups, releases, change-aware runs, logs), using each user's own GitHub personal access token.
 
 ## Working Rule For Future Agents
 
@@ -436,7 +436,7 @@ If the task is about:
 
 Plan and later phases: [`plan/github-integration-plan.md`](./plan/github-integration-plan.md).
 
-- Routes: `_app.projects.$projectId_.github.tsx` (link repo + your token), `_app.projects.$projectId_.pulls.index.tsx` (list, `?state=merged|closed|all`) and `_app.projects.$projectId_.pulls.$pullNumber.tsx` (detail). The trailing `_` keeps these pages out of the project task route's layout; `ProjectGitHubHeader` renders the shared Tasks / Pull requests / GitHub tabs. Settings also shows `GitHubAccountCard`.
+- Routes: `_app.projects.$projectId_.github.tsx` (link repo + your token), `_app.projects.$projectId_.pulls.index.tsx` (list, `?state=merged|closed|all`) and `_app.projects.$projectId_.pulls.$pullNumber.tsx` (detail). The trailing `_` keeps these pages out of the project task route's layout; `ProjectGitHubHeader` renders the shared Tasks / Pull requests / Workflows / GitHub tabs. Settings also shows `GitHubAccountCard`.
 - Frontend code lives in `src/features/tasker/github/`: `useGitHubData.ts` (action-backed loading with refresh-on-focus), `pullRequestDisplay.ts` (pure labels, merge readiness, filtering), and `components/`.
 - `convex/github.ts` owns persistence and permission checks (`getAccount` and `getIntegration` queries, `disconnectAccount` and `unlinkRepository` mutations, internal helpers). `convex/githubActions.ts` owns all GitHub network calls. `convex/lib/githubApi.ts` holds the REST/GraphQL client, GraphQL documents and normalizers; `convex/lib/githubCrypto.ts` holds AES-GCM token encryption.
 - No shared credentials. `githubConnections` holds one personal access token per Tasker user, used in every project and only for that user's own requests. `githubRepositoryLinks` only records which repository a project tracks. Never add a code path that reads or acts with another user's token, and never cache GitHub responses in Convex where other users could read them.
@@ -447,6 +447,17 @@ Plan and later phases: [`plan/github-integration-plan.md`](./plan/github-integra
 - The pull request timeline (`buildTimeline`) holds comments, commits, reviews with the inline review threads they started, and threads whose review is not loaded. Threads from the viewer's pending review are left out. `replyToReviewThread` and `setReviewThreadResolved` first confirm the thread belongs to the pull request in the linked repository; `previewMarkdown` renders drafts with GitHub's markdown API.
 - Repository link/unlink, merge, close and reopen write `github.*` project activity entries.
 - Coverage: `tests/github.test.ts` and `src/features/tasker/github/pullRequestDisplay.test.ts`.
+
+### Workflows (GitHub Actions)
+
+- Routes: `_app.projects.$projectId_.workflows.index.tsx` (`?view=workflows`, `?group=<id>` filter, `?release=<id>` scrolls to and highlights a release) and `_app.projects.$projectId_.workflows.runs.$runId.tsx` (`?job=`, `?line=` link to a log line). Frontend code is in `src/features/tasker/github/workflows/`.
+- `convex/githubWorkflows.ts` holds every Actions network call (overview, runs, run detail, job logs, failure summaries, branches, `planRun`, `startRun`, re-run, cancel, enable/disable). It uses the same per-user token rules as pull requests via `convex/lib/githubAccess.ts` (`view` for reads, `write` for anything that starts or changes runs).
+- `githubWorkflowGroups` (named workflow sets, shared by the project, a workflow may be in many groups) and `githubWorkflowReleases` (which runs Tasker started together) live in `convex/githubWorkflowGroups.ts`. They store workflow ids, paths and run ids only; run state is always read live from GitHub.
+- `startRun` re-resolves the branch and refuses with `GITHUB_REF_MOVED` when it moved since `planRun`, so users never start runs on commits they did not review. It records the release, dispatches with `return_run_details` (falls back to matching new runs), then writes a `github.workflows_started` activity.
+- Change detection (`convex/lib/workflowImpact.ts`, pure and tested): workflow YAML is read with `convex/lib/yamlLite.ts` (no YAML dependency); docker/build-push-action steps lead to Dockerfiles (build args substituted), `dotnet` commands lead to project files, and the ProjectReference graph plus shared build files (`Directory.Build.props`, `global.json`, …) form each workflow's dependency rules. Changed files come from a compare against each workflow's last successful run (or a tree diff when the compare is incomplete). Anything Tasker cannot follow marks the analysis incomplete, and incomplete analyses never report "unchanged".
+- The release feed (`workflowDisplay.ts#buildReleaseFeed`) groups Tasker releases, `workflow_run` chains under their trigger run (for example `TriggerAll`), and leaves other runs single. Failure groups use `errorSignature` so the same error across services shows once.
+- Logs are parsed client-side (`logModel.ts`: ANSI colors, `##[group]` folding, error/warning markers, line-to-step assignment). Job logs only exist after a job finishes; running jobs show live step progress instead.
+- Coverage: `tests/githubWorkflows.test.ts` and `src/features/tasker/github/workflows/workflowDisplay.test.ts`.
 
 ## Agent / MCP Workflow
 
