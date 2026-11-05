@@ -41,6 +41,7 @@ Expectations:
 - Target Node: `25.x` from [`package.json`](./package.json)
 - Dependency script decisions live in [`pnpm-workspace.yaml`](./pnpm-workspace.yaml): allow esbuild's binary setup and skip Clerk's optional telemetry notice script.
 - Deployment uses [`nixpacks.toml`](./nixpacks.toml), which explicitly runs pnpm 11 through `npx`, installs with the frozen lockfile, and starts the built Nitro server directly with Node.
+- Deploying is two steps (see [`AGENTS.md`](./AGENTS.md#deploying)): `pnpm exec convex deploy -y` for the backend (self-hosted Convex from `.env.local`), then commit and `git push origin main` for the app, which Railway deploys automatically. Backend first whenever `convex/` changed.
 - TS/path aliases from [`tsconfig.json`](./tsconfig.json):
   - `#/*` -> `src/*`
   - `#convex/*` -> `convex/*`
