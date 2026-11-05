@@ -76,12 +76,9 @@ function parseJson(text: string): unknown {
 
 export type GitHubResponse<T> = { data: T; headers: Headers; status: number }
 
-export async function githubRequest<T>(
-  token: string,
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-  path: string,
-  body?: unknown,
-): Promise<GitHubResponse<T>> {
+type GitHubMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+async function sendGitHubRequest(token: string, method: GitHubMethod, path: string, body?: unknown) {
   let response: Response
   try {
     response = await fetch(`${GITHUB_API_URL}${path}`, {
@@ -99,11 +96,31 @@ export async function githubRequest<T>(
     throw githubError('GITHUB_UNAVAILABLE', 'Could not reach GitHub. Try again in a moment.')
   }
   const text = await response.text()
-  const data = text ? parseJson(text) : null
   if (!response.ok) {
-    throw toGitHubError(response.status, response.headers, data)
+    throw toGitHubError(response.status, response.headers, text ? parseJson(text) : null)
   }
+  return { response, text }
+}
+
+export async function githubRequest<T>(
+  token: string,
+  method: GitHubMethod,
+  path: string,
+  body?: unknown,
+): Promise<GitHubResponse<T>> {
+  const { response, text } = await sendGitHubRequest(token, method, path, body)
+  const data = text ? parseJson(text) : null
   return { data: data as T, headers: response.headers, status: response.status }
+}
+
+/** Renders GitHub Flavored Markdown exactly as GitHub would in `repository`. */
+export async function githubRenderMarkdown(token: string, text: string, repository: string) {
+  const { text: html } = await sendGitHubRequest(token, 'POST', '/markdown', {
+    text,
+    mode: 'gfm',
+    context: repository,
+  })
+  return html
 }
 
 type GraphqlError = { message: string; type?: string; path?: Array<string | number> }
@@ -213,7 +230,14 @@ export function parseRepositoryReference(input: string) {
 // ---------------------------------------------------------------------------
 // Normalized shapes returned to the client
 
-export type GitHubActor = { login: string; avatarUrl: string | null; url: string | null }
+export type GitHubActor = {
+  login: string
+  avatarUrl: string | null
+  url: string | null
+  isBot: boolean
+}
+
+export type GitHubReaction = { emoji: string; label: string; count: number; viewerHasReacted: boolean }
 export type PullRequestState = 'open' | 'closed' | 'merged'
 export type PullRequestStateFilter = PullRequestState | 'all'
 export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required' | null
@@ -261,28 +285,57 @@ export type PullRequestFile = {
   changeType: string
 }
 
+/** A comment, review body or review thread reply, rendered by GitHub. */
+export type PullRequestComment = {
+  id: string
+  author: GitHubActor | null
+  /** HTML rendered and sanitized by GitHub; clients sanitize it again. */
+  bodyHtml: string
+  createdAt: number
+  url: string | null
+  reactions: GitHubReaction[]
+}
+
+/** Inline code review conversation. */
+export type PullRequestReviewThread = {
+  id: string
+  path: string
+  line: number | null
+  startLine: number | null
+  isFileComment: boolean
+  isResolved: boolean
+  isOutdated: boolean
+  resolvedBy: string | null
+  diffHunk: string | null
+  viewerCanReply: boolean
+  viewerCanResolve: boolean
+  viewerCanUnresolve: boolean
+  createdAt: number
+  comments: PullRequestComment[]
+  /** May exceed `comments.length` for very long threads. */
+  totalComments: number
+}
+
+export type PullRequestCommit = {
+  sha: string
+  shortSha: string
+  message: string
+  url: string | null
+  createdAt: number
+  author: GitHubActor | null
+  authorName: string | null
+}
+
 export type PullRequestTimelineItem =
-  | {
-      kind: 'comment'
-      id: string
-      author: GitHubActor | null
-      body: string
-      createdAt: number
-      url: string | null
-    }
-  | {
-      kind: 'review'
-      id: string
-      author: GitHubActor | null
-      body: string
-      createdAt: number
-      url: string | null
-      state: string
-    }
+  | ({ kind: 'comment' } & PullRequestComment)
+  | ({ kind: 'review'; state: string; threads: PullRequestReviewThread[] } & PullRequestComment)
+  | { kind: 'thread'; id: string; createdAt: number; thread: PullRequestReviewThread }
+  | ({ kind: 'commit'; id: string } & PullRequestCommit)
 
 export type PullRequestDetail = PullRequestSummary & {
   nodeId: string
-  body: string
+  bodyHtml: string
+  reactions: GitHubReaction[]
   headSha: string
   headRepository: string | null
   isCrossRepository: boolean
@@ -310,6 +363,9 @@ export type PullRequestDetail = PullRequestSummary & {
 // ---------------------------------------------------------------------------
 // GraphQL documents
 
+const ACTOR_FIELDS = `__typename login avatarUrl url`
+const REACTION_FIELDS = `reactionGroups { content viewerHasReacted reactors { totalCount } }`
+
 const PULL_REQUEST_SUMMARY_FIELDS = `
   number
   title
@@ -320,7 +376,7 @@ const PULL_REQUEST_SUMMARY_FIELDS = `
   updatedAt
   closedAt
   mergedAt
-  author { login avatarUrl url }
+  author { ${ACTOR_FIELDS} }
   headRefName
   baseRefName
   reviewDecision
@@ -369,7 +425,8 @@ export const GET_PULL_REQUEST_QUERY = `
       pullRequest(number: $number) {
         ${PULL_REQUEST_SUMMARY_FIELDS}
         id
-        body
+        bodyHTML
+        ${REACTION_FIELDS}
         headRefOid
         headRepository { nameWithOwner }
         isCrossRepository
@@ -392,15 +449,88 @@ export const GET_PULL_REQUEST_QUERY = `
             }
           }
         }
+        timelineCommits: commits(last: 100) {
+          nodes {
+            commit {
+              oid
+              abbreviatedOid
+              messageHeadline
+              url
+              committedDate
+              author { name user { login avatarUrl url } }
+            }
+          }
+        }
         files(first: 100) { totalCount nodes { path additions deletions changeType } }
         timelineComments: comments(last: 100) {
-          nodes { id url body createdAt author { login avatarUrl url } }
+          nodes { id url bodyHTML createdAt author { ${ACTOR_FIELDS} } ${REACTION_FIELDS} }
         }
-        reviews(last: 50) {
-          nodes { id url body state submittedAt createdAt author { login avatarUrl url } }
+        reviews(last: 100) {
+          nodes {
+            id url bodyHTML state submittedAt createdAt
+            author { ${ACTOR_FIELDS} }
+            ${REACTION_FIELDS}
+          }
+        }
+        reviewThreads(last: 100) {
+          nodes {
+            id
+            path
+            line
+            originalLine
+            startLine
+            originalStartLine
+            subjectType
+            isResolved
+            isOutdated
+            resolvedBy { login }
+            viewerCanReply
+            viewerCanResolve
+            viewerCanUnresolve
+            comments(first: 100) {
+              totalCount
+              nodes {
+                id url bodyHTML createdAt diffHunk
+                pullRequestReview { id }
+                author { ${ACTOR_FIELDS} }
+                ${REACTION_FIELDS}
+              }
+            }
+          }
         }
       }
     }
+  }
+`
+
+export const REVIEW_THREAD_OWNER_QUERY = `
+  query TaskerReviewThread($id: ID!) {
+    node(id: $id) {
+      ... on PullRequestReviewThread {
+        id
+        pullRequest { number repository { nameWithOwner } }
+      }
+    }
+  }
+`
+
+export const REPLY_TO_REVIEW_THREAD_MUTATION = `
+  mutation TaskerReplyToThread($threadId: ID!, $body: String!) {
+    addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $threadId, body: $body }) {
+      comment { id }
+    }
+  }
+`
+
+export const RESOLVE_REVIEW_THREAD_MUTATION = `
+  mutation TaskerResolveThread($threadId: ID!) {
+    resolveReviewThread(input: { threadId: $threadId }) { thread { isResolved } }
+  }
+`
+
+export const UNRESOLVE_REVIEW_THREAD_MUTATION = `
+  mutation TaskerUnresolveThread($threadId: ID!) {
+    unresolveReviewThread(input: { threadId: $threadId }) { thread { isResolved } }
   }
 `
 
@@ -440,7 +570,44 @@ export function pullRequestStatesFor(filter: PullRequestStateFilter) {
 // ---------------------------------------------------------------------------
 // Normalizers
 
-type RawActor = { login: string; avatarUrl?: string | null; url?: string | null } | null | undefined
+type RawActor =
+  | { __typename?: string; login: string; avatarUrl?: string | null; url?: string | null }
+  | null
+  | undefined
+
+type RawReactionGroup = { content: string; viewerHasReacted: boolean; reactors: { totalCount: number } }
+type RawReactions = { reactionGroups?: Array<RawReactionGroup> | null }
+
+type RawComment = RawReactions & {
+  id: string
+  url: string | null
+  bodyHTML: string
+  createdAt: string
+  author: RawActor
+}
+
+type RawReviewThread = {
+  id: string
+  path: string
+  line: number | null
+  originalLine: number | null
+  startLine: number | null
+  originalStartLine: number | null
+  subjectType: 'LINE' | 'FILE' | null
+  isResolved: boolean
+  isOutdated: boolean
+  resolvedBy: { login: string } | null
+  viewerCanReply: boolean
+  viewerCanResolve: boolean
+  viewerCanUnresolve: boolean
+  comments: {
+    totalCount: number
+    nodes: Array<
+      | (RawComment & { diffHunk: string | null; pullRequestReview: { id: string } | null })
+      | null
+    > | null
+  } | null
+}
 
 type RawCheckContext =
   | {
@@ -498,39 +665,40 @@ export type RawPullRequestSummary = {
   }
 }
 
-export type RawPullRequestDetail = RawPullRequestSummary & {
-  id: string
-  body: string
-  headRefOid: string
-  headRepository: { nameWithOwner: string } | null
-  isCrossRepository: boolean
-  mergeStateStatus: string
-  mergedBy: { login: string } | null
-  files: {
-    totalCount: number
-    nodes: Array<{ path: string; additions: number; deletions: number; changeType: string } | null> | null
-  } | null
-  timelineComments: {
-    nodes: Array<{
-      id: string
-      url: string | null
-      body: string
-      createdAt: string
-      author: RawActor
-    } | null> | null
+export type RawPullRequestDetail = RawPullRequestSummary &
+  RawReactions & {
+    id: string
+    bodyHTML: string
+    headRefOid: string
+    headRepository: { nameWithOwner: string } | null
+    isCrossRepository: boolean
+    mergeStateStatus: string
+    mergedBy: { login: string } | null
+    timelineCommits?: {
+      nodes: Array<{
+        commit: {
+          oid: string
+          abbreviatedOid: string
+          messageHeadline: string
+          url: string | null
+          committedDate: string
+          author: {
+            name: string | null
+            user: { login: string; avatarUrl: string | null; url: string | null } | null
+          } | null
+        }
+      } | null> | null
+    } | null
+    files: {
+      totalCount: number
+      nodes: Array<{ path: string; additions: number; deletions: number; changeType: string } | null> | null
+    } | null
+    timelineComments: { nodes: Array<RawComment | null> | null } | null
+    reviews: {
+      nodes: Array<(RawComment & { state: string; submittedAt: string | null }) | null> | null
+    } | null
+    reviewThreads?: { nodes: Array<RawReviewThread | null> | null } | null
   }
-  reviews: {
-    nodes: Array<{
-      id: string
-      url: string | null
-      body: string
-      state: string
-      submittedAt: string | null
-      createdAt: string
-      author: RawActor
-    } | null> | null
-  } | null
-}
 
 export type RawRepositoryMergeSettings = {
   mergeCommitAllowed: boolean
@@ -553,7 +721,134 @@ function toTimestamp(value: string | null | undefined) {
 
 export function normalizeActor(actor: RawActor): GitHubActor | null {
   if (!actor) return null
-  return { login: actor.login, avatarUrl: actor.avatarUrl ?? null, url: actor.url ?? null }
+  return {
+    login: actor.login,
+    avatarUrl: actor.avatarUrl ?? null,
+    url: actor.url ?? null,
+    isBot: actor.__typename === 'Bot' || actor.login.endsWith('[bot]'),
+  }
+}
+
+const REACTIONS: Record<string, { emoji: string; label: string }> = {
+  THUMBS_UP: { emoji: '👍', label: 'Thumbs up' },
+  THUMBS_DOWN: { emoji: '👎', label: 'Thumbs down' },
+  LAUGH: { emoji: '😄', label: 'Laugh' },
+  HOORAY: { emoji: '🎉', label: 'Hooray' },
+  CONFUSED: { emoji: '😕', label: 'Confused' },
+  HEART: { emoji: '❤️', label: 'Heart' },
+  ROCKET: { emoji: '🚀', label: 'Rocket' },
+  EYES: { emoji: '👀', label: 'Eyes' },
+}
+
+export function normalizeReactions(raw: RawReactions): GitHubReaction[] {
+  return (raw.reactionGroups ?? []).flatMap((group) => {
+    const reaction = REACTIONS[group.content]
+    const count = group.reactors?.totalCount ?? 0
+    if (!reaction || count < 1) return []
+    return [{ ...reaction, count, viewerHasReacted: group.viewerHasReacted }]
+  })
+}
+
+function normalizeComment(raw: RawComment): PullRequestComment {
+  return {
+    id: raw.id,
+    author: normalizeActor(raw.author),
+    bodyHtml: raw.bodyHTML ?? '',
+    createdAt: toTimestamp(raw.createdAt) ?? 0,
+    url: raw.url ?? null,
+    reactions: normalizeReactions(raw),
+  }
+}
+
+export function normalizeReviewThread(raw: RawReviewThread): PullRequestReviewThread {
+  const rawComments = compact(raw.comments?.nodes)
+  const line = raw.line ?? raw.originalLine
+  const startLine = raw.startLine ?? raw.originalStartLine
+  return {
+    id: raw.id,
+    path: raw.path,
+    line: line ?? null,
+    startLine: startLine !== null && startLine !== line ? startLine : null,
+    isFileComment: raw.subjectType === 'FILE',
+    isResolved: raw.isResolved,
+    isOutdated: raw.isOutdated,
+    resolvedBy: raw.resolvedBy?.login ?? null,
+    diffHunk: rawComments[0]?.diffHunk ?? null,
+    viewerCanReply: raw.viewerCanReply,
+    viewerCanResolve: raw.viewerCanResolve,
+    viewerCanUnresolve: raw.viewerCanUnresolve,
+    createdAt: toTimestamp(rawComments[0]?.createdAt) ?? 0,
+    comments: rawComments.map(normalizeComment),
+    totalComments: raw.comments?.totalCount ?? rawComments.length,
+  }
+}
+
+/**
+ * Builds the conversation timeline: comments, commits, and reviews with the
+ * inline threads they started. Threads whose review is not loaded stand alone;
+ * threads of the viewer's pending (unsubmitted) review are left out.
+ */
+export function buildTimeline(raw: RawPullRequestDetail): PullRequestTimelineItem[] {
+  const rawReviews = compact(raw.reviews?.nodes)
+  const pendingReviewIds = new Set(
+    rawReviews.filter((review) => review.state === 'PENDING').map((review) => review.id),
+  )
+  const threadsByReview = new Map<string, PullRequestReviewThread[]>()
+  const orphanThreads: PullRequestReviewThread[] = []
+  for (const rawThread of compact(raw.reviewThreads?.nodes)) {
+    const reviewId = compact(rawThread.comments?.nodes)[0]?.pullRequestReview?.id ?? null
+    if (reviewId && pendingReviewIds.has(reviewId)) continue
+    const thread = normalizeReviewThread(rawThread)
+    if (!thread.comments.length) continue
+    if (reviewId && rawReviews.some((review) => review.id === reviewId)) {
+      threadsByReview.set(reviewId, [...(threadsByReview.get(reviewId) ?? []), thread])
+    } else {
+      orphanThreads.push(thread)
+    }
+  }
+
+  const reviews: PullRequestTimelineItem[] = rawReviews
+    .filter((review) => review.state !== 'PENDING')
+    .map((review) => ({
+      kind: 'review' as const,
+      ...normalizeComment(review),
+      createdAt: toTimestamp(review.submittedAt ?? review.createdAt) ?? 0,
+      state: review.state,
+      threads: (threadsByReview.get(review.id) ?? []).sort((a, b) => a.createdAt - b.createdAt),
+    }))
+    // Reviews that only reply to existing threads add nothing to the timeline.
+    .filter(
+      (review) =>
+        review.kind === 'review' &&
+        (review.bodyHtml.trim() || review.state !== 'COMMENTED' || review.threads.length),
+    )
+
+  const comments: PullRequestTimelineItem[] = compact(raw.timelineComments?.nodes).map(
+    (comment) => ({ kind: 'comment' as const, ...normalizeComment(comment) }),
+  )
+  const threads: PullRequestTimelineItem[] = orphanThreads.map((thread) => ({
+    kind: 'thread' as const,
+    id: thread.id,
+    createdAt: thread.createdAt,
+    thread,
+  }))
+  const commits: PullRequestTimelineItem[] = compact(raw.timelineCommits?.nodes).map(
+    ({ commit }) => ({
+      kind: 'commit' as const,
+      id: commit.oid,
+      sha: commit.oid,
+      shortSha: commit.abbreviatedOid,
+      message: commit.messageHeadline,
+      url: commit.url ?? null,
+      createdAt: toTimestamp(commit.committedDate) ?? 0,
+      author: commit.author?.user ? normalizeActor(commit.author.user) : null,
+      authorName: commit.author?.name ?? null,
+    }),
+  )
+
+  return [...comments, ...reviews, ...threads, ...commits].sort(
+    (a, b) => a.createdAt - b.createdAt,
+  )
 }
 
 export function normalizeChecksSummary(state: string | null | undefined): ChecksSummary {
@@ -694,33 +989,11 @@ export function normalizePullRequestDetail(
     .map(normalizeCheckContext)
     .sort((a, b) => CHECK_ORDER[a.state] - CHECK_ORDER[b.state] || a.name.localeCompare(b.name))
 
-  const comments: PullRequestTimelineItem[] = compact(raw.timelineComments?.nodes).map((comment) => ({
-    kind: 'comment',
-    id: comment.id,
-    author: normalizeActor(comment.author),
-    body: comment.body,
-    createdAt: toTimestamp(comment.createdAt) ?? 0,
-    url: comment.url ?? null,
-  }))
-  const reviews: PullRequestTimelineItem[] = compact(raw.reviews?.nodes)
-    // Pending reviews are private drafts of the token owner.
-    .filter((review) => review.state !== 'PENDING')
-    // Reviews that only carry inline comments have no body; keep state changes.
-    .filter((review) => review.body.trim() || review.state !== 'COMMENTED')
-    .map((review) => ({
-      kind: 'review',
-      id: review.id,
-      author: normalizeActor(review.author),
-      body: review.body,
-      createdAt: toTimestamp(review.submittedAt ?? review.createdAt) ?? 0,
-      url: review.url ?? null,
-      state: review.state,
-    }))
-
   return {
     ...summary,
     nodeId: raw.id,
-    body: raw.body ?? '',
+    bodyHtml: raw.bodyHTML ?? '',
+    reactions: normalizeReactions(raw),
     headSha: raw.headRefOid,
     headRepository: raw.headRepository?.nameWithOwner ?? null,
     isCrossRepository: raw.isCrossRepository,
@@ -737,7 +1010,7 @@ export function normalizePullRequestDetail(
       changeType: file.changeType,
     })),
     fileCount: raw.files?.totalCount ?? raw.changedFiles,
-    timeline: [...comments, ...reviews].sort((a, b) => a.createdAt - b.createdAt),
+    timeline: buildTimeline(raw),
     repository: {
       mergeCommitAllowed: repository.mergeCommitAllowed,
       squashMergeAllowed: repository.squashMergeAllowed,

@@ -81,6 +81,7 @@ function PullRequestLoader({
 				{detail.error ? <ErrorCard message={detail.error} /> : null}
 				<PullRequestDetail
 					projectId={projectId}
+					repository={detail.data.repository}
 					pullRequest={detail.data.pullRequest}
 					canWrite={canWrite}
 					isRefreshing={detail.isLoading}

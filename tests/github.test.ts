@@ -71,7 +71,7 @@ function rawPullRequest(overrides: Partial<RawPullRequestDetail> = {}): RawPullR
         },
       ],
     },
-    body: 'Body',
+    bodyHTML: '<p>Body</p>',
     headRefOid: 'abc123',
     headRepository: { nameWithOwner: 'acme/app' },
     isCrossRepository: false,
@@ -79,13 +79,13 @@ function rawPullRequest(overrides: Partial<RawPullRequestDetail> = {}): RawPullR
     mergedBy: null,
     files: { totalCount: 1, nodes: [{ path: 'src/a.ts', additions: 10, deletions: 2, changeType: 'MODIFIED' }] },
     timelineComments: {
-      nodes: [{ id: 'c1', url: null, body: 'Later comment', createdAt: '2026-11-02T09:00:00Z', author: null }],
+      nodes: [{ id: 'c1', url: null, bodyHTML: '<p>Later comment</p>', createdAt: '2026-11-02T09:00:00Z', author: null }],
     },
     reviews: {
       nodes: [
-        { id: 'r1', url: null, body: '', state: 'CHANGES_REQUESTED', submittedAt: '2026-11-01T12:00:00Z', createdAt: '2026-11-01T12:00:00Z', author: { login: 'reviewer' } },
-        { id: 'r2', url: null, body: '', state: 'COMMENTED', submittedAt: '2026-11-01T13:00:00Z', createdAt: '2026-11-01T13:00:00Z', author: { login: 'inline-only' } },
-        { id: 'r3', url: null, body: 'draft', state: 'PENDING', submittedAt: null, createdAt: '2026-11-01T14:00:00Z', author: { login: 'me' } },
+        { id: 'r1', url: null, bodyHTML: '', state: 'CHANGES_REQUESTED', submittedAt: '2026-11-01T12:00:00Z', createdAt: '2026-11-01T12:00:00Z', author: { login: 'reviewer' } },
+        { id: 'r2', url: null, bodyHTML: '', state: 'COMMENTED', submittedAt: '2026-11-01T13:00:00Z', createdAt: '2026-11-01T13:00:00Z', author: { login: 'inline-only' } },
+        { id: 'r3', url: null, bodyHTML: '<p>draft</p>', state: 'PENDING', submittedAt: null, createdAt: '2026-11-01T14:00:00Z', author: { login: 'me' } },
       ],
     },
     ...overrides,
@@ -261,7 +261,7 @@ describe('GitHub pull request actions', () => {
       additions: 1, deletions: 0, changedFiles: 1, mergeable: 'MERGEABLE', reviewDecision: null,
       author: { login: 'ann', avatarUrl: null, url: null },
       comments: { totalCount: 0 }, labels: { nodes: [] }, assignees: { nodes: [] }, reviewRequests: { nodes: [] },
-      id: 'PR_1', body: '', headRefOid: 'abc', headRepository: { nameWithOwner: 'acme/app' }, isCrossRepository: false,
+      id: 'PR_1', bodyHTML: '', headRefOid: 'abc', headRepository: { nameWithOwner: 'acme/app' }, isCrossRepository: false,
       mergeStateStatus: 'CLEAN', mergedBy: null,
       commits: { totalCount: 1, nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS', contexts: { nodes: [
         null,
@@ -288,6 +288,92 @@ describe('GitHub pull request actions', () => {
     expect(result.pullRequest.checksHidden).toBe(true)
     expect(result.pullRequest.detailsHidden).toBe(false)
     expect(result.pullRequest.checkRuns.map((check: { name: string }) => check.name)).toEqual(['ci/legacy'])
+  })
+
+  it('groups inline threads under the review that started them', async () => {
+    const { ctx } = await actionContext()
+    const actor = (login: string, typename = 'User') => ({ __typename: typename, login, avatarUrl: null, url: null })
+    const comment = (id: string, reviewId: string, createdAt: string, login = 'ann') => ({
+      id, url: null, bodyHTML: `<p>${id}</p>`, createdAt, diffHunk: '@@ -1,1 +1,2 @@\n a\n+b',
+      pullRequestReview: { id: reviewId }, author: actor(login),
+      reactionGroups: [{ content: 'THUMBS_UP', viewerHasReacted: true, reactors: { totalCount: 2 } }],
+    })
+    const thread = (id: string, comments: unknown[], extra: Record<string, unknown> = {}) => ({
+      id, path: 'src/a.ts', line: null, originalLine: 7, startLine: null, originalStartLine: null,
+      subjectType: 'LINE', isResolved: false, isOutdated: true, resolvedBy: null,
+      viewerCanReply: true, viewerCanResolve: true, viewerCanUnresolve: false,
+      comments: { totalCount: comments.length, nodes: comments }, ...extra,
+    })
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        data: {
+          repository: {
+            mergeCommitAllowed: true, squashMergeAllowed: true, rebaseMergeAllowed: true, deleteBranchOnMerge: false,
+            viewerDefaultMergeMethod: 'MERGE', viewerPermission: 'WRITE',
+            pullRequest: {
+              number: 9, title: 'T', url: 'u', state: 'OPEN', isDraft: false, createdAt: '2026-11-01T00:00:00Z',
+              updatedAt: '2026-11-01T00:00:00Z', mergedAt: null, closedAt: null, headRefName: 'f', baseRefName: 'main',
+              additions: 0, deletions: 0, changedFiles: 0, mergeable: 'MERGEABLE', reviewDecision: null,
+              author: actor('ann'), comments: { totalCount: 1 }, labels: { nodes: [] }, assignees: { nodes: [] },
+              reviewRequests: { nodes: [] }, id: 'PR_9', bodyHTML: '<p>hi</p>', reactionGroups: [],
+              headRefOid: 'abc', headRepository: null, isCrossRepository: false, mergeStateStatus: 'CLEAN', mergedBy: null,
+              commits: { totalCount: 1, nodes: [] },
+              timelineCommits: { nodes: [{ commit: { oid: 'abc123', abbreviatedOid: 'abc', messageHeadline: 'Start',
+                url: 'c', committedDate: '2026-11-01T01:00:00Z', author: { name: 'Ann', user: actor('ann') } } }] },
+              files: { totalCount: 0, nodes: [] },
+              timelineComments: { nodes: [{ id: 'C1', url: null, bodyHTML: '<p>bot</p>', createdAt: '2026-11-01T02:00:00Z',
+                author: actor('coderabbitai', 'Bot'), reactionGroups: [] }] },
+              reviews: { nodes: [
+                { id: 'R1', url: null, bodyHTML: '', state: 'COMMENTED', submittedAt: '2026-11-01T03:00:00Z',
+                  createdAt: '2026-11-01T03:00:00Z', author: actor('ann'), reactionGroups: [] },
+                { id: 'R2', url: null, bodyHTML: '', state: 'COMMENTED', submittedAt: '2026-11-01T05:00:00Z',
+                  createdAt: '2026-11-01T05:00:00Z', author: actor('bob'), reactionGroups: [] },
+                { id: 'R3', url: null, bodyHTML: '', state: 'PENDING', submittedAt: null,
+                  createdAt: '2026-11-01T06:00:00Z', author: actor('ann'), reactionGroups: [] },
+              ] },
+              reviewThreads: { nodes: [
+                thread('T1', [comment('c1', 'R1', '2026-11-01T03:00:00Z'), comment('c2', 'R2', '2026-11-01T05:00:00Z', 'bob')]),
+                thread('T2', [comment('c3', 'R3', '2026-11-01T06:00:00Z')]),
+                thread('T3', [comment('c4', 'R0', '2026-11-01T04:00:00Z')], { line: 3, startLine: 1 }),
+              ] },
+            },
+          },
+        },
+      }),
+    )
+    const { pullRequest } = await handler(githubActions.getPullRequest)(ctx, { projectId, number: 9 })
+    const timeline = pullRequest.timeline as Array<Record<string, any>>
+    // R2 only replied to T1, and R3 is an unsubmitted draft, so neither appears.
+    expect(timeline.map((item) => `${item.kind}:${item.id}`)).toEqual([
+      'commit:abc123', 'comment:C1', 'review:R1', 'thread:T3',
+    ])
+    expect(timeline[1].author).toMatchObject({ login: 'coderabbitai', isBot: true })
+    const [t1] = timeline[2].threads
+    expect(t1).toMatchObject({ id: 'T1', line: 7, isOutdated: true, diffHunk: '@@ -1,1 +1,2 @@\n a\n+b' })
+    expect(t1.comments.map((c: { id: string }) => c.id)).toEqual(['c1', 'c2'])
+    expect(t1.comments[0].reactions).toEqual([{ emoji: '👍', label: 'Thumbs up', count: 2, viewerHasReacted: true }])
+    expect(timeline[3].thread).toMatchObject({ line: 3, startLine: 1 })
+    expect(pullRequest.bodyHtml).toBe('<p>hi</p>')
+  })
+
+  it('replies only to threads in the linked pull request', async () => {
+    const { ctx } = await actionContext()
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { data: { node: { id: 'T1', pullRequest: { number: 12, repository: { nameWithOwner: 'acme/other' } } } } }),
+    )
+    await expect(
+      handler(githubActions.replyToReviewThread)(ctx, { projectId, number: 12, threadId: 'T1', body: 'ok' }),
+    ).rejects.toThrow(/not part of this pull request/)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(200, { data: { node: { id: 'T1', pullRequest: { number: 12, repository: { nameWithOwner: 'ACME/app' } } } } }),
+      )
+      .mockResolvedValueOnce(jsonResponse(200, { data: { addPullRequestReviewThreadReply: { comment: { id: 'X' } } } }))
+    await handler(githubActions.replyToReviewThread)(ctx, { projectId, number: 12, threadId: 'T1', body: ' Thanks ' })
+    const reply = JSON.parse(fetchMock.mock.calls[2][1].body)
+    expect(reply.variables).toEqual({ threadId: 'T1', body: 'Thanks' })
   })
 
   it('still fails when GitHub hides the pull request itself', async () => {

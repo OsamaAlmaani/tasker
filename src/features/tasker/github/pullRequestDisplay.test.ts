@@ -17,7 +17,7 @@ function pullRequest(
 		url: "https://github.com/acme/app/pull/42",
 		state: "open",
 		isDraft: false,
-		author: { login: "octocat", avatarUrl: null, url: null },
+		author: { login: "octocat", avatarUrl: null, url: null, isBot: false },
 		headRefName: "fix/login",
 		baseRefName: "main",
 		createdAt: 1,

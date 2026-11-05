@@ -9,16 +9,13 @@ import {
 	GitMerge,
 	RefreshCw,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Select } from "#/components/ui/select";
-import { Textarea } from "#/components/ui/textarea";
-import { formatRelative } from "#/features/tasker/format";
-import { renderMarkdownHtml } from "#/features/tasker/notes/markdown";
 import { cn, getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
@@ -31,7 +28,6 @@ import {
 	mergeReadiness,
 	type PullRequestDetail as PullRequestDetailData,
 	reviewDecisionDisplay,
-	reviewStateLabel,
 } from "../pullRequestDisplay";
 import {
 	GitHubAvatar,
@@ -40,36 +36,58 @@ import {
 	ToneBadge,
 	toneTextClasses,
 } from "./GitHubBadges";
-import "./githubMarkdown.css";
+import { MarkdownEditor } from "./GitHubContent";
+import {
+	type ConversationFilters,
+	ConversationsCard,
+	PullRequestConversation,
+	threadStartedByBot,
+} from "./PullRequestConversation";
 
 type Notice = { tone: "success" | "danger"; message: string } | null;
 
-function Markdown({ body }: { body: string }) {
-	if (!body.trim()) {
-		return (
-			<p className="m-0 text-sm text-[var(--muted-text)] italic">
-				No description provided.
-			</p>
-		);
-	}
-	return (
-		<div
-			className="github-markdown"
-			// renderMarkdownHtml escapes all HTML before applying markdown formatting.
-			// biome-ignore lint/security/noDangerouslySetInnerHtml: escaped markdown output
-			dangerouslySetInnerHTML={{ __html: renderMarkdownHtml(body) }}
-		/>
-	);
+const FILTERS_STORAGE_KEY = "tasker:pull-request-filters";
+const DEFAULT_FILTERS: ConversationFilters = {
+	hideBots: false,
+	hideResolved: false,
+};
+
+/** Remembers this viewer's conversation filters in the browser. */
+function useConversationFilters() {
+	const [filters, setFilters] = useState<ConversationFilters>(DEFAULT_FILTERS);
+	useEffect(() => {
+		try {
+			const stored = JSON.parse(
+				window.localStorage.getItem(FILTERS_STORAGE_KEY) ?? "null",
+			) as Partial<ConversationFilters> | null;
+			if (stored) {
+				setFilters({
+					hideBots: stored.hideBots === true,
+					hideResolved: stored.hideResolved === true,
+				});
+			}
+		} catch {}
+	}, []);
+	const update = useCallback((next: ConversationFilters) => {
+		setFilters(next);
+		try {
+			window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(next));
+		} catch {}
+	}, []);
+	return [filters, update] as const;
 }
 
 export function PullRequestDetail({
 	projectId,
+	repository,
 	pullRequest,
 	canWrite,
 	isRefreshing,
 	onRefresh,
 }: {
 	projectId: Id<"projects">;
+	/** `owner/name` of the linked repository. */
+	repository: string;
 	pullRequest: PullRequestDetailData;
 	canWrite: boolean;
 	isRefreshing: boolean;
@@ -80,6 +98,10 @@ export function PullRequestDetail({
 	const [notice, setNotice] = useState<Notice>(null);
 	const [busyAction, setBusyAction] = useState<string | null>(null);
 	const [confirmClose, setConfirmClose] = useState(false);
+	const [filters, setFilters] = useConversationFilters();
+	const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
+	const clearFocusedThread = useCallback(() => setFocusedThreadId(null), []);
+	const html = { repository, projectId };
 
 	async function run(
 		name: string,
@@ -246,27 +268,17 @@ export function PullRequestDetail({
 
 			<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
 				<div className="min-w-0 space-y-4">
-					<Card>
-						<CardHeader className="flex flex-row items-center gap-2">
-							{pullRequest.author ? (
-								<GitHubAvatar
-									login={pullRequest.author.login}
-									avatarUrl={pullRequest.author.avatarUrl}
-								/>
-							) : null}
-							<CardTitle>
-								{pullRequest.author?.login ?? "Unknown"}{" "}
-								<span className="font-normal text-[var(--muted-text)]">
-									opened {formatRelative(pullRequest.createdAt)}
-								</span>
-							</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<Markdown body={pullRequest.body} />
-						</CardContent>
-					</Card>
-
-					<Timeline pullRequest={pullRequest} />
+					<PullRequestConversation
+						pullRequest={pullRequest}
+						projectId={projectId}
+						html={html}
+						canWrite={canWrite}
+						onRefresh={onRefresh}
+						filters={filters}
+						onFiltersChange={setFilters}
+						focusedThreadId={focusedThreadId}
+						onFocusHandled={clearFocusedThread}
+					/>
 
 					{canWrite && isOpen ? (
 						<MergeBox
@@ -280,6 +292,7 @@ export function PullRequestDetail({
 					{canWrite ? (
 						<Composer
 							projectId={projectId}
+							repository={repository}
 							pullRequest={pullRequest}
 							disabled={busyAction !== null}
 							run={run}
@@ -289,6 +302,15 @@ export function PullRequestDetail({
 
 				<div className="min-w-0 space-y-4">
 					<ReviewSummary pullRequest={pullRequest} />
+					<ConversationsCard
+						pullRequest={pullRequest}
+						onOpenThread={(thread) => {
+							if (filters.hideBots && threadStartedByBot(thread)) {
+								setFilters({ ...filters, hideBots: false });
+							}
+							setFocusedThreadId(thread.id);
+						}}
+					/>
 					<ChecksCard pullRequest={pullRequest} />
 					<FilesCard pullRequest={pullRequest} />
 				</div>
@@ -328,82 +350,15 @@ type RunAction = (
 	failureMessage: string,
 ) => Promise<boolean>;
 
-function Timeline({ pullRequest }: { pullRequest: PullRequestDetailData }) {
-	if (!pullRequest.timeline.length) {
-		return (
-			<p className="m-0 px-1 text-sm text-[var(--muted-text)]">
-				No comments or reviews yet.
-			</p>
-		);
-	}
-	return (
-		<ol className="m-0 list-none space-y-3 p-0">
-			{pullRequest.timeline.map((item) => {
-				const review =
-					item.kind === "review"
-						? {
-								tone:
-									item.state === "APPROVED"
-										? ("success" as const)
-										: item.state === "CHANGES_REQUESTED"
-											? ("danger" as const)
-											: ("muted" as const),
-								label: reviewStateLabel(item.state),
-							}
-						: null;
-				return (
-					<li key={item.id}>
-						<Card>
-							<CardHeader className="flex flex-row flex-wrap items-center gap-2">
-								{item.author ? (
-									<GitHubAvatar
-										login={item.author.login}
-										avatarUrl={item.author.avatarUrl}
-									/>
-								) : null}
-								<CardTitle className="min-w-0">
-									{item.author?.login ?? "ghost"}{" "}
-									<span
-										className={cn(
-											"font-normal",
-											review
-												? toneTextClasses[review.tone]
-												: "text-[var(--muted-text)]",
-										)}
-									>
-										{review ? review.label : "commented"}
-									</span>
-								</CardTitle>
-								<span className="ml-auto text-xs text-[var(--muted-text)]">
-									{item.url ? (
-										<a href={item.url} target="_blank" rel="noreferrer">
-											{formatRelative(item.createdAt)}
-										</a>
-									) : (
-										formatRelative(item.createdAt)
-									)}
-								</span>
-							</CardHeader>
-							{item.body.trim() ? (
-								<CardContent>
-									<Markdown body={item.body} />
-								</CardContent>
-							) : null}
-						</Card>
-					</li>
-				);
-			})}
-		</ol>
-	);
-}
-
 function Composer({
 	projectId,
+	repository,
 	pullRequest,
 	disabled,
 	run,
 }: {
 	projectId: Id<"projects">;
+	repository: string;
 	pullRequest: PullRequestDetailData;
 	disabled: boolean;
 	run: RunAction;
@@ -444,22 +399,17 @@ function Composer({
 				<CardTitle>Add a comment</CardTitle>
 			</CardHeader>
 			<CardContent className="space-y-3">
-				<Textarea
+				<MarkdownEditor
 					value={body}
-					onChange={(event) => setBody(event.target.value)}
-					placeholder="Leave a comment. Markdown is supported."
-					aria-label="Comment"
-					onKeyDown={(event) => {
-						if (
-							event.key === "Enter" &&
-							(event.metaKey || event.ctrlKey) &&
-							hasBody &&
-							!disabled
-						) {
-							event.preventDefault();
-							void submit("comment");
-						}
+					onChange={setBody}
+					onSubmit={() => {
+						if (hasBody && !disabled) void submit("comment");
 					}}
+					projectId={projectId}
+					context={{ repository, projectId }}
+					placeholder="Leave a comment"
+					label="Comment"
+					disabled={disabled}
 				/>
 				<div className="flex flex-wrap gap-2">
 					<Button

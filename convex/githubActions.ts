@@ -8,12 +8,17 @@ import {
   githubError,
   githubGraphql,
   githubGraphqlPartial,
+  githubRenderMarkdown,
   githubRequest,
   LIST_PULL_REQUESTS_QUERY,
   MARK_READY_FOR_REVIEW_MUTATION,
   normalizePullRequestDetail,
   normalizePullRequestSummary,
   PULL_REQUEST_NODE_QUERY,
+  REPLY_TO_REVIEW_THREAD_MUTATION,
+  RESOLVE_REVIEW_THREAD_MUTATION,
+  REVIEW_THREAD_OWNER_QUERY,
+  UNRESOLVE_REVIEW_THREAD_MUTATION,
   type PullRequestDetail,
   type PullRequestSummary,
   parseRepositoryReference,
@@ -474,5 +479,81 @@ export const setPullRequestDraft = action({
       { id: pullRequest.id },
     )
     return null
+  },
+})
+
+// ---------------------------------------------------------------------------
+// Inline review conversations
+
+const MAX_NODE_ID_LENGTH = 200
+
+/**
+ * Confirms a review thread belongs to the given pull request in the project's
+ * linked repository, so a client cannot act on threads elsewhere.
+ */
+async function assertThreadInPullRequest(
+  token: string,
+  repository: LinkedGitHubClient['repository'],
+  number: number,
+  threadId: string,
+) {
+  if (!threadId || threadId.length > MAX_NODE_ID_LENGTH) {
+    throw invalidInput('That conversation could not be found.')
+  }
+  const data = await githubGraphql<{
+    node: { id?: string; pullRequest?: { number: number; repository: { nameWithOwner: string } } } | null
+  }>(token, REVIEW_THREAD_OWNER_QUERY, { id: threadId })
+  const pullRequest = data.node?.pullRequest
+  if (
+    !pullRequest ||
+    pullRequest.number !== number ||
+    pullRequest.repository.nameWithOwner.toLowerCase() !== repository.fullName.toLowerCase()
+  ) {
+    throw githubError('GITHUB_NOT_FOUND', 'That conversation is not part of this pull request.')
+  }
+}
+
+export const replyToReviewThread = action({
+  args: { projectId: v.id('projects'), number: v.number(), threadId: v.string(), body: v.string() },
+  handler: async (ctx, args) => {
+    assertPullNumber(args.number)
+    const body = args.body.trim()
+    if (!body) throw invalidInput('Reply cannot be empty.')
+    if (body.length > MAX_COMMENT_LENGTH) throw invalidInput('Reply is too long.')
+    const { token, repository } = await loadLinkedClient(ctx, args.projectId, 'write')
+    await assertThreadInPullRequest(token, repository, args.number, args.threadId)
+    await githubGraphql(token, REPLY_TO_REVIEW_THREAD_MUTATION, { threadId: args.threadId, body })
+    return null
+  },
+})
+
+export const setReviewThreadResolved = action({
+  args: {
+    projectId: v.id('projects'),
+    number: v.number(),
+    threadId: v.string(),
+    resolved: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    assertPullNumber(args.number)
+    const { token, repository } = await loadLinkedClient(ctx, args.projectId, 'write')
+    await assertThreadInPullRequest(token, repository, args.number, args.threadId)
+    await githubGraphql(
+      token,
+      args.resolved ? RESOLVE_REVIEW_THREAD_MUTATION : UNRESOLVE_REVIEW_THREAD_MUTATION,
+      { threadId: args.threadId },
+    )
+    return null
+  },
+})
+
+/** Renders a draft comment the way GitHub will show it. */
+export const previewMarkdown = action({
+  args: { projectId: v.id('projects'), body: v.string() },
+  handler: async (ctx, args): Promise<{ html: string }> => {
+    if (args.body.length > MAX_COMMENT_LENGTH) throw invalidInput('Comment is too long.')
+    if (!args.body.trim()) return { html: '' }
+    const { token, repository } = await loadLinkedClient(ctx, args.projectId, 'write')
+    return { html: await githubRenderMarkdown(token, args.body, repository.fullName) }
   },
 })
