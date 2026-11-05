@@ -22,7 +22,25 @@ const activityLabel: Record<string, string> = {
 	"issue.assignee_changed": "Changed task assignee",
 	"comment.created": "Added comment",
 	"comment.edited": "Edited comment",
+	"github.repo_linked": "Linked GitHub repository",
+	"github.repo_unlinked": "Unlinked GitHub repository",
+	"github.pr_merged": "Merged pull request",
+	"github.pr_closed": "Closed pull request",
+	"github.pr_reopened": "Reopened pull request",
 };
+
+function githubActivityDetail(activity: Doc<"activities">) {
+	if (!activity.action.startsWith("github.")) return null;
+	const metadata = (activity.metadata ?? {}) as {
+		repository?: string;
+		number?: number;
+		title?: string;
+	};
+	if (metadata.number && metadata.title) {
+		return `#${metadata.number} ${metadata.title}`;
+	}
+	return metadata.repository ?? null;
+}
 
 export function ActivityFeed({
 	activities,
@@ -40,8 +58,13 @@ export function ActivityFeed({
 					key={activity._id}
 					className="flex items-center justify-between rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2"
 				>
-					<div className="text-sm text-[var(--text)]">
+					<div className="min-w-0 text-sm text-[var(--text)]">
 						{activityLabel[activity.action] ?? activity.action}
+						{githubActivityDetail(activity) ? (
+							<span className="ml-1 text-[var(--muted-text)]">
+								{githubActivityDetail(activity)}
+							</span>
+						) : null}
 					</div>
 					<div className="text-xs text-[var(--muted-text)]">
 						{formatRelative(activity.createdAt)}

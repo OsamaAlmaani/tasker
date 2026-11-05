@@ -8,6 +8,7 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { AgentConnectionCard } from "#/features/tasker/agents/AgentConnectionCard";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
+import { GitHubAccountCard } from "#/features/tasker/github/components/GitHubAccountCard";
 import { globalRoleLabel } from "#/features/tasker/model";
 import { api } from "#convex/_generated/api";
 
@@ -60,6 +61,8 @@ function SettingsPage() {
 			</Card>
 
 			<AgentConnectionCard />
+
+			<GitHubAccountCard className="mb-4" />
 
 			<Card>
 				<CardHeader>

@@ -182,6 +182,16 @@ Optional:
 pnpm dlx convex env set CLERK_API_URL https://api.clerk.com/v1
 ```
 
+GitHub integration (per-project GitHub section and pull request pages):
+
+```bash
+# Required before anyone can save a GitHub token. Encrypts stored tokens.
+pnpm dlx convex env set GITHUB_TOKEN_ENCRYPTION_KEY "$(openssl rand -base64 32)"
+```
+
+- Each user adds their own GitHub personal access token in **Settings** or on a project's **GitHub** tab. Tokens are never shared: every pull request read and action uses only the signed-in user's token.
+- Changing `GITHUB_TOKEN_ENCRYPTION_KEY` makes stored tokens unreadable; users must add their tokens again.
+
 5. Verify Convex auth provider values for your Clerk instance in `/convex/auth.config.ts`.
 
 - `domain` and `issuer` must match your Clerk account domain.

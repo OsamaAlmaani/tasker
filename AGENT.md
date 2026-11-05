@@ -21,6 +21,7 @@ It supports:
 - Comments and activity history.
 - Local MCP workspace reads/writes plus renewable agent claims and result submission for human review.
 - Project archive state and issue soft-delete behavior.
+- Per-project linked GitHub repository and a pull request list/detail workspace (comments, reviews, merges), using each user's own GitHub personal access token.
 
 ## Working Rule For Future Agents
 
@@ -75,6 +76,7 @@ From code and README, local dev expects:
   - `SMTP_FROM_EMAIL`
   - `SMTP_FROM_NAME`
   - optional `CLERK_API_URL`
+  - `GITHUB_TOKEN_ENCRYPTION_KEY` (base64, 32 bytes) before any user can save a GitHub token
 
 Important auth wiring:
 
@@ -148,6 +150,8 @@ Core tables in [`convex/schema.ts`](./convex/schema.ts):
 - `projectInvites`
 - `activities`
 - `notifications`
+- `githubConnections`
+- `githubRepositoryLinks`
 
 Notable schema choices:
 
@@ -427,6 +431,19 @@ If the task is about:
 - Dashboard:
   - [`convex/dashboard.ts`](./convex/dashboard.ts)
   - [`src/routes/_app.dashboard.tsx`](./src/routes/_app.dashboard.tsx)
+
+## GitHub Integration
+
+Plan and later phases: [`plan/github-integration-plan.md`](./plan/github-integration-plan.md).
+
+- Routes: `_app.projects.$projectId_.github.tsx` (link repo + your token), `_app.projects.$projectId_.pulls.index.tsx` (list, `?state=merged|closed|all`) and `_app.projects.$projectId_.pulls.$pullNumber.tsx` (detail). The trailing `_` keeps these pages out of the project task route's layout; `ProjectGitHubHeader` renders the shared Tasks / Pull requests / GitHub tabs. Settings also shows `GitHubAccountCard`.
+- Frontend code lives in `src/features/tasker/github/`: `useGitHubData.ts` (action-backed loading with refresh-on-focus), `pullRequestDisplay.ts` (pure labels, merge readiness, filtering), and `components/`.
+- `convex/github.ts` owns persistence and permission checks (`getAccount` and `getIntegration` queries, `disconnectAccount` and `unlinkRepository` mutations, internal helpers). `convex/githubActions.ts` owns all GitHub network calls. `convex/lib/githubApi.ts` holds the REST/GraphQL client, GraphQL documents and normalizers; `convex/lib/githubCrypto.ts` holds AES-GCM token encryption.
+- No shared credentials. `githubConnections` holds one personal access token per Tasker user, used in every project and only for that user's own requests. `githubRepositoryLinks` only records which repository a project tracks. Never add a code path that reads or acts with another user's token, and never cache GitHub responses in Convex where other users could read them.
+- Tokens are encrypted with `GITHUB_TOKEN_ENCRYPTION_KEY`, are only decrypted inside actions, and must never be returned by queries. Every project action first runs `internal.github.resolveAccess` with the caller's auth (`view` for reads, `write` for linking and PR writes), which returns only the caller's own connection.
+- Pull request data is fetched live with the caller's token and never stored in Convex. Merges send the head SHA the user loaded; GitHub rejects the merge (409) if new commits arrived.
+- Repository link/unlink, merge, close and reopen write `github.*` project activity entries.
+- Coverage: `tests/github.test.ts` and `src/features/tasker/github/pullRequestDisplay.test.ts`.
 
 ## Agent / MCP Workflow
 

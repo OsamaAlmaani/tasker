@@ -98,6 +98,36 @@ export default defineSchema({
     .index('by_userId', ['userId'])
     .index('by_projectId_userId', ['projectId', 'userId']),
 
+  // One personal GitHub token per Tasker user. Only that user's requests ever
+  // decrypt it; nobody else reads or acts through it.
+  githubConnections: defineTable({
+    userId: v.id('users'),
+    // Encrypted with GITHUB_TOKEN_ENCRYPTION_KEY; never returned to clients.
+    accessToken: v.string(),
+    scopes: v.array(v.string()),
+    githubUserId: v.number(),
+    githubLogin: v.string(),
+    githubAvatarUrl: v.optional(v.string()),
+    githubProfileUrl: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_userId', ['userId']),
+
+  // Which repository a project tracks. Holds no credentials or GitHub data;
+  // each member reads it with their own token.
+  githubRepositoryLinks: defineTable({
+    projectId: v.id('projects'),
+    repositoryId: v.number(),
+    owner: v.string(),
+    name: v.string(),
+    fullName: v.string(),
+    htmlUrl: v.string(),
+    defaultBranch: v.string(),
+    private: v.boolean(),
+    linkedBy: v.id('users'),
+    linkedAt: v.number(),
+  }).index('by_projectId', ['projectId']),
+
   projectCounters: defineTable({
     projectId: v.id('projects'),
     nextIssueNumber: v.number(),

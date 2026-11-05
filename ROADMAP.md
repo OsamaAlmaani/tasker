@@ -173,6 +173,13 @@ Workflow model progress:
 
 - [ ] Add notification integrations such as email, Slack, Discord, and similar channels
 - [ ] Add operations integrations such as GitHub
+  - [x] Personal GitHub token per Tasker account (no shared credentials) and a linked repository per project
+  - [x] Project pull request list and detail pages with checks, reviews, comments, merges, close/reopen, draft state and branch updates
+  - [ ] Link pull requests to Tasker tasks and show PR status on task details
+  - [ ] GitHub webhooks for live updates and task status automation
+  - [ ] Inline diff viewer and line review comments
+  - [ ] Expose pull request reads and actions through the Tasker MCP workspace
+- 2026-11-05: Added a project GitHub section (`/projects/$projectId/github`) for linking one repository per project, and a Pull requests page (`/projects/$projectId/pulls`) with open/merged/closed/all lists, CI check, review and conflict status, plus a detail page for comments, reviews, merges (merge/squash/rebase with optional branch deletion), close/reopen, ready-for-review/draft and branch updates. Each user adds their own GitHub personal access token (Settings or the project GitHub tab); every read and action uses only that user's token, so there are no shared credentials or shared GitHub data. Tokens are AES-GCM encrypted and never reach the client; PR data is fetched live from GitHub. Plan: `plan/github-integration-plan.md`.
 - [ ] Add calendar sync
 - [ ] Extend import/export from task-level JSON to full project-level import/export
 - [ ] Add CSV / Excel-compatible import and export support

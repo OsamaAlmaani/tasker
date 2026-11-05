@@ -38,6 +38,7 @@ export const ACTIVITY_ENTITY_TYPES = [
   'member',
   'invite',
   'user',
+  'github',
 ] as const
 
 export const ACTIVITY_ACTIONS = [
@@ -64,6 +65,11 @@ export const ACTIVITY_ACTIONS = [
   'user.role_changed',
   'user.activated',
   'user.deactivated',
+  'github.repo_linked',
+  'github.repo_unlinked',
+  'github.pr_merged',
+  'github.pr_closed',
+  'github.pr_reopened',
 ] as const
 
 export const INVITE_STATUSES = [
@@ -191,6 +197,7 @@ export const activityEntityTypeValidator = v.union(
   v.literal('member'),
   v.literal('invite'),
   v.literal('user'),
+  v.literal('github'),
 )
 
 export const activityActionValidator = v.union(
@@ -217,6 +224,11 @@ export const activityActionValidator = v.union(
   v.literal('user.role_changed'),
   v.literal('user.activated'),
   v.literal('user.deactivated'),
+  v.literal('github.repo_linked'),
+  v.literal('github.repo_unlinked'),
+  v.literal('github.pr_merged'),
+  v.literal('github.pr_closed'),
+  v.literal('github.pr_reopened'),
 )
 
 export const inviteStatusValidator = v.union(

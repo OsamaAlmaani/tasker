@@ -1,7 +1,8 @@
-import { ClientOnly, useNavigate } from "@tanstack/react-router";
+import { ClientOnly, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
 	Download,
+	GitPullRequest,
 	History,
 	ListTodo,
 	MoreHorizontal,
@@ -415,6 +416,16 @@ export function ProjectDetailContent({
 								Project Settings
 							</Button>
 						) : null}
+						<Link
+							to="/projects/$projectId/pulls"
+							params={{ projectId }}
+							className="no-underline"
+						>
+							<Button variant="secondary">
+								<GitPullRequest className="mr-2 h-4 w-4" />
+								Pull requests
+							</Button>
+						</Link>
 						<Button
 							variant="secondary"
 							onClick={() =>
