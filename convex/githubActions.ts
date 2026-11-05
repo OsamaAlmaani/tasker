@@ -7,6 +7,7 @@ import {
   GET_PULL_REQUEST_QUERY,
   githubError,
   githubGraphql,
+  githubGraphqlPartial,
   githubRequest,
   LIST_PULL_REQUESTS_QUERY,
   MARK_READY_FOR_REVIEW_MUTATION,
@@ -215,7 +216,8 @@ export const listPullRequests = action({
     nextCursor: string | null
   }> => {
     const { token, repository } = await loadLinkedClient(ctx, args.projectId, 'view')
-    const data = await githubGraphql<{
+    // Keep the list when GitHub hides fields inside individual pull requests.
+    const { data } = await githubGraphqlPartial<{
       repository: {
         pullRequests: {
           totalCount: number
@@ -223,13 +225,18 @@ export const listPullRequests = action({
           nodes: Array<RawPullRequestSummary | null> | null
         }
       } | null
-    }>(token, LIST_PULL_REQUESTS_QUERY, {
-      owner: repository.owner,
-      name: repository.name,
-      states: pullRequestStatesFor(args.state),
-      first: PULL_REQUEST_PAGE_SIZE,
-      after: args.cursor ?? null,
-    })
+    }>(
+      token,
+      LIST_PULL_REQUESTS_QUERY,
+      {
+        owner: repository.owner,
+        name: repository.name,
+        states: pullRequestStatesFor(args.state),
+        first: PULL_REQUEST_PAGE_SIZE,
+        after: args.cursor ?? null,
+      },
+      3,
+    )
     if (!data.repository) {
       throw githubError('GITHUB_NOT_FOUND', `Repository ${repository.fullName} was not found.`)
     }
@@ -250,20 +257,27 @@ export const getPullRequest = action({
   handler: async (ctx, args): Promise<{ repository: string; pullRequest: PullRequestDetail }> => {
     assertPullNumber(args.number)
     const { token, repository } = await loadLinkedClient(ctx, args.projectId, 'view')
-    const data = await githubGraphql<{
+    // Fine-grained tokens cannot read some nested data (notably check runs),
+    // so keep whatever GitHub returns below the pull request itself.
+    const { data, hiddenPaths } = await githubGraphqlPartial<{
       repository: (RawRepositoryMergeSettings & { pullRequest: RawPullRequestDetail | null }) | null
-    }>(token, GET_PULL_REQUEST_QUERY, {
-      owner: repository.owner,
-      name: repository.name,
-      number: args.number,
-    })
+    }>(
+      token,
+      GET_PULL_REQUEST_QUERY,
+      { owner: repository.owner, name: repository.name, number: args.number },
+      2,
+    )
     if (!data.repository?.pullRequest) {
       throw githubError('GITHUB_NOT_FOUND', `Pull request #${args.number} was not found.`)
     }
     const { pullRequest, ...settings } = data.repository
     return {
       repository: repository.fullName,
-      pullRequest: normalizePullRequestDetail(pullRequest, settings),
+      pullRequest: normalizePullRequestDetail(
+        pullRequest,
+        settings,
+        hiddenPaths.map((path) => path.slice(2)),
+      ),
     }
   },
 })

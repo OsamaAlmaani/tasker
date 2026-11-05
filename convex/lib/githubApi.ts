@@ -106,9 +106,56 @@ export async function githubRequest<T>(
   return { data: data as T, headers: response.headers, status: response.status }
 }
 
+type GraphqlError = { message: string; type?: string; path?: Array<string | number> }
+
 type GraphqlResponse<T> = {
   data?: T
-  errors?: Array<{ message: string; type?: string }>
+  errors?: GraphqlError[]
+}
+
+export type GraphqlPartialResult<T> = {
+  data: T
+  /** Paths GitHub left out because the token cannot read them. */
+  hiddenPaths: Array<Array<string | number>>
+}
+
+async function runGraphql<T>(
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+  // Forbidden errors deeper than this many path segments are tolerated.
+  tolerateForbiddenBelowDepth: number | null,
+): Promise<GraphqlPartialResult<T>> {
+  const { data } = await githubRequest<GraphqlResponse<T>>(token, 'POST', '/graphql', {
+    query,
+    variables,
+  })
+  const errors = data?.errors ?? []
+  const isHidden = (error: GraphqlError) =>
+    tolerateForbiddenBelowDepth !== null &&
+    error.type === 'FORBIDDEN' &&
+    (error.path?.length ?? 0) > tolerateForbiddenBelowDepth
+  const fatal = errors.filter((error) => !isHidden(error))
+  if (fatal.length) {
+    const notFound = fatal.find((error) => error.type === 'NOT_FOUND')
+    if (notFound) {
+      throw githubError('GITHUB_NOT_FOUND', notFound.message)
+    }
+    const forbidden = fatal.find((error) => error.type === 'FORBIDDEN')
+    const message = fatal.map((error) => error.message).join(' — ')
+    throw githubError(
+      forbidden ? 'GITHUB_FORBIDDEN' : 'GITHUB_ERROR',
+      forbidden ? `GitHub denied the request: ${message}. Check that your token has access.` : message,
+    )
+  }
+  if (!data?.data) {
+    throw githubError('GITHUB_ERROR', 'GitHub returned an empty response.')
+  }
+  const hiddenPaths = errors.map((error) => error.path ?? [])
+  if (hiddenPaths.length) {
+    console.warn('GitHub hid fields the token cannot read:', hiddenPaths.map((path) => path.join('.')))
+  }
+  return { data: data.data, hiddenPaths }
 }
 
 export async function githubGraphql<T>(
@@ -116,25 +163,21 @@ export async function githubGraphql<T>(
   query: string,
   variables: Record<string, unknown>,
 ): Promise<T> {
-  const { data } = await githubRequest<GraphqlResponse<T>>(token, 'POST', '/graphql', {
-    query,
-    variables,
-  })
-  if (data?.errors?.length) {
-    const notFound = data.errors.find((error) => error.type === 'NOT_FOUND')
-    if (notFound) {
-      throw githubError('GITHUB_NOT_FOUND', notFound.message)
-    }
-    const forbidden = data.errors.find((error) => error.type === 'FORBIDDEN')
-    throw githubError(
-      forbidden ? 'GITHUB_FORBIDDEN' : 'GITHUB_ERROR',
-      data.errors.map((error) => error.message).join(' — '),
-    )
-  }
-  if (!data?.data) {
-    throw githubError('GITHUB_ERROR', 'GitHub returned an empty response.')
-  }
-  return data.data
+  return (await runGraphql<T>(token, query, variables, null)).data
+}
+
+/**
+ * Like `githubGraphql`, but keeps the response when GitHub only hides nested
+ * fields the token cannot read (for example check runs, which fine-grained
+ * tokens cannot access). Errors at `depth` path segments or above still throw.
+ */
+export async function githubGraphqlPartial<T>(
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+  depth: number,
+): Promise<GraphqlPartialResult<T>> {
+  return await runGraphql<T>(token, query, variables, depth)
 }
 
 export function parseScopes(headers: Headers) {
@@ -247,6 +290,10 @@ export type PullRequestDetail = PullRequestSummary & {
   mergedBy: string | null
   commitCount: number
   checkRuns: PullRequestCheck[]
+  /** GitHub hid some checks because the token cannot read them. */
+  checksHidden: boolean
+  /** GitHub hid other parts of the pull request from the token. */
+  detailsHidden: boolean
   files: PullRequestFile[]
   fileCount: number
   timeline: PullRequestTimelineItem[]
@@ -636,7 +683,11 @@ function normalizeMergeMethod(
 export function normalizePullRequestDetail(
   raw: RawPullRequestDetail,
   repository: RawRepositoryMergeSettings,
+  // Paths GitHub hid, relative to the pull request (e.g. ['commits', 'nodes', 0, ...]).
+  hiddenPaths: Array<Array<string | number>> = [],
 ): PullRequestDetail {
+  const checksHidden = hiddenPaths.some((path) => path[0] === 'commits')
+  const detailsHidden = hiddenPaths.some((path) => path[0] !== 'commits')
   const summary = normalizePullRequestSummary(raw)
   const rollup = compact(raw.commits?.nodes)[0]?.commit.statusCheckRollup
   const checkRuns = compact(rollup?.contexts?.nodes)
@@ -677,6 +728,8 @@ export function normalizePullRequestDetail(
     mergedBy: raw.mergedBy?.login ?? null,
     commitCount: raw.commits?.totalCount ?? 0,
     checkRuns,
+    checksHidden,
+    detailsHidden,
     files: compact(raw.files?.nodes).map((file) => ({
       path: file.path,
       additions: file.additions,

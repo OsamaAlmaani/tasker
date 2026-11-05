@@ -9,6 +9,23 @@ export function cn(...inputs: ClassValue[]) {
 export function parseConvexError(
 	error: unknown,
 ): { code?: string; message?: string } | null {
+	// Production deployments replace the message with "Server Error" and only
+	// pass ConvexError details through `data`.
+	if (typeof error === "object" && error !== null && "data" in error) {
+		const data = (error as { data: unknown }).data;
+		if (typeof data === "object" && data !== null) {
+			const { code, message } = data as { code?: unknown; message?: unknown };
+			if (typeof code === "string" || typeof message === "string") {
+				return {
+					code: typeof code === "string" ? code : undefined,
+					message: typeof message === "string" ? message : undefined,
+				};
+			}
+		} else if (typeof data === "string" && data) {
+			return { message: data };
+		}
+	}
+
 	const errorMessage =
 		error instanceof Error
 			? error.message

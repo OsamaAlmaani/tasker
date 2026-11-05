@@ -253,6 +253,56 @@ describe('GitHub pull request actions', () => {
     expect(runMutation).not.toHaveBeenCalled()
   })
 
+  it('loads a pull request when GitHub hides check runs from the token', async () => {
+    const { ctx } = await actionContext()
+    const pullRequest = {
+      number: 3102, title: 'Feature', url: 'u', state: 'OPEN', isDraft: false, createdAt: '2026-11-01T00:00:00Z',
+      updatedAt: '2026-11-02T00:00:00Z', mergedAt: null, closedAt: null, headRefName: 'feature', baseRefName: 'main',
+      additions: 1, deletions: 0, changedFiles: 1, mergeable: 'MERGEABLE', reviewDecision: null,
+      author: { login: 'ann', avatarUrl: null, url: null },
+      comments: { totalCount: 0 }, labels: { nodes: [] }, assignees: { nodes: [] }, reviewRequests: { nodes: [] },
+      id: 'PR_1', body: '', headRefOid: 'abc', headRepository: { nameWithOwner: 'acme/app' }, isCrossRepository: false,
+      mergeStateStatus: 'CLEAN', mergedBy: null,
+      commits: { totalCount: 1, nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS', contexts: { nodes: [
+        null,
+        { __typename: 'StatusContext', context: 'ci/legacy', state: 'SUCCESS', targetUrl: null, description: null },
+      ] } } } }] },
+      files: { totalCount: 0, nodes: [] }, timelineComments: { nodes: [] }, reviews: { nodes: [] },
+    }
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        data: {
+          repository: {
+            mergeCommitAllowed: true, squashMergeAllowed: true, rebaseMergeAllowed: true, deleteBranchOnMerge: false,
+            viewerDefaultMergeMethod: 'MERGE', viewerPermission: 'WRITE', pullRequest,
+          },
+        },
+        errors: [{
+          type: 'FORBIDDEN',
+          message: 'Resource not accessible by personal access token',
+          path: ['repository', 'pullRequest', 'commits', 'nodes', 0, 'commit', 'statusCheckRollup', 'contexts', 'nodes', 0],
+        }],
+      }),
+    )
+    const result = await handler(githubActions.getPullRequest)(ctx, { projectId, number: 3102 })
+    expect(result.pullRequest.checksHidden).toBe(true)
+    expect(result.pullRequest.detailsHidden).toBe(false)
+    expect(result.pullRequest.checkRuns.map((check: { name: string }) => check.name)).toEqual(['ci/legacy'])
+  })
+
+  it('still fails when GitHub hides the pull request itself', async () => {
+    const { ctx } = await actionContext()
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        data: { repository: null },
+        errors: [{ type: 'FORBIDDEN', message: 'Resource not accessible by personal access token', path: ['repository'] }],
+      }),
+    )
+    await expect(
+      handler(githubActions.getPullRequest)(ctx, { projectId, number: 3102 }),
+    ).rejects.toThrow(/Resource not accessible/)
+  })
+
   it('requires a body when requesting changes', async () => {
     const { ctx } = await actionContext()
     await expect(

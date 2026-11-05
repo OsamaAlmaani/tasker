@@ -237,6 +237,13 @@ export function PullRequestDetail({
 				</p>
 			) : null}
 
+			{pullRequest.detailsHidden ? (
+				<p className="m-0 text-sm text-[var(--muted-text)]">
+					Some details of this pull request are hidden because your GitHub token
+					can't read them.
+				</p>
+			) : null}
+
 			<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
 				<div className="min-w-0 space-y-4">
 					<Card>
@@ -754,11 +761,18 @@ function ChecksCard({ pullRequest }: { pullRequest: PullRequestDetailData }) {
 							);
 						})}
 					</ul>
-				) : (
+				) : pullRequest.checksHidden ? null : (
 					<p className="m-0 text-sm text-[var(--muted-text)]">
 						No checks reported for the latest commit.
 					</p>
 				)}
+				{pullRequest.checksHidden ? (
+					<p className="m-0 mt-2 text-xs text-[var(--muted-text)]">
+						Some checks are hidden because your GitHub token can't read them.
+						Fine-grained tokens can't read GitHub check runs; a classic token
+						with the <code>repo</code> scope can.
+					</p>
+				) : null}
 			</CardContent>
 		</Card>
 	);

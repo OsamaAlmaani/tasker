@@ -442,6 +442,7 @@ Plan and later phases: [`plan/github-integration-plan.md`](./plan/github-integra
 - No shared credentials. `githubConnections` holds one personal access token per Tasker user, used in every project and only for that user's own requests. `githubRepositoryLinks` only records which repository a project tracks. Never add a code path that reads or acts with another user's token, and never cache GitHub responses in Convex where other users could read them.
 - Tokens are encrypted with `GITHUB_TOKEN_ENCRYPTION_KEY`, are only decrypted inside actions, and must never be returned by queries. Every project action first runs `internal.github.resolveAccess` with the caller's auth (`view` for reads, `write` for linking and PR writes), which returns only the caller's own connection.
 - Pull request data is fetched live with the caller's token and never stored in Convex. Merges send the head SHA the user loaded; GitHub rejects the merge (409) if new commits arrived.
+- GitHub hides some nested data from fine-grained tokens (notably check runs) with GraphQL `FORBIDDEN` errors. `githubGraphqlPartial` keeps the response when only fields below the pull request are hidden; the detail exposes `checksHidden`/`detailsHidden` and the UI says what is missing. Errors on the repository or pull request itself still throw.
 - Repository link/unlink, merge, close and reopen write `github.*` project activity entries.
 - Coverage: `tests/github.test.ts` and `src/features/tasker/github/pullRequestDisplay.test.ts`.
 
