@@ -211,28 +211,32 @@ export function MarkdownEditor({
 	});
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+	// Text of the last finished preview, so switching tabs does not re-render it.
+	const renderedTextRef = useRef<string | null>(null);
+
 	useEffect(() => {
-		if (tab !== "preview" || preview.text === value) return;
+		if (tab !== "preview" || renderedTextRef.current === value) return;
 		let cancelled = false;
 		setPreview({ text: value, html: null, error: null, loading: true });
 		renderPreview({ projectId, body: value })
 			.then(({ html }) => {
-				if (!cancelled)
-					setPreview({ text: value, html, error: null, loading: false });
+				if (cancelled) return;
+				renderedTextRef.current = value;
+				setPreview({ text: value, html, error: null, loading: false });
 			})
 			.catch((error: unknown) => {
-				if (!cancelled)
-					setPreview({
-						text: value,
-						html: null,
-						error: getClientErrorMessage(error, "Could not render a preview."),
-						loading: false,
-					});
+				if (cancelled) return;
+				setPreview({
+					text: value,
+					html: null,
+					error: getClientErrorMessage(error, "Could not render a preview."),
+					loading: false,
+				});
 			});
 		return () => {
 			cancelled = true;
 		};
-	}, [tab, value, preview.text, projectId, renderPreview]);
+	}, [tab, value, projectId, renderPreview]);
 
 	useEffect(() => {
 		if (autoFocus) textareaRef.current?.focus();

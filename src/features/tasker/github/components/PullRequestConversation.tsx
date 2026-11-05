@@ -1143,14 +1143,14 @@ export function ConversationsCard({
 											className="w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
 										>
 											<span className="flex min-w-0 items-center gap-1.5 font-mono text-xs text-[var(--text)]">
-												<span className="truncate" title={thread.path}>
-													{file}
+												<span className="flex min-w-0" title={thread.path}>
+													<span className="truncate">{file}</span>
+													{thread.line !== null && !thread.isFileComment ? (
+														<span className="shrink-0 text-[var(--muted-text)]">
+															:{thread.line}
+														</span>
+													) : null}
 												</span>
-												{thread.line !== null && !thread.isFileComment ? (
-													<span className="shrink-0 text-[var(--muted-text)]">
-														:{thread.line}
-													</span>
-												) : null}
 												{thread.isOutdated ? (
 													<span className="ml-auto shrink-0 font-sans text-[10px] text-amber-600 dark:text-amber-400">
 														outdated

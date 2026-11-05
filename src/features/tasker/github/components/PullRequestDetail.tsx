@@ -280,24 +280,27 @@ export function PullRequestDetail({
 						onFocusHandled={clearFocusedThread}
 					/>
 
-					{canWrite && isOpen ? (
-						<MergeBox
-							projectId={projectId}
-							pullRequest={pullRequest}
-							disabled={busyAction !== null}
-							run={run}
-						/>
-					) : null}
+					{/* Aligned with the conversation cards, right of the rail. */}
+					<div className="space-y-4 pl-[38px] sm:pl-12">
+						{canWrite && isOpen ? (
+							<MergeBox
+								projectId={projectId}
+								pullRequest={pullRequest}
+								disabled={busyAction !== null}
+								run={run}
+							/>
+						) : null}
 
-					{canWrite ? (
-						<Composer
-							projectId={projectId}
-							repository={repository}
-							pullRequest={pullRequest}
-							disabled={busyAction !== null}
-							run={run}
-						/>
-					) : null}
+						{canWrite ? (
+							<Composer
+								projectId={projectId}
+								repository={repository}
+								pullRequest={pullRequest}
+								disabled={busyAction !== null}
+								run={run}
+							/>
+						) : null}
+					</div>
 				</div>
 
 				<div className="min-w-0 space-y-4">

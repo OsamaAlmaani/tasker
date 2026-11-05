@@ -135,7 +135,9 @@ export function GitHubAvatar({
 			alt=""
 			width={size}
 			height={size}
-			className="shrink-0 rounded-full"
+			// Explicit size keeps the avatar round inside stretching flex rows.
+			style={{ width: size, height: size }}
+			className="shrink-0 rounded-full object-cover"
 			loading="lazy"
 		/>
 	);

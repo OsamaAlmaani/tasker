@@ -205,6 +205,11 @@
 	vertical-align: middle;
 }
 
+/* Tailwind's base styles make images blocks; markdown images flow with text. */
+.github-markdown img {
+	display: inline;
+}
+
 .github-markdown video {
 	display: block;
 	border: 1px solid var(--line);
