@@ -3,6 +3,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import {
 	ExternalLink,
 	FolderPlus,
+	KeyRound,
 	Layers,
 	ListChecks,
 	Play,
@@ -463,23 +464,81 @@ export function WorkflowsWorkspace({
 	}, [feed, feedFilter]);
 
 	if (overview.error && !overview.data) {
+		const tokenBlocked =
+			/not accessible by personal access token|denied the request/i.test(
+				overview.error,
+			);
 		return (
 			<Card>
-				<CardContent className="space-y-2 p-4">
-					<p className="m-0 text-sm text-[var(--danger)]" role="alert">
-						{overview.error}
-					</p>
-					<p className="m-0 text-xs text-[var(--muted-text)]">
-						Your token needs the Actions permission (read to view, read and
-						write to start runs).
-					</p>
-					<Link
-						to="/projects/$projectId/github"
-						params={{ projectId }}
-						className="text-sm"
-					>
-						Check GitHub settings
-					</Link>
+				<CardContent className="space-y-3 p-5">
+					<div className="flex items-start gap-3">
+						<KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-[var(--muted-text)]" />
+						<div className="space-y-1">
+							<p className="m-0 font-medium">
+								{tokenBlocked
+									? "Your GitHub token cannot read Actions yet"
+									: "Could not load workflows"}
+							</p>
+							<p className="m-0 text-sm text-[var(--muted-text)]">
+								{tokenBlocked ? (
+									<>
+										Edit your fine-grained token on GitHub and set{" "}
+										<strong className="text-[var(--text)]">Actions</strong> to{" "}
+										<strong className="text-[var(--text)]">
+											Read and write
+										</strong>{" "}
+										(read only is enough to view runs). Saving the change keeps
+										the same token, so there is nothing to paste into Tasker.
+									</>
+								) : (
+									overview.error
+								)}
+							</p>
+							{tokenBlocked ? (
+								<p className="m-0 text-xs text-[var(--muted-text)]">
+									GitHub said: {overview.error}
+								</p>
+							) : null}
+						</div>
+					</div>
+					<div className="flex flex-wrap gap-2 pl-8">
+						{tokenBlocked ? (
+							<a
+								href="https://github.com/settings/personal-access-tokens"
+								target="_blank"
+								rel="noreferrer"
+								className="no-underline"
+							>
+								<Button size="sm">
+									<ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+									Open your GitHub tokens
+								</Button>
+							</a>
+						) : null}
+						<Button
+							size="sm"
+							variant="secondary"
+							onClick={() => void overview.refetch()}
+							disabled={overview.isLoading}
+						>
+							<RefreshCw
+								className={cn(
+									"mr-1.5 h-3.5 w-3.5",
+									overview.isLoading && "animate-spin",
+								)}
+							/>
+							Try again
+						</Button>
+						<Link
+							to="/projects/$projectId/github"
+							params={{ projectId }}
+							className="no-underline"
+						>
+							<Button size="sm" variant="ghost">
+								GitHub settings
+							</Button>
+						</Link>
+					</div>
 				</CardContent>
 			</Card>
 		);
