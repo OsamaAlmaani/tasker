@@ -4,7 +4,9 @@ import { buildGitHubNotificationContent } from '../convex/lib/notifications'
 import {
   diffHunkTail,
   followUpReplyBody,
-  isPendingReviewThread,
+  chunk,
+  inboxPreview,
+  inboxThreadFromRaw,
   normalizeReviewTaskSettings,
   normalizeTrackedThread,
   reviewTaskDescription,
@@ -235,10 +237,60 @@ describe('review replies', () => {
     expect(content.body).toBe('reviewer replied on src/tax.ts:42 in #12 Fix tax (acme/app).')
   })
 
-  it('leaves out threads of reviews that are not submitted', () => {
-    expect(isPendingReviewThread({ comments: { nodes: [{ pullRequestReview: { state: 'PENDING' } }] } })).toBe(true)
-    expect(isPendingReviewThread({ comments: { nodes: [null, { pullRequestReview: { state: 'COMMENTED' } }] } })).toBe(false)
-    expect(isPendingReviewThread({})).toBe(false)
+  it('builds Reviews page conversations from plain text and skips unsubmitted reviews', () => {
+    const raw = {
+      id: 'PRRT_9',
+      path: 'src/a.ts',
+      line: null,
+      originalLine: 7,
+      subjectType: 'LINE' as const,
+      isResolved: false,
+      isOutdated: true,
+      pullRequest: { number: 3, repository: { nameWithOwner: 'acme/app' } },
+      comments: {
+        totalCount: 3,
+        nodes: [{
+          id: 'c1',
+          url: 'u',
+          body: 'Use <b>bold</b> & `escape`',
+          createdAt: '2026-11-10T00:00:00Z',
+          pullRequestReview: { state: 'COMMENTED' },
+          author: { __typename: 'User', login: 'me', avatarUrl: null, url: null },
+        }],
+      },
+    }
+    expect(inboxThreadFromRaw(raw)).toMatchObject({
+      id: 'PRRT_9',
+      line: 7,
+      isOutdated: true,
+      totalComments: 3,
+      comments: [{ bodyHtml: '<p>Use bold &amp; escape</p>', author: { login: 'me', isBot: false } }],
+    })
+    const pending = { ...raw, comments: { totalCount: 1, nodes: [{ ...raw.comments.nodes[0], pullRequestReview: { state: 'PENDING' } }] } }
+    expect(inboxThreadFromRaw(pending)).toBeNull()
+    expect(inboxThreadFromRaw({ ...raw, comments: { totalCount: 0, nodes: [] } })).toBeNull()
+    expect(inboxThreadFromRaw(null)).toBeNull()
+  })
+
+  it('previews bot-style markdown as one short line', () => {
+    const body = [
+      '<!-- metadata -->',
+      '**Major** · Quick win',
+      '',
+      '<details><summary>Fix</summary>',
+      '',
+      '```ts',
+      'const a = 1',
+      '```',
+      '</details>',
+    ].join('\n')
+    expect(inboxPreview(body)).toBe('Major · Quick win Fix')
+    expect(inboxPreview('x'.repeat(900))).toHaveLength(500)
+  })
+
+  it('splits ids into request-sized batches', () => {
+    expect(chunk([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]])
+    expect(chunk([], 30)).toEqual([])
   })
 
   it('filters the review inbox to conversations the viewer started', () => {

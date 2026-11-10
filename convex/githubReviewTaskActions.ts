@@ -17,11 +17,15 @@ import {
 } from './lib/githubApi'
 import {
   followUpReplyBody,
-  isPendingReviewThread,
   MAX_TRACKED_THREADS,
   normalizeTrackedThread,
   OPEN_REVIEW_PULL_REQUESTS,
-  OPEN_REVIEW_THREADS_QUERY,
+  OPEN_REVIEW_PULL_REQUESTS_QUERY,
+  REVIEW_INBOX_BATCH_SIZE,
+  REVIEW_INBOX_THREADS_QUERY,
+  type RawInboxThread,
+  chunk,
+  inboxThreadFromRaw,
   type RawTrackedThread,
   REVIEW_THREAD_DETAILS_QUERY,
   REVIEW_THREADS_QUERY,
@@ -200,7 +204,9 @@ type RawOpenPullRequest = {
   isDraft: boolean
   updatedAt: string
   author: Parameters<typeof normalizeActor>[0]
-  reviewThreads: { nodes: Array<Parameters<typeof normalizeReviewThread>[0] | null> | null } | null
+  reviewThreads: {
+    nodes: Array<{ id: string; isResolved: boolean; isOutdated: boolean; resolvedBy: { login: string } | null } | null> | null
+  } | null
 }
 
 export type OpenReviewPullRequest = {
@@ -213,10 +219,23 @@ export type OpenReviewPullRequest = {
   threads: PullRequestReviewThread[]
 }
 
+/** Retries once when GitHub times out (502/504), which large reads sometimes hit. */
+async function withRetry<T>(load: () => Promise<T>): Promise<T> {
+  try {
+    return await load()
+  } catch (error) {
+    const status = error instanceof ConvexError ? (error.data as { status?: number }).status : undefined
+    if (status !== 502 && status !== 504) throw error
+    return await load()
+  }
+}
+
 /**
  * Unresolved review conversations across the most recently updated open pull
- * requests, read with the viewer's own token. Threads of reviews that are not
- * submitted yet are left out.
+ * requests, read with the viewer's own token. A light listing finds the open
+ * conversations, then their first comments load in parallel batches, which
+ * keeps every request well inside GitHub's time limit. Threads of reviews that
+ * are not submitted yet are left out.
  */
 export const listOpenReviewThreads = action({
   args: { projectId: v.id('projects') },
@@ -227,39 +246,72 @@ export const listOpenReviewThreads = action({
     viewerLogin: string
     totalPullRequests: number
     checkedPullRequests: number
+    /** Open conversations whose details GitHub did not return. */
+    missingThreads: number
     pullRequests: OpenReviewPullRequest[]
   }> => {
     const { token, repository } = await loadLinkedClient(ctx, args.projectId, 'view')
-    const data = await githubGraphql<{
-      viewer: { login: string }
-      repository: { pullRequests: { totalCount: number; nodes: Array<RawOpenPullRequest | null> | null } } | null
-    }>(token, OPEN_REVIEW_THREADS_QUERY, {
-      owner: repository.owner,
-      name: repository.name,
-      first: OPEN_REVIEW_PULL_REQUESTS,
-    })
+    const data = await withRetry(() =>
+      githubGraphql<{
+        viewer: { login: string }
+        repository: { pullRequests: { totalCount: number; nodes: Array<RawOpenPullRequest | null> | null } } | null
+      }>(token, OPEN_REVIEW_PULL_REQUESTS_QUERY, {
+        owner: repository.owner,
+        name: repository.name,
+        first: OPEN_REVIEW_PULL_REQUESTS,
+      }),
+    )
     if (!data.repository) throw githubError('GITHUB_NOT_FOUND', 'The linked repository was not found.')
+    const pulls = (data.repository.pullRequests.nodes ?? []).filter((pr): pr is RawOpenPullRequest => Boolean(pr))
+    const threadsOf = (pr: RawOpenPullRequest) =>
+      (pr.reviewThreads?.nodes ?? []).filter((node): node is NonNullable<typeof node> => Boolean(node))
+
+    // Keep tracked tasks in step with what GitHub reports.
     const tracked = new Set(
       await ctx.runQuery(internal.githubReviewTasks.trackedPullNumbers, { projectId: args.projectId }),
     )
-    const pullRequests: OpenReviewPullRequest[] = []
-    for (const pr of data.repository.pullRequests.nodes ?? []) {
-      if (!pr) continue
-      const all = (pr.reviewThreads?.nodes ?? [])
-        .filter((node): node is NonNullable<typeof node> => Boolean(node) && !isPendingReviewThread(node!))
-        .map((node) => normalizeReviewThread(node))
-        .filter((thread) => thread.comments.length)
-      if (tracked.has(pr.number)) await ctx.runMutation(internal.githubReviewTasks.reconcileThreads, {
+    for (const pr of pulls) {
+      if (!tracked.has(pr.number)) continue
+      await ctx.runMutation(internal.githubReviewTasks.reconcileThreads, {
         projectId: args.projectId,
         pullNumber: pr.number,
-        threads: all.map((thread) => ({
+        threads: threadsOf(pr).map((thread) => ({
           threadId: thread.id,
           isResolved: thread.isResolved,
           isOutdated: thread.isOutdated,
-          resolvedByLogin: thread.resolvedBy ?? undefined,
+          resolvedByLogin: thread.resolvedBy?.login ?? undefined,
         })),
       })
-      const open = all.filter((thread) => !thread.isResolved).sort((a, b) => a.createdAt - b.createdAt)
+    }
+
+    const openIds = pulls.flatMap((pr) => threadsOf(pr).filter((thread) => !thread.isResolved).map((thread) => thread.id))
+    const batches = await Promise.all(
+      chunk(openIds, REVIEW_INBOX_BATCH_SIZE).map(async (ids) => {
+        try {
+          return await withRetry(() =>
+            githubGraphql<{ nodes: Array<RawInboxThread | null> }>(token, REVIEW_INBOX_THREADS_QUERY, { ids }),
+          )
+        } catch {
+          return { nodes: [] as Array<RawInboxThread | null> }
+        }
+      }),
+    )
+    const details = new Map<string, PullRequestReviewThread>()
+    const loaded = new Set<string>()
+    for (const node of batches.flatMap((batch) => batch.nodes ?? [])) {
+      if (!node?.id) continue
+      if (node.pullRequest?.repository.nameWithOwner.toLowerCase() !== repository.fullName.toLowerCase()) continue
+      loaded.add(node.id)
+      const thread = inboxThreadFromRaw(node)
+      if (thread && !thread.isResolved) details.set(node.id, thread)
+    }
+
+    const pullRequests: OpenReviewPullRequest[] = []
+    for (const pr of pulls) {
+      const open = threadsOf(pr)
+        .map((thread) => details.get(thread.id))
+        .filter((thread): thread is PullRequestReviewThread => Boolean(thread))
+        .sort((a, b) => a.createdAt - b.createdAt)
       if (!open.length) continue
       pullRequests.push({
         number: pr.number,
@@ -274,7 +326,8 @@ export const listOpenReviewThreads = action({
     return {
       viewerLogin: data.viewer.login,
       totalPullRequests: data.repository.pullRequests.totalCount,
-      checkedPullRequests: (data.repository.pullRequests.nodes ?? []).length,
+      checkedPullRequests: pulls.length,
+      missingThreads: openIds.filter((id) => !loaded.has(id)).length,
       pullRequests,
     }
   },

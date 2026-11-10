@@ -192,6 +192,12 @@ export function ReviewInbox({
 					recently updated of {live.data.totalPullRequests} open pull requests.
 				</p>
 			) : null}
+			{live.data?.missingThreads ? (
+				<p className="m-0 text-xs text-amber-700 dark:text-amber-300">
+					GitHub did not return {live.data.missingThreads} open conversation
+					{live.data.missingThreads === 1 ? "" : "s"}. Refresh to try again.
+				</p>
+			) : null}
 		</div>
 	);
 }
