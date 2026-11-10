@@ -30,6 +30,35 @@ async function taskAccess(ctx: QueryCtx | MutationCtx, token: string, issueId: I
   return { issue, project, user, credential, scoped: ctx as MutationCtx }
 }
 
+/**
+ * Pull request review conversations the task was created from. The comment
+ * itself is quoted in the task description; these say where it lives.
+ */
+async function reviewFeedbackFor(ctx: QueryCtx, issue: Doc<'issues'>) {
+  const links = await ctx.db.query('githubReviewThreadLinks').withIndex('by_issueId', q => q.eq('issueId', issue._id)).collect()
+  if (!links.length) return []
+  const repository = await ctx.db.query('githubRepositoryLinks').withIndex('by_projectId', q => q.eq('projectId', issue.projectId)).unique()
+  if (!repository) return []
+  return links
+    .filter(link => link.repositoryId === repository.repositoryId)
+    .map(link => {
+      const pullRequestUrl = `${repository.htmlUrl}/pull/${link.pullNumber}`
+      return {
+        repository: repository.fullName,
+        pullNumber: link.pullNumber,
+        pullRequestUrl,
+        conversationUrl: link.rootCommentId ? `${pullRequestUrl}#discussion_r${link.rootCommentId}` : pullRequestUrl,
+        path: link.path,
+        line: link.line ?? null,
+        reviewerLogin: link.authorLogin ?? null,
+        kind: link.kind,
+        isResolved: link.isResolved,
+        isOutdated: link.isOutdated,
+        replyCount: link.replyCount ?? 0,
+      }
+    })
+}
+
 function validateRunId(runId: string) {
   if (!runId.trim() || runId.length > 200) fail('VALIDATION_ERROR', 'Provide a nonempty run ID up to 200 characters.')
 }
@@ -145,6 +174,7 @@ export const get = query({
       childIssues: children.filter(child => !child.archived && child.deletedAt === undefined),
       assignee: assignee ? { _id: assignee._id, name: assignee.name } : null,
       canWrite: canWrite(user.globalRole),
+      reviewFeedback: await reviewFeedbackFor(ctx, issue),
     }
   },
 })

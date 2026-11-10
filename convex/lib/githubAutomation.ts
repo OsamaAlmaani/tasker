@@ -104,6 +104,26 @@ export function resolveTransition(
 // ---------------------------------------------------------------------------
 // Webhook payloads
 
+/** Events Tasker subscribes its repository webhook to. */
+export const GITHUB_WEBHOOK_EVENTS = [
+  'pull_request',
+  'pull_request_review',
+  'pull_request_review_thread',
+  'pull_request_review_comment',
+  'push',
+  'check_suite',
+  'workflow_run',
+]
+
+/** Events of hooks registered before Tasker stored the list. */
+export const LEGACY_WEBHOOK_EVENTS = ['pull_request', 'pull_request_review', 'push', 'check_suite', 'workflow_run']
+
+/** Events the current hook lacks, so the GitHub tab can offer an update. */
+export function missingWebhookEvents(events: ReadonlyArray<string> | null | undefined) {
+  const registered = new Set(events ?? LEGACY_WEBHOOK_EVENTS)
+  return GITHUB_WEBHOOK_EVENTS.filter((event) => !registered.has(event))
+}
+
 export type WebhookRepository = {
   repositoryId: number
   fullName: string
@@ -153,6 +173,26 @@ export type WebhookEvent =
       action: 'submitted' | 'other'
       state: 'approved' | 'changes_requested' | 'commented' | 'dismissed' | 'other'
       reviewerLogin: string | null
+      pullRequest: NormalizedPullRequest
+      repository: WebhookRepository
+      senderLogin: string | null
+    }
+  | {
+      kind: 'pull_request_review_thread'
+      action: 'resolved' | 'unresolved'
+      threadId: string
+      pullRequest: NormalizedPullRequest
+      repository: WebhookRepository
+      senderLogin: string | null
+    }
+  | {
+      kind: 'pull_request_review_comment'
+      action: 'created' | 'edited' | 'deleted' | 'other'
+      commentId: number
+      /** Id of the thread's first comment; null when this comment starts a thread. */
+      inReplyToId: number | null
+      authorLogin: string | null
+      url: string | null
       pullRequest: NormalizedPullRequest
       repository: WebhookRepository
       senderLogin: string | null
@@ -309,6 +349,31 @@ export function normalizeWebhookEvent(eventName: string, payload: unknown): Webh
         action: str(body.action) === 'submitted' ? 'submitted' : 'other',
         state,
         reviewerLogin: str(dict(review.user)?.login),
+        pullRequest,
+        repository,
+        senderLogin,
+      }
+    }
+    case 'pull_request_review_thread': {
+      const pullRequest = normalizePullRequest(body.pull_request)
+      const threadId = str(dict(body.thread)?.node_id)
+      const action = str(body.action)
+      if (!pullRequest || !threadId || (action !== 'resolved' && action !== 'unresolved')) return null
+      return { kind: 'pull_request_review_thread', action, threadId, pullRequest, repository, senderLogin }
+    }
+    case 'pull_request_review_comment': {
+      const pullRequest = normalizePullRequest(body.pull_request)
+      const comment = dict(body.comment)
+      const commentId = num(comment?.id)
+      if (!pullRequest || !comment || commentId === null) return null
+      const rawAction = str(body.action)
+      return {
+        kind: 'pull_request_review_comment',
+        action: rawAction === 'created' || rawAction === 'edited' || rawAction === 'deleted' ? rawAction : 'other',
+        commentId,
+        inReplyToId: num(comment.in_reply_to_id),
+        authorLogin: str(dict(comment.user)?.login),
+        url: str(comment.html_url),
         pullRequest,
         repository,
         senderLogin,

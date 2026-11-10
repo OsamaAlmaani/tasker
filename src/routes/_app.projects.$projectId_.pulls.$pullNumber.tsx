@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAction } from "convex/react";
 import { ArrowLeft } from "lucide-react";
+import { z } from "zod";
 import { Card, CardContent } from "#/components/ui/card";
 import {
 	GitHubSetupPrompt,
@@ -11,9 +12,15 @@ import { useGitHubData } from "#/features/tasker/github/useGitHubData";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
 
+const pullRequestSearchSchema = z.object({
+	// Review conversation to scroll to, for links from tasks.
+	thread: z.string().max(200).optional(),
+});
+
 export const Route = createFileRoute(
 	"/_app/projects/$projectId_/pulls/$pullNumber",
 )({
+	validateSearch: pullRequestSearchSchema,
 	component: ProjectPullRequestPage,
 });
 
@@ -21,6 +28,7 @@ function ProjectPullRequestPage() {
 	const params = Route.useParams();
 	const projectId = params.projectId as Id<"projects">;
 	const pullNumber = Number(params.pullNumber);
+	const search = Route.useSearch();
 
 	return (
 		<ProjectGitHubPage projectId={projectId}>
@@ -41,6 +49,7 @@ function ProjectPullRequestPage() {
 							pullNumber={pullNumber}
 							canWrite={integration.canManage}
 							liveVersion={integration.repository.liveVersion}
+							initialThreadId={search.thread ?? null}
 						/>
 					) : (
 						<GitHubSetupPrompt
@@ -60,12 +69,14 @@ function PullRequestLoader({
 	pullNumber,
 	canWrite,
 	liveVersion,
+	initialThreadId,
 }: {
 	projectId: Id<"projects">;
 	repository: string;
 	pullNumber: number;
 	canWrite: boolean;
 	liveVersion?: number;
+	initialThreadId: string | null;
 }) {
 	const getPullRequest = useAction(api.githubActions.getPullRequest);
 	const isValidNumber = Number.isInteger(pullNumber) && pullNumber > 0;
@@ -90,6 +101,7 @@ function PullRequestLoader({
 					canWrite={canWrite}
 					isRefreshing={detail.isLoading}
 					onRefresh={detail.refetch}
+					initialThreadId={initialThreadId}
 				/>
 			</>
 		);

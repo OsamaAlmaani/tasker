@@ -82,6 +82,7 @@ function IssueDetailPage() {
 		subIssueForm,
 		subIssueFormOpen,
 		submitComment,
+		reviewReply,
 		submitSubIssue,
 		submitTitleEdit,
 		timelineItems,
@@ -244,6 +245,7 @@ function IssueDetailPage() {
 					onCommentSubmit={submitComment}
 					onSaveComment={saveComment}
 					onStartEditComment={startCommentEdit}
+					reviewReply={reviewReply}
 					timelineItems={timelineItems}
 				/>
 			</div>

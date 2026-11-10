@@ -1,5 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { GitPullRequest, ListTodo, Plug, Workflow } from "lucide-react";
+import {
+	GitPullRequest,
+	ListTodo,
+	MessageSquareText,
+	Plug,
+	Workflow,
+} from "lucide-react";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
 
 const tabClassName =
@@ -44,6 +50,14 @@ export function ProjectGitHubHeader({
 				>
 					<GitPullRequest className="h-4 w-4" />
 					Pull requests
+				</Link>
+				<Link
+					to="/projects/$projectId/reviews"
+					params={{ projectId }}
+					className={tabClassName}
+				>
+					<MessageSquareText className="h-4 w-4" />
+					Reviews
 				</Link>
 				<Link
 					to="/projects/$projectId/workflows"

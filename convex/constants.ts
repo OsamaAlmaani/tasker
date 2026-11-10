@@ -81,6 +81,9 @@ export const ACTIVITY_ACTIONS = [
   'github.webhook_registered',
   'github.webhook_removed',
   'github.automation_settings_changed',
+  'github.review_thread_linked',
+  'github.review_thread_unlinked',
+  'github.review_thread_event',
 ] as const
 
 export const INVITE_STATUSES = [
@@ -106,6 +109,7 @@ export const NOTIFICATION_TYPES = [
   'github_merge_conflict',
   'github_pr_merged',
   'github_workflow_failed',
+  'github_review_reply',
 ] as const
 
 export const NOTIFICATION_EMAIL_STATUSES = [
@@ -261,6 +265,9 @@ export const activityActionValidator = v.union(
   v.literal('github.webhook_registered'),
   v.literal('github.webhook_removed'),
   v.literal('github.automation_settings_changed'),
+  v.literal('github.review_thread_linked'),
+  v.literal('github.review_thread_unlinked'),
+  v.literal('github.review_thread_event'),
 )
 
 export const inviteStatusValidator = v.union(
@@ -288,6 +295,7 @@ export const notificationTypeValidator = v.union(
   v.literal('github_merge_conflict'),
   v.literal('github_pr_merged'),
   v.literal('github_workflow_failed'),
+  v.literal('github_review_reply'),
 )
 
 export const GITHUB_AUTOMATION_TRIGGERS = [
@@ -387,6 +395,20 @@ export type GitHubPullRequestSnapshot = {
   checks: 'success' | 'failure' | 'pending' | null
   mergeable: 'mergeable' | 'conflicting' | 'unknown'
   updatedAt: number
+}
+
+/** What a tracked review conversation means for its task. */
+export const githubReviewTaskKindValidator = v.union(v.literal('fix'), v.literal('follow_up'))
+export type GitHubReviewTaskKind = 'fix' | 'follow_up'
+
+/** Per-project sync between review conversations and their tasks. */
+export const githubReviewTaskSettingsValidator = v.object({
+  completeTaskOnResolve: v.boolean(),
+  resolveThreadOnDone: v.boolean(),
+})
+export type GitHubReviewTaskSettings = {
+  completeTaskOnResolve: boolean
+  resolveThreadOnDone: boolean
 }
 
 export const notificationEmailStatusValidator = v.union(

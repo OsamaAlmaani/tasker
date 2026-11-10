@@ -252,6 +252,21 @@ export const getPullRequest = action({
       source: 'body',
       items: linkCandidatesFromSummaries([detail], projectKey, detail.bodyText),
     })
+    const threads = detail.timeline.flatMap((item) =>
+      item.kind === 'review' ? item.threads : item.kind === 'thread' ? [item.thread] : [],
+    )
+    if (threads.length) {
+      await ctx.runMutation(internal.githubReviewTasks.reconcileThreads, {
+        projectId: args.projectId,
+        pullNumber: args.number,
+        threads: threads.map((thread) => ({
+          threadId: thread.id,
+          isResolved: thread.isResolved,
+          isOutdated: thread.isOutdated,
+          resolvedByLogin: thread.resolvedBy ?? undefined,
+        })),
+      })
+    }
     return { repository: repository.fullName, pullRequest: detail }
   },
 })

@@ -7,9 +7,10 @@ import {
 	ExternalLink,
 	FileDiff,
 	GitMerge,
+	ListTodo,
 	RefreshCw,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { ConfirmDialog } from "#/components/ui/confirm-dialog";
@@ -41,9 +42,11 @@ import { LinkedTasksCard } from "./LinkedTasksCard";
 import {
 	type ConversationFilters,
 	ConversationsCard,
+	collectThreads,
 	PullRequestConversation,
 	threadStartedByBot,
 } from "./PullRequestConversation";
+import { TrackThreadsDialog, useReviewTasks } from "./ReviewTasks";
 
 type Notice = { tone: "success" | "danger"; message: string } | null;
 
@@ -51,6 +54,7 @@ const FILTERS_STORAGE_KEY = "tasker:pull-request-filters";
 const DEFAULT_FILTERS: ConversationFilters = {
 	hideBots: false,
 	hideResolved: false,
+	hideTracked: false,
 };
 
 /** Remembers this viewer's conversation filters in the browser. */
@@ -65,6 +69,7 @@ function useConversationFilters() {
 				setFilters({
 					hideBots: stored.hideBots === true,
 					hideResolved: stored.hideResolved === true,
+					hideTracked: stored.hideTracked === true,
 				});
 			}
 		} catch {}
@@ -85,6 +90,7 @@ export function PullRequestDetail({
 	canWrite,
 	isRefreshing,
 	onRefresh,
+	initialThreadId = null,
 }: {
 	projectId: Id<"projects">;
 	/** `owner/name` of the linked repository. */
@@ -93,6 +99,8 @@ export function PullRequestDetail({
 	canWrite: boolean;
 	isRefreshing: boolean;
 	onRefresh: () => Promise<void>;
+	/** Conversation to scroll to on load, from `?thread=`. */
+	initialThreadId?: string | null;
 }) {
 	const setPullRequestState = useAction(api.githubActions.setPullRequestState);
 	const setPullRequestDraft = useAction(api.githubActions.setPullRequestDraft);
@@ -100,9 +108,50 @@ export function PullRequestDetail({
 	const [busyAction, setBusyAction] = useState<string | null>(null);
 	const [confirmClose, setConfirmClose] = useState(false);
 	const [filters, setFilters] = useConversationFilters();
-	const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
+	const [focusedThreadId, setFocusedThreadId] = useState<string | null>(
+		initialThreadId,
+	);
 	const clearFocusedThread = useCallback(() => setFocusedThreadId(null), []);
 	const html = { repository, projectId };
+	const reviewTasks = useReviewTasks(
+		projectId,
+		pullRequest.number,
+		pullRequest.author?.login ?? null,
+	);
+	const [trackTarget, setTrackTarget] = useState<string[] | null>(null);
+	const threads = useMemo(
+		() => collectThreads(pullRequest.timeline),
+		[pullRequest.timeline],
+	);
+	const onTrack =
+		canWrite && reviewTasks.data?.canWrite
+			? (threadIds: string[]) => setTrackTarget(threadIds)
+			: null;
+	const trackThreads = trackTarget
+		? threads.filter(
+				(thread) =>
+					trackTarget.includes(thread.id) &&
+					!reviewTasks.byThread.has(thread.id),
+			)
+		: [];
+
+	// A focused conversation hidden by a filter shows the filtered items again.
+	useEffect(() => {
+		if (!focusedThreadId) return;
+		const thread = threads.find((item) => item.id === focusedThreadId);
+		if (!thread) return;
+		const showResolved = filters.hideResolved && thread.isResolved;
+		const showBots = filters.hideBots && threadStartedByBot(thread);
+		const showTracked =
+			filters.hideTracked && reviewTasks.byThread.has(thread.id);
+		if (showResolved || showBots || showTracked) {
+			setFilters({
+				hideResolved: filters.hideResolved && !showResolved,
+				hideBots: filters.hideBots && !showBots,
+				hideTracked: filters.hideTracked && !showTracked,
+			});
+		}
+	}, [focusedThreadId, threads, filters, setFilters, reviewTasks.byThread]);
 
 	async function run(
 		name: string,
@@ -279,6 +328,8 @@ export function PullRequestDetail({
 						onFiltersChange={setFilters}
 						focusedThreadId={focusedThreadId}
 						onFocusHandled={clearFocusedThread}
+						reviewTasks={reviewTasks.byThread}
+						onTrack={onTrack}
 					/>
 
 					{/* Aligned with the conversation cards, right of the rail. */}
@@ -289,6 +340,7 @@ export function PullRequestDetail({
 								pullRequest={pullRequest}
 								disabled={busyAction !== null}
 								run={run}
+								openReviewTasks={reviewTasks.progress.fixesOpen}
 							/>
 						) : null}
 
@@ -312,17 +364,30 @@ export function PullRequestDetail({
 					<ReviewSummary pullRequest={pullRequest} />
 					<ConversationsCard
 						pullRequest={pullRequest}
-						onOpenThread={(thread) => {
-							if (filters.hideBots && threadStartedByBot(thread)) {
-								setFilters({ ...filters, hideBots: false });
-							}
-							setFocusedThreadId(thread.id);
-						}}
+						onOpenThread={(thread) => setFocusedThreadId(thread.id)}
+						reviewTasks={reviewTasks.byThread}
+						progress={reviewTasks.progress}
+						onTrack={onTrack}
 					/>
 					<ChecksCard pullRequest={pullRequest} />
 					<FilesCard pullRequest={pullRequest} />
 				</div>
 			</div>
+
+			{trackTarget && reviewTasks.data && trackThreads.length ? (
+				<TrackThreadsDialog
+					projectId={projectId}
+					pullNumber={pullRequest.number}
+					threads={trackThreads}
+					initialSelected={trackTarget}
+					data={reviewTasks.data}
+					onClose={() => setTrackTarget(null)}
+					onTracked={({ message, failed }) => {
+						setNotice({ tone: failed ? "danger" : "success", message });
+						void onRefresh();
+					}}
+				/>
+			) : null}
 
 			<ConfirmDialog
 				open={confirmClose}
@@ -462,11 +527,14 @@ function MergeBox({
 	pullRequest,
 	disabled,
 	run,
+	openReviewTasks,
 }: {
 	projectId: Id<"projects">;
 	pullRequest: PullRequestDetailData;
 	disabled: boolean;
 	run: RunAction;
+	/** Fix-before-merge review tasks that are not done yet. */
+	openReviewTasks: number;
 }) {
 	const mergePullRequest = useAction(api.githubActions.mergePullRequest);
 	const updateBranch = useAction(api.githubActions.updatePullRequestBranch);
@@ -524,6 +592,19 @@ function MergeBox({
 				<p className={cn("m-0 text-sm", toneTextClasses[readiness.tone])}>
 					{readiness.message}
 				</p>
+				{openReviewTasks ? (
+					<p
+						className={cn(
+							"m-0 flex items-center gap-1.5 text-sm",
+							toneTextClasses.warning,
+						)}
+					>
+						<ListTodo className="h-4 w-4 shrink-0" aria-hidden="true" />
+						{openReviewTasks === 1
+							? "1 review task is still open."
+							: `${openReviewTasks} review tasks are still open.`}
+					</p>
+				) : null}
 				{pullRequest.mergeStateStatus === "BEHIND" ? (
 					<Button
 						variant="secondary"

@@ -25,6 +25,7 @@ import { Route as AppProjectsIndexRouteImport } from './routes/_app.projects.ind
 import { Route as AppProjectsProjectIdRouteImport } from './routes/_app.projects.$projectId'
 import { Route as AppIssuesIssueIdRouteImport } from './routes/_app.issues.$issueId'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
+import { Route as AppProjectsProjectIdReviewsRouteImport } from './routes/_app.projects.$projectId_.reviews'
 import { Route as AppProjectsProjectIdGithubRouteImport } from './routes/_app.projects.$projectId_.github'
 import { Route as AppProjectsProjectIdWorkflowsIndexRouteImport } from './routes/_app.projects.$projectId_.workflows.index'
 import { Route as AppProjectsProjectIdPullsIndexRouteImport } from './routes/_app.projects.$projectId_.pulls.index'
@@ -110,6 +111,12 @@ const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
   path: '/admin/users',
   getParentRoute: () => AppRoute,
 } as any)
+const AppProjectsProjectIdReviewsRoute =
+  AppProjectsProjectIdReviewsRouteImport.update({
+    id: '/projects/$projectId_/reviews',
+    path: '/projects/$projectId/reviews',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppProjectsProjectIdGithubRoute =
   AppProjectsProjectIdGithubRouteImport.update({
     id: '/projects/$projectId_/github',
@@ -158,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/projects/$projectId/github': typeof AppProjectsProjectIdGithubRoute
+  '/projects/$projectId/reviews': typeof AppProjectsProjectIdReviewsRoute
   '/projects/$projectId/pulls/$pullNumber': typeof AppProjectsProjectIdPullsPullNumberRoute
   '/projects/$projectId/pulls/': typeof AppProjectsProjectIdPullsIndexRoute
   '/projects/$projectId/workflows/': typeof AppProjectsProjectIdWorkflowsIndexRoute
@@ -180,6 +188,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects': typeof AppProjectsIndexRoute
   '/projects/$projectId/github': typeof AppProjectsProjectIdGithubRoute
+  '/projects/$projectId/reviews': typeof AppProjectsProjectIdReviewsRoute
   '/projects/$projectId/pulls/$pullNumber': typeof AppProjectsProjectIdPullsPullNumberRoute
   '/projects/$projectId/pulls': typeof AppProjectsProjectIdPullsIndexRoute
   '/projects/$projectId/workflows': typeof AppProjectsProjectIdWorkflowsIndexRoute
@@ -204,6 +213,7 @@ export interface FileRoutesById {
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/projects/$projectId_/github': typeof AppProjectsProjectIdGithubRoute
+  '/_app/projects/$projectId_/reviews': typeof AppProjectsProjectIdReviewsRoute
   '/_app/projects/$projectId_/pulls/$pullNumber': typeof AppProjectsProjectIdPullsPullNumberRoute
   '/_app/projects/$projectId_/pulls/': typeof AppProjectsProjectIdPullsIndexRoute
   '/_app/projects/$projectId_/workflows/': typeof AppProjectsProjectIdWorkflowsIndexRoute
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/projects/'
     | '/projects/$projectId/github'
+    | '/projects/$projectId/reviews'
     | '/projects/$projectId/pulls/$pullNumber'
     | '/projects/$projectId/pulls/'
     | '/projects/$projectId/workflows/'
@@ -250,6 +261,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/projects'
     | '/projects/$projectId/github'
+    | '/projects/$projectId/reviews'
     | '/projects/$projectId/pulls/$pullNumber'
     | '/projects/$projectId/pulls'
     | '/projects/$projectId/workflows'
@@ -273,6 +285,7 @@ export interface FileRouteTypes {
     | '/_app/projects/$projectId'
     | '/_app/projects/'
     | '/_app/projects/$projectId_/github'
+    | '/_app/projects/$projectId_/reviews'
     | '/_app/projects/$projectId_/pulls/$pullNumber'
     | '/_app/projects/$projectId_/pulls/'
     | '/_app/projects/$projectId_/workflows/'
@@ -403,6 +416,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminUsersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/projects/$projectId_/reviews': {
+      id: '/_app/projects/$projectId_/reviews'
+      path: '/projects/$projectId/reviews'
+      fullPath: '/projects/$projectId/reviews'
+      preLoaderRoute: typeof AppProjectsProjectIdReviewsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/projects/$projectId_/github': {
       id: '/_app/projects/$projectId_/github'
       path: '/projects/$projectId/github'
@@ -452,6 +472,7 @@ interface AppRouteChildren {
   AppProjectsProjectIdRoute: typeof AppProjectsProjectIdRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppProjectsProjectIdGithubRoute: typeof AppProjectsProjectIdGithubRoute
+  AppProjectsProjectIdReviewsRoute: typeof AppProjectsProjectIdReviewsRoute
   AppProjectsProjectIdPullsPullNumberRoute: typeof AppProjectsProjectIdPullsPullNumberRoute
   AppProjectsProjectIdPullsIndexRoute: typeof AppProjectsProjectIdPullsIndexRoute
   AppProjectsProjectIdWorkflowsIndexRoute: typeof AppProjectsProjectIdWorkflowsIndexRoute
@@ -469,6 +490,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppProjectsProjectIdRoute: AppProjectsProjectIdRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppProjectsProjectIdGithubRoute: AppProjectsProjectIdGithubRoute,
+  AppProjectsProjectIdReviewsRoute: AppProjectsProjectIdReviewsRoute,
   AppProjectsProjectIdPullsPullNumberRoute:
     AppProjectsProjectIdPullsPullNumberRoute,
   AppProjectsProjectIdPullsIndexRoute: AppProjectsProjectIdPullsIndexRoute,

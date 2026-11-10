@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MutationCtx } from '../convex/_generated/server'
 import * as githubWebhooks from '../convex/githubWebhooks'
+import { applyIssueUpdate } from '../convex/issues'
 import { normalizeWebhookEvent } from '../convex/lib/githubAutomation'
 import { linkCandidatesFromSummaries, snapshotFromRest } from '../convex/lib/githubLinkSync'
 import type { PullRequestSummary } from '../convex/lib/githubApi'
@@ -94,6 +95,7 @@ describe('webhook processing', () => {
   let ctx: MutationCtx
   let rows: Map<string, Row>
   let runMutation: ReturnType<typeof vi.fn>
+  let runAfter: ReturnType<typeof vi.fn>
   let linkId: string
   let issueId: string
 
@@ -101,7 +103,13 @@ describe('webhook processing', () => {
     const fake = fakeDb()
     rows = fake.rows
     runMutation = vi.fn(async () => null)
-    ctx = { db: fake.db, runMutation, auth: { getUserIdentity: async () => null } } as unknown as MutationCtx
+    runAfter = vi.fn(async () => null)
+    ctx = {
+      db: fake.db,
+      runMutation,
+      scheduler: { runAfter },
+      auth: { getUserIdentity: async () => null },
+    } as unknown as MutationCtx
     const now = Date.now()
     const linker = await fake.insert('users', { name: 'Linker', email: 'l@x', globalRole: 'member', isActive: true })
     const dev = await fake.insert('users', { name: 'Dev', email: 'd@x', globalRole: 'member', isActive: true })
@@ -319,6 +327,200 @@ describe('webhook processing', () => {
     const args = { repositoryId: 99, deliveryId: 'dup', event: 'ping', action: null, outcome: 'processing' }
     expect(await record(ctx, args)).toEqual({ duplicate: false })
     expect(await record(ctx, args)).toEqual({ duplicate: true })
+  })
+
+  describe('review conversations tracked as tasks', () => {
+    let threadLinkId: string
+
+    function insertThreadLink(overrides: Row = {}) {
+      const now = Date.now()
+      const id = `githubReviewThreadLinks-${rows.size + 100}`
+      rows.set(id, {
+        _id: id,
+        projectId: issue().projectId,
+        repositoryId: 99,
+        pullNumber: 12,
+        issueId,
+        threadId: 'PRRT_1',
+        kind: 'fix',
+        path: 'src/tax.ts',
+        line: 42,
+        isResolved: false,
+        isOutdated: false,
+        createdBy: 'users-1',
+        createdAt: now,
+        updatedAt: now,
+        ...overrides,
+      })
+      return id
+    }
+
+    function threadPayload(action: 'resolved' | 'unresolved', sender = 'dev') {
+      const { pull_request } = pullRequestPayload('opened')
+      return { action, repository, sender: { login: sender }, pull_request, thread: { node_id: 'PRRT_1', comments: [] } }
+    }
+
+    beforeEach(() => {
+      rows.get(issueId)!.status = 'in_progress'
+      threadLinkId = insertThreadLink()
+    })
+
+    const threadLink = () => rows.get(threadLinkId)!
+
+    it('completes a fix task when its conversation is resolved and restores it when reopened', async () => {
+      const result = await deliver('pull_request_review_thread', threadPayload('resolved'))
+      expect(result.outcomes[0]).toContain('task moved to done')
+      expect(issue().status).toBe('done')
+      expect(threadLink()).toMatchObject({ isResolved: true, statusBeforeResolve: 'in_progress' })
+      expect(activities('github.review_thread_event')[0].metadata).toMatchObject({
+        event: 'resolved',
+        from: 'in_progress',
+        to: 'done',
+        actorLogin: 'dev',
+      })
+      // The mapped GitHub user who resolved the thread made the change.
+      expect(activities('issue.status_changed')[0].actorId).toBe('users-2')
+      // The thread is already resolved, so nothing is sent back to GitHub.
+      expect(runAfter).not.toHaveBeenCalled()
+      expect(rows.get(linkId)!.liveVersion).toBe(1)
+
+      await deliver('pull_request_review_thread', threadPayload('unresolved'))
+      expect(issue().status).toBe('in_progress')
+      expect(threadLink().isResolved).toBe(false)
+      expect(threadLink().statusBeforeResolve).toBeUndefined()
+      expect(runAfter).not.toHaveBeenCalled()
+    })
+
+    it('ignores repeated deliveries and untracked threads', async () => {
+      await deliver('pull_request_review_thread', threadPayload('resolved'))
+      const second = await deliver('pull_request_review_thread', threadPayload('resolved'))
+      expect(second.outcomes[0]).toContain('unchanged')
+      expect(activities('github.review_thread_event')).toHaveLength(1)
+
+      rows.delete(threadLinkId)
+      const untracked = await deliver('pull_request_review_thread', threadPayload('unresolved'))
+      expect(untracked.outcomes[0]).toContain('not tracked')
+    })
+
+    it('leaves follow-up tasks alone', async () => {
+      rows.get(threadLinkId)!.kind = 'follow_up'
+      await deliver('pull_request_review_thread', threadPayload('resolved'))
+      expect(issue().status).toBe('in_progress')
+      expect(threadLink().isResolved).toBe(true)
+      expect(activities('github.review_thread_event')).toHaveLength(0)
+    })
+
+    it('only records the event when completing tasks is turned off', async () => {
+      rows.get(linkId)!.reviewTaskSettings = { completeTaskOnResolve: false, resolveThreadOnDone: true }
+      await deliver('pull_request_review_thread', threadPayload('resolved'))
+      expect(issue().status).toBe('in_progress')
+      expect(activities('github.review_thread_event')[0].metadata).toMatchObject({ event: 'resolved' })
+      expect(activities('github.review_thread_event')[0].metadata.to).toBeUndefined()
+    })
+
+    it('records a skipped move when a sub-task cannot reopen under a done parent', async () => {
+      await deliver('pull_request_review_thread', threadPayload('resolved'))
+      const now = Date.now()
+      rows.set('issues-900', {
+        _id: 'issues-900',
+        projectId: issue().projectId,
+        issueNumber: 900,
+        title: 'Parent',
+        searchText: 'parent',
+        status: 'done',
+        priority: 'none',
+        reporterId: 'users-1',
+        createdBy: 'users-1',
+        labels: [],
+        archived: false,
+        createdAt: now,
+        updatedAt: now,
+      })
+      rows.get(issueId)!.parentIssueId = 'issues-900'
+      await deliver('pull_request_review_thread', threadPayload('unresolved'))
+      expect(issue().status).toBe('done')
+      expect(threadLink().isResolved).toBe(false)
+      const skipped = activities('github.review_thread_event').at(-1)!
+      expect(skipped.metadata).toMatchObject({ event: 'unresolved', to: 'in_progress' })
+      expect(skipped.metadata.reason).toContain('parent')
+    })
+
+    function replyPayload(sender: string, inReplyTo: number | null = 1001, action = 'created') {
+      const { pull_request } = pullRequestPayload('opened')
+      return {
+        action,
+        repository,
+        sender: { login: sender },
+        pull_request,
+        comment: { id: 2002, in_reply_to_id: inReplyTo, user: { login: sender }, html_url: 'https://github.com/acme/app/pull/12#discussion_r2002', body: 'secret text' },
+      }
+    }
+    const replyNotifications = () =>
+      runMutation.mock.calls.filter(([, args]: any) => args?.type === 'github_review_reply').map(([, args]: any) => args)
+
+    it('records replies on tracked conversations and tells the assignee', async () => {
+      rows.get(threadLinkId)!.rootCommentId = 1001
+      rows.get(issueId)!.assigneeId = 'users-2'
+      const result = await deliver('pull_request_review_comment', replyPayload('linker-login'))
+      expect(result.outcomes[0]).toContain('1 task(s)')
+      expect(threadLink()).toMatchObject({ replyCount: 1, lastReplyLogin: 'linker-login' })
+      expect(activities('github.review_thread_event')[0].metadata).toMatchObject({ event: 'replied', actorLogin: 'linker-login' })
+      // The reply text never reaches Tasker's database.
+      expect(JSON.stringify([...rows.values()])).not.toContain('secret text')
+      expect(replyNotifications()).toHaveLength(1)
+      expect(replyNotifications()[0]).toMatchObject({
+        recipientUserId: 'users-2',
+        issueId,
+        metadata: { threadId: 'PRRT_1', location: 'src/tax.ts:42', taskKeys: ['SHOP-142'] },
+      })
+      expect(rows.get(linkId)!.liveVersion).toBe(1)
+    })
+
+    it('does not notify the assignee about their own reply, follow-ups or unrelated comments', async () => {
+      rows.get(threadLinkId)!.rootCommentId = 1001
+      rows.get(issueId)!.assigneeId = 'users-2'
+      await deliver('pull_request_review_comment', replyPayload('dev'))
+      expect(replyNotifications()).toHaveLength(0)
+      expect(threadLink().replyCount).toBe(1)
+
+      rows.get(threadLinkId)!.kind = 'follow_up'
+      await deliver('pull_request_review_comment', replyPayload('someone'))
+      expect(replyNotifications()).toHaveLength(0)
+
+      const untracked = await deliver('pull_request_review_comment', replyPayload('someone', 555))
+      expect(untracked.outcomes[0]).toContain('not tracked')
+      const root = await deliver('pull_request_review_comment', replyPayload('someone', null))
+      expect(root.outcomes[0]).toContain('ignored')
+      const edited = await deliver('pull_request_review_comment', replyPayload('someone', 1001, 'edited'))
+      expect(edited.outcomes[0]).toContain('ignored')
+      expect(threadLink().replyCount).toBe(2)
+    })
+
+    it('queues resolving the conversation when a fix task is finished in Tasker', async () => {
+      const user = rows.get('users-2')!
+      await applyIssueUpdate(ctx, { issue: structuredClone(issue()) as any, user: user as any, changes: { status: 'done' } })
+      expect(runAfter).toHaveBeenCalledTimes(1)
+      expect(runAfter.mock.calls[0][0]).toBe(0)
+      expect(runAfter.mock.calls[0][2]).toEqual({ linkId: threadLinkId, userId: 'users-2', resolved: true })
+
+      // Reopening an unresolved thread's task has nothing to undo.
+      runAfter.mockClear()
+      await applyIssueUpdate(ctx, { issue: structuredClone(issue()) as any, user: user as any, changes: { status: 'todo' } })
+      expect(runAfter).not.toHaveBeenCalled()
+    })
+
+    it('does not touch GitHub when the setting is off or the task is a follow-up', async () => {
+      const user = rows.get('users-2')!
+      rows.get(linkId)!.reviewTaskSettings = { completeTaskOnResolve: true, resolveThreadOnDone: false }
+      await applyIssueUpdate(ctx, { issue: structuredClone(issue()) as any, user: user as any, changes: { status: 'done' } })
+      expect(runAfter).not.toHaveBeenCalled()
+
+      delete rows.get(linkId)!.reviewTaskSettings
+      rows.get(threadLinkId)!.kind = 'follow_up'
+      await applyIssueUpdate(ctx, { issue: structuredClone(issue()) as any, user: user as any, changes: { status: 'todo' } })
+      await applyIssueUpdate(ctx, { issue: structuredClone(issue()) as any, user: user as any, changes: { status: 'done' } })
+      expect(runAfter).not.toHaveBeenCalled()
+    })
   })
 })
 

@@ -73,6 +73,7 @@ export type GitHubNotificationType =
   | 'github_merge_conflict'
   | 'github_pr_merged'
   | 'github_workflow_failed'
+  | 'github_review_reply'
 
 export type GitHubNotificationMetadata = {
   repository: string
@@ -88,6 +89,9 @@ export type GitHubNotificationMetadata = {
   runUrl?: string
   branch?: string
   taskKeys?: string[]
+  /** Review conversation a reply belongs to, for `github_review_reply`. */
+  threadId?: string
+  location?: string
   /** Prevents the same signal reaching a user twice (for example one failure per commit). */
   dedupeKey: string
 }
@@ -104,7 +108,9 @@ export function buildGitHubNotificationContent(
   const link =
     type === 'github_workflow_failed' && meta.runId
       ? `/projects/${meta.projectId}/workflows/runs/${meta.runId}`
-      : `/projects/${meta.projectId}/pulls/${meta.pullNumber ?? ''}`
+      : `/projects/${meta.projectId}/pulls/${meta.pullNumber ?? ''}${
+          type === 'github_review_reply' && meta.threadId ? `?thread=${encodeURIComponent(meta.threadId)}` : ''
+        }`
   const absoluteLink = `${appBaseUrl.replace(/\/$/, '')}${link}`
 
   let title: string
@@ -133,6 +139,10 @@ export function buildGitHubNotificationContent(
     case 'github_pr_merged':
       title = `${pr} merged`
       body = `${actor} merged ${prLabel} in ${meta.repository}${tasks}.`
+      break
+    case 'github_review_reply':
+      title = `New reply on a review conversation${meta.taskKeys?.length ? ` for ${meta.taskKeys.join(', ')}` : ''}`
+      body = `${actor} replied${meta.location ? ` on ${meta.location}` : ''} in ${prLabel} (${meta.repository}).`
       break
     case 'github_workflow_failed':
       title = `${meta.runName ?? 'Workflow'} failed on ${meta.branch ?? 'the default branch'}`

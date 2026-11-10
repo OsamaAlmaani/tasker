@@ -5,9 +5,11 @@ import { internalMutation, internalQuery, type MutationCtx } from './_generated/
 import type { GitHubAutomationRule, GitHubAutomationTrigger, GitHubPullRequestSnapshot } from './constants'
 import { applyIssueUpdate } from './issues'
 import { createActivity } from './lib/activity'
-import { canWrite, getProjectMembership, isAdmin, requireProjectWriteAccess } from './lib/auth'
+import { requireProjectWriteAccess } from './lib/auth'
+import { canViewProject, resolveActor } from './lib/githubActors'
 import {
   checksSummaryFromConclusion,
+  GITHUB_WEBHOOK_EVENTS,
   normalizeAutomationRules,
   resolveTransition,
   snapshotFromPullRequest,
@@ -22,6 +24,7 @@ import {
   upsertBranchLinkForProject,
   upsertPullRequestLinksForProject,
 } from './githubLinks'
+import { applyThreadState } from './githubReviewTasks'
 
 // Webhook persistence and processing. The HTTP route in `http.ts` verifies the
 // signature, then calls `processEvent` for the repository links whose secret
@@ -58,6 +61,7 @@ export const saveWebhook = internalMutation({
         url: args.url,
         registeredBy: user._id,
         registeredAt: Date.now(),
+        events: GITHUB_WEBHOOK_EVENTS,
       },
     })
     await createActivity(ctx, {
@@ -68,6 +72,17 @@ export const saveWebhook = internalMutation({
       action: 'github.webhook_registered',
       metadata: { repository: link.fullName, manual: args.hookId === null },
     })
+    return null
+  },
+})
+
+export const setWebhookEvents = internalMutation({
+  args: { projectId: v.id('projects'), events: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    await requireProjectWriteAccess(ctx, args.projectId)
+    const link = await getRepositoryLink(ctx, args.projectId)
+    if (!link?.webhook) return null
+    await ctx.db.patch(link._id, { webhook: { ...link.webhook, events: args.events } })
     return null
   },
 })
@@ -140,6 +155,8 @@ function changesLiveViews(event: WebhookEvent) {
   return (
     event.kind === 'pull_request' ||
     (event.kind === 'pull_request_review' && event.action === 'submitted') ||
+    event.kind === 'pull_request_review_thread' ||
+    (event.kind === 'pull_request_review_comment' && event.action !== 'other') ||
     event.kind === 'check_suite' ||
     event.kind === 'workflow_run'
   )
@@ -177,40 +194,6 @@ export const processEvent = internalMutation({
     return { outcomes }
   },
 })
-
-/** Whether a user may see the project: admin, creator or member, and active. */
-async function canViewProject(ctx: MutationCtx, user: Doc<'users'> | null, project: Doc<'projects'>) {
-  if (!user || !user.isActive) return false
-  if (isAdmin(user.globalRole) || project.createdBy === user._id) return true
-  return Boolean(await getProjectMembership(ctx, project._id, user._id))
-}
-
-/** Whether a user may change tasks in the project, as the UI would allow. */
-async function canActForProject(ctx: MutationCtx, user: Doc<'users'> | null, project: Doc<'projects'>) {
-  return Boolean(user && canWrite(user.globalRole) && (await canViewProject(ctx, user, project)))
-}
-
-/**
- * Who automation acts as: the mapped GitHub sender when they could make the
- * change themselves, else the opted-in automation identity, else the person
- * who linked the repository. Null disables automation for this delivery.
- */
-async function resolveActor(
-  ctx: MutationCtx,
-  link: Doc<'githubRepositoryLinks'>,
-  project: Doc<'projects'>,
-  sender: Doc<'users'> | null,
-) {
-  const candidates = [
-    sender,
-    link.automationUserId ? await ctx.db.get(link.automationUserId) : null,
-    await ctx.db.get(link.linkedBy),
-  ]
-  for (const candidate of candidates) {
-    if (await canActForProject(ctx, candidate, project)) return candidate
-  }
-  return null
-}
 
 // ---------------------------------------------------------------------------
 // Event handling
@@ -250,6 +233,10 @@ async function handleEvent(
       return await handlePullRequest(ctx, context, event)
     case 'pull_request_review':
       return await handleReview(ctx, context, event)
+    case 'pull_request_review_thread':
+      return await handleReviewThread(ctx, context, rawProject, event)
+    case 'pull_request_review_comment':
+      return await handleReviewComment(ctx, context, event)
     case 'push':
       return await handlePush(ctx, context, event)
     case 'check_suite':
@@ -572,6 +559,107 @@ async function handleReview(
     },
   })
   return `review ${event.state}: ${links.length} task(s)`
+}
+
+/** A review conversation was resolved or reopened on GitHub. */
+async function handleReviewThread(
+  ctx: MutationCtx,
+  context: ProjectContext,
+  project: Doc<'projects'>,
+  event: Extract<WebhookEvent, { kind: 'pull_request_review_thread' }>,
+) {
+  const links = (
+    await ctx.db
+      .query('githubReviewThreadLinks')
+      .withIndex('by_threadId', (q) => q.eq('threadId', event.threadId))
+      .collect()
+  ).filter((row) => row.projectId === context.link.projectId && row.repositoryId === context.link.repositoryId)
+  if (!links.length) return `review thread ${event.action}: not tracked`
+  const outcomes: string[] = []
+  for (const link of links) {
+    outcomes.push(
+      await applyThreadState(ctx, {
+        repository: context.link,
+        project,
+        link,
+        state: { isResolved: event.action === 'resolved' },
+        sender: context.sender,
+        senderLogin: event.senderLogin,
+        deliveryId: context.deliveryId,
+      }),
+    )
+  }
+  return `review thread ${event.action}: ${outcomes.join(', ')}`
+}
+
+/**
+ * A reply on a tracked review conversation. Only who replied is recorded; the
+ * text stays on GitHub and is read live with each viewer's token. The task's
+ * assignee hears about replies on open `fix` conversations.
+ */
+async function handleReviewComment(
+  ctx: MutationCtx,
+  context: ProjectContext,
+  event: Extract<WebhookEvent, { kind: 'pull_request_review_comment' }>,
+) {
+  if (event.action !== 'created' || event.inReplyToId === null) return `review comment ${event.action}: ignored`
+  const rootCommentId = event.inReplyToId
+  const links = (
+    await ctx.db
+      .query('githubReviewThreadLinks')
+      .withIndex('by_repositoryId_rootCommentId', (q) =>
+        q.eq('repositoryId', context.link.repositoryId).eq('rootCommentId', rootCommentId),
+      )
+      .collect()
+  ).filter((row) => row.projectId === context.link.projectId)
+  if (!links.length) return 'review reply: not tracked'
+  const pr = event.pullRequest
+  const now = Date.now()
+  const actorLogin = event.authorLogin ?? event.senderLogin
+  for (const link of links) {
+    await ctx.db.patch(link._id, {
+      replyCount: (link.replyCount ?? 0) + 1,
+      lastReplyAt: now,
+      lastReplyLogin: actorLogin ?? undefined,
+      updatedAt: now,
+    })
+    const issue = await ctx.db.get(link.issueId)
+    if (!issue || issue.deletedAt) continue
+    const location = link.line ? `${link.path}:${link.line}` : link.path
+    await createActivity(ctx, {
+      actorId: context.sender?._id,
+      projectId: link.projectId,
+      issueId: issue._id,
+      entityType: 'github',
+      entityId: `${link.repositoryId}#${link.pullNumber}`,
+      action: 'github.review_thread_event',
+      metadata: {
+        event: 'replied',
+        pullNumber: link.pullNumber,
+        path: link.path,
+        line: link.line ?? null,
+        actorLogin,
+        deliveryId: context.deliveryId,
+      },
+    })
+    if (link.kind !== 'fix' || link.isResolved || !issue.assigneeId) continue
+    await notify(ctx, context, {
+      recipient: await ctx.db.get(issue.assigneeId),
+      type: 'github_review_reply',
+      issueId: issue._id,
+      meta: {
+        pullNumber: pr.number,
+        pullTitle: pr.title,
+        pullUrl: pr.url,
+        actorLogin,
+        taskKeys: [`${context.project.key}-${issue.issueNumber}`],
+        threadId: link.threadId,
+        location,
+        dedupeKey: `review_reply:${context.link.repositoryId}:${event.commentId}:${issue.assigneeId}`,
+      },
+    })
+  }
+  return `review reply: ${links.length} task(s)`
 }
 
 async function handlePush(ctx: MutationCtx, context: ProjectContext, event: Extract<WebhookEvent, { kind: 'push' }>) {

@@ -126,6 +126,14 @@ The original claim tools also enforce configured read/write/project scopes.
 Claims renew leases and are intentionally not exactly-once operations. Existing
 claim/review workflow semantics remain distinct from ordinary task editing.
 
+Review tasks: tasks created from a pull request review conversation return
+`reviewFeedback` from `get_task` (repository, pull request number and URL, file,
+line, reviewer, conversation URL, `fix` or `follow_up`, resolved and outdated
+state). The review comment is quoted in the task description. Agents have no
+GitHub access through Tasker: fix the code on the pull request branch with your
+own tools and submit the task for review. When a person finishes the task,
+Tasker resolves the conversation on GitHub with that person's token.
+
 ## Local startup and client configuration
 
 Use the repository's Node 25.x and pnpm 11.x toolchain and installed dependencies.

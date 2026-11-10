@@ -13,6 +13,7 @@ import {
   githubAutomationRuleValidator,
   githubLinkSourceValidator,
   githubPullRequestSnapshotValidator,
+  githubReviewTaskSettingsValidator,
   githubTemplatesValidator,
 } from './constants'
 import { createActivity } from './lib/activity'
@@ -24,7 +25,8 @@ import {
   requireProjectViewAccess,
   requireProjectWriteAccess,
 } from './lib/auth'
-import { describeAutomationRules, normalizeAutomationRules } from './lib/githubAutomation'
+import { describeAutomationRules, missingWebhookEvents, normalizeAutomationRules } from './lib/githubAutomation'
+import { normalizeReviewTaskSettings } from './lib/githubReviewTasks'
 import { normalizeTemplates } from './lib/githubReferences'
 import { getIssueChecklistProgress } from './lib/issueChecklists'
 import { getProjectStatusColor, getProjectStatusLabel, normalizeProject } from './lib/projectStatuses'
@@ -342,6 +344,7 @@ export const getSettings = query({
         statuses.map((status) => status.key),
       ),
       templates: normalizeTemplates(repository.templates),
+      reviewTaskSettings: normalizeReviewTaskSettings(repository.reviewTaskSettings),
       webhook: repository.webhook
         ? {
             hookId: repository.webhook.hookId,
@@ -351,6 +354,7 @@ export const getSettings = query({
             lastDeliveryAt: repository.webhook.lastDeliveryAt ?? null,
             lastDeliveryEvent: repository.webhook.lastDeliveryEvent ?? null,
             lastError: repository.webhook.lastError ?? null,
+            missingEvents: missingWebhookEvents(repository.webhook.events),
           }
         : null,
       webhookEndpoint: webhookEndpoint(),
@@ -392,6 +396,7 @@ export const updateAutomationSettings = mutation({
     projectId: v.id('projects'),
     rules: v.optional(v.array(githubAutomationRuleValidator)),
     templates: v.optional(githubTemplatesValidator),
+    reviewTaskSettings: v.optional(githubReviewTaskSettingsValidator),
   },
   handler: async (ctx, args) => {
     const { user, project } = await requireProjectWriteAccess(ctx, args.projectId)
@@ -415,6 +420,7 @@ export const updateAutomationSettings = mutation({
       patch.automationRules = rules
     }
     if (args.templates) patch.templates = normalizeTemplates(args.templates)
+    if (args.reviewTaskSettings) patch.reviewTaskSettings = normalizeReviewTaskSettings(args.reviewTaskSettings)
     await ctx.db.patch(repository._id, patch)
     await createActivity(ctx, {
       actorId: user._id,

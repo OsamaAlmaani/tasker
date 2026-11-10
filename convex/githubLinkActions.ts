@@ -12,7 +12,7 @@ import {
   type PullRequestSummary,
   type RawPullRequestSummary,
 } from './lib/githubApi'
-import { generateWebhookSecret } from './lib/githubAutomation'
+import { GITHUB_WEBHOOK_EVENTS, generateWebhookSecret } from './lib/githubAutomation'
 import { encryptSecret, getEncryptionKey } from './lib/githubCrypto'
 import { linkCandidatesFromSummaries, type RestPullRequestLike, snapshotFromRest } from './lib/githubLinkSync'
 import { renderBranchName, renderTemplate, sanitizeBranchName, type TemplateContext } from './lib/githubReferences'
@@ -21,7 +21,7 @@ import { renderBranchName, renderTemplate, sanitizeBranchName, type TemplateCont
 // requests, live summaries and the repository access check. Webhook
 // registration lives here too because it uses the registering user's token.
 
-const WEBHOOK_EVENTS = ['pull_request', 'pull_request_review', 'push', 'check_suite', 'workflow_run']
+const WEBHOOK_EVENTS = GITHUB_WEBHOOK_EVENTS
 const MAX_LINKED_PULL_REQUESTS = 20
 
 function appBaseUrl() {
@@ -295,6 +295,46 @@ export const createManualWebhook = action({
       url: endpoint,
     })
     return { url: endpoint, secret, events: WEBHOOK_EVENTS }
+  },
+})
+
+/**
+ * Subscribes an existing hook to every event Tasker handles today. A manual
+ * hook cannot be changed from here, so the caller confirms they ticked the
+ * events on GitHub and Tasker records that.
+ */
+export const updateWebhookEvents = action({
+  args: { projectId: v.id('projects') },
+  handler: async (ctx, args): Promise<{ updatedOnGitHub: boolean }> => {
+    const { token, repository } = await loadLinkedClient(ctx, args.projectId, 'write')
+    if (!repository.webhook) {
+      throw new ConvexError({ code: 'GITHUB_WEBHOOK_MISSING', message: 'Set up the webhook first.' })
+    }
+    let updatedOnGitHub = false
+    if (repository.webhook.hookId) {
+      try {
+        await githubRequest(token, 'PATCH', `${repoPath(repository)}/hooks/${repository.webhook.hookId}`, {
+          events: WEBHOOK_EVENTS,
+          active: true,
+        })
+        updatedOnGitHub = true
+      } catch (error) {
+        const status = error instanceof ConvexError ? (error.data as { status?: number }).status : undefined
+        if (status === 403 || status === 404) {
+          throw githubError(
+            'GITHUB_FORBIDDEN',
+            'Your token cannot manage webhooks on this repository. Grant it the "Webhooks" repository permission, or add the events on GitHub by hand.',
+            status,
+          )
+        }
+        throw error
+      }
+    }
+    await ctx.runMutation(internal.githubWebhooks.setWebhookEvents, {
+      projectId: args.projectId,
+      events: WEBHOOK_EVENTS,
+    })
+    return { updatedOnGitHub }
   },
 })
 

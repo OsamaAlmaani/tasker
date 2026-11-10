@@ -179,3 +179,58 @@ describe("task discussion tabs", () => {
 		expect(screen.getByRole("textbox", { name: "Add a comment" })).toBeTruthy();
 	});
 });
+
+describe("replying on GitHub from a task comment", () => {
+	function Harness({
+		options,
+	}: {
+		options: { value: string; label: string }[];
+	}) {
+		const [selected, setSelected] = useState<string | null>(null);
+		return (
+			<IssueDiscussionPanel
+				{...panelProps({
+					reviewReply: { options, selected, setSelected, error: null },
+				})}
+			/>
+		);
+	}
+
+	it("offers the only conversation with a checkbox and renames the submit button", () => {
+		render(<Harness options={[{ value: "t1", label: "tax.ts:42 (#12)" }]} />);
+		const toggle = screen.getByRole("checkbox", {
+			name: "Also reply on GitHub (tax.ts:42 (#12))",
+		});
+		expect(screen.getByRole("button", { name: "Add comment" })).toBeTruthy();
+		fireEvent.click(toggle);
+		expect(
+			screen.getByRole("button", { name: "Comment and reply on GitHub" }),
+		).toBeTruthy();
+		expect(screen.queryByRole("combobox")).toBeNull();
+	});
+
+	it("lets the commenter pick between several conversations", () => {
+		render(
+			<Harness
+				options={[
+					{ value: "t1", label: "a.ts:1 (#12)" },
+					{ value: "t2", label: "b.ts:2 (#12)" },
+				]}
+			/>,
+		);
+		fireEvent.click(
+			screen.getByRole("checkbox", { name: "Also reply on GitHub" }),
+		);
+		const select = screen.getByRole("combobox", {
+			name: "Review conversation to reply to",
+		}) as HTMLSelectElement;
+		expect(select.value).toBe("t1");
+		fireEvent.change(select, { target: { value: "t2" } });
+		expect(select.value).toBe("t2");
+	});
+
+	it("hides the option when the task has no review conversations", () => {
+		render(<IssueDiscussionPanel {...panelProps()} />);
+		expect(screen.queryByRole("checkbox")).toBeNull();
+	});
+});

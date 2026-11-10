@@ -126,6 +126,31 @@ describe('agent task queue', () => {
     expect((await handler(tasks.list)(ctx, { token, statuses: ['in_review'] })).tasks).toHaveLength(1)
     const result = await handler(tasks.get)(ctx, { token, issueId })
     expect(result).toMatchObject({ issue: { title: 'Work' }, project: { key: 'TEST' }, assignee: { _id: userId, name: 'User' }, canWrite: true })
+    expect(result.reviewFeedback).toEqual([])
+  })
+  it('includes the review conversations a task was created from', async () => {
+    const { ctx, records } = await context()
+    records.set('githubRepositoryLinks-1', { _id: 'githubRepositoryLinks-1', projectId, repositoryId: 99, fullName: 'acme/app', htmlUrl: 'https://github.com/acme/app' })
+    records.set('githubReviewThreadLinks-1', {
+      _id: 'githubReviewThreadLinks-1', projectId, repositoryId: 99, issueId, pullNumber: 12, threadId: 'PRRT_1', rootCommentId: 1001,
+      kind: 'fix', path: 'src/tax.ts', line: 42, authorLogin: 'reviewer', isResolved: false, isOutdated: true, replyCount: 2,
+    })
+    // A link left over from a repository the project no longer tracks is hidden.
+    records.set('githubReviewThreadLinks-2', { _id: 'githubReviewThreadLinks-2', projectId, repositoryId: 7, issueId, pullNumber: 3, threadId: 'PRRT_2', kind: 'fix', path: 'a.ts', isResolved: false, isOutdated: false })
+    const result = await handler(tasks.get)(ctx, { token, issueId })
+    expect(result.reviewFeedback).toEqual([{
+      repository: 'acme/app',
+      pullNumber: 12,
+      pullRequestUrl: 'https://github.com/acme/app/pull/12',
+      conversationUrl: 'https://github.com/acme/app/pull/12#discussion_r1001',
+      path: 'src/tax.ts',
+      line: 42,
+      reviewerLogin: 'reviewer',
+      kind: 'fix',
+      isResolved: false,
+      isOutdated: true,
+      replyCount: 2,
+    }])
   })
   it('filters mine, others, unassigned, and a specific assignee without leaking other projects', async () => {
     const { ctx, records } = await context()

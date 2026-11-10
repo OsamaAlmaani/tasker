@@ -8,6 +8,7 @@ import {
 	Eye,
 	FileCode2,
 	GitCommitHorizontal,
+	ListPlus,
 	MessagesSquare,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -29,10 +30,16 @@ import {
 	type PullRequestDetail as PullRequestDetailData,
 	reviewStateLabel,
 } from "../pullRequestDisplay";
+import type { reviewTaskProgress } from "../reviewTaskDisplay";
 import { GitHubAvatar, ToneBadge, toneTextClasses } from "./GitHubBadges";
 import { GitHubHtml, GitHubReactions, MarkdownEditor } from "./GitHubContent";
+import { type ReviewTask, ReviewTaskChip } from "./ReviewTasks";
 
-export type ConversationFilters = { hideBots: boolean; hideResolved: boolean };
+export type ConversationFilters = {
+	hideBots: boolean;
+	hideResolved: boolean;
+	hideTracked: boolean;
+};
 
 type ReviewItem = Extract<PullRequestTimelineItem, { kind: "review" }>;
 type CommentItem = Extract<PullRequestTimelineItem, { kind: "comment" }>;
@@ -57,6 +64,9 @@ type ConversationContext = {
 	onRefresh: () => Promise<void>;
 	focusedThreadId: string | null;
 	onFocusHandled: () => void;
+	reviewTasks: Map<string, ReviewTask>;
+	/** Opens the tracking dialog; null when the viewer cannot create tasks. */
+	onTrack: ((threadIds: string[]) => void) | null;
 };
 
 const DIFF_CONTEXT_LINES = 6;
@@ -80,13 +90,19 @@ export function threadStartedByBot(thread: PullRequestReviewThread) {
 function buildEntries(
 	timeline: PullRequestTimelineItem[],
 	filters: ConversationFilters,
+	isTracked: (threadId: string) => boolean,
 ) {
 	const entries: Entry[] = [];
 	let hiddenBots = 0;
 	let hiddenResolved = 0;
+	let hiddenTracked = 0;
 	const keepThread = (thread: PullRequestReviewThread) => {
 		if (filters.hideResolved && thread.isResolved) {
 			hiddenResolved += 1;
+			return false;
+		}
+		if (filters.hideTracked && isTracked(thread.id)) {
+			hiddenTracked += 1;
 			return false;
 		}
 		return true;
@@ -126,7 +142,7 @@ function buildEntries(
 		}
 		entries.push({ kind: "review", key: item.id, item, threads });
 	}
-	return { entries, hiddenBots, hiddenResolved };
+	return { entries, hiddenBots, hiddenResolved, hiddenTracked };
 }
 
 function fileParts(path: string) {
@@ -498,6 +514,7 @@ function ReviewThreadCard({
 		).values(),
 	] as GitHubActor[];
 	const { focusedThreadId, onFocusHandled } = context;
+	const reviewTask = context.reviewTasks.get(thread.id);
 
 	useEffect(() => {
 		if (focusedThreadId !== thread.id) return;
@@ -596,6 +613,22 @@ function ReviewThreadCard({
 							</span>
 						) : null}
 					</button>
+					{reviewTask ? (
+						<ReviewTaskChip task={reviewTask} />
+					) : context.onTrack ? (
+						<Button
+							type="button"
+							size="sm"
+							variant="ghost"
+							className="h-7 shrink-0 gap-1 px-2 text-xs"
+							title="Create a Tasker task for this conversation"
+							onClick={() => context.onTrack?.([thread.id])}
+						>
+							<ListPlus className="h-3.5 w-3.5" aria-hidden="true" />
+							<span className="hidden sm:inline">Track</span>
+							<span className="sr-only sm:hidden">Track as task</span>
+						</Button>
+					) : null}
 					{thread.isOutdated ? (
 						<ToneBadge
 							tone="warning"
@@ -902,6 +935,8 @@ export function PullRequestConversation({
 	onFiltersChange,
 	focusedThreadId,
 	onFocusHandled,
+	reviewTasks,
+	onTrack,
 }: {
 	pullRequest: PullRequestDetailData;
 	projectId: Id<"projects">;
@@ -912,6 +947,8 @@ export function PullRequestConversation({
 	onFiltersChange: (filters: ConversationFilters) => void;
 	focusedThreadId: string | null;
 	onFocusHandled: () => void;
+	reviewTasks: Map<string, ReviewTask>;
+	onTrack: ((threadIds: string[]) => void) | null;
 }) {
 	const context: ConversationContext = {
 		projectId,
@@ -921,11 +958,15 @@ export function PullRequestConversation({
 		onRefresh,
 		focusedThreadId,
 		onFocusHandled,
+		reviewTasks,
+		onTrack,
 	};
-	const { entries, hiddenBots, hiddenResolved } = buildEntries(
+	const { entries, hiddenBots, hiddenResolved, hiddenTracked } = buildEntries(
 		pullRequest.timeline,
 		filters,
+		(threadId) => reviewTasks.has(threadId),
 	);
+	const trackedCount = reviewTasks.size;
 	const botCount = useMemo(
 		() =>
 			pullRequest.timeline.filter((item) =>
@@ -944,8 +985,24 @@ export function PullRequestConversation({
 
 	return (
 		<section aria-label="Conversation" className="space-y-3">
-			{botCount || resolvedCount ? (
+			{botCount || resolvedCount || trackedCount ? (
 				<div className="flex flex-wrap items-center justify-end gap-1.5">
+					{trackedCount ? (
+						<FilterToggle
+							pressed={filters.hideTracked}
+							onToggle={() =>
+								onFiltersChange({
+									...filters,
+									hideTracked: !filters.hideTracked,
+								})
+							}
+						>
+							Hide tracked
+							<span className="tabular-nums text-[var(--muted-text)]">
+								{filters.hideTracked ? hiddenTracked : trackedCount}
+							</span>
+						</FilterToggle>
+					) : null}
 					{botCount ? (
 						<FilterToggle
 							pressed={filters.hideBots}
@@ -1057,7 +1114,7 @@ export function PullRequestConversation({
 
 			{!entries.length ? (
 				<p className="m-0 pl-12 text-sm text-[var(--muted-text)]">
-					{hiddenBots || hiddenResolved
+					{hiddenBots || hiddenResolved || hiddenTracked
 						? "Everything else is hidden by the filters above."
 						: "No comments or reviews yet."}
 				</p>
@@ -1069,14 +1126,63 @@ export function PullRequestConversation({
 // ---------------------------------------------------------------------------
 // Sidebar
 
+function ReviewTaskProgress({
+	progress,
+}: {
+	progress: ReturnType<typeof reviewTaskProgress>;
+}) {
+	const percent = progress.fixes
+		? Math.round((progress.fixesDone / progress.fixes) * 100)
+		: 0;
+	return (
+		<div className="mb-3 space-y-1.5">
+			{progress.fixes ? (
+				<>
+					<div className="flex items-center justify-between text-xs">
+						<span className="font-medium text-[var(--text)]">Review tasks</span>
+						<span className="tabular-nums text-[var(--muted-text)]">
+							{progress.fixesDone}/{progress.fixes} done
+						</span>
+					</div>
+					<div
+						className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-muted)]"
+						role="progressbar"
+						aria-label="Review tasks done"
+						aria-valuemin={0}
+						aria-valuemax={progress.fixes}
+						aria-valuenow={progress.fixesDone}
+					>
+						<div
+							className="h-full rounded-full bg-emerald-500 transition-[width] motion-reduce:transition-none"
+							style={{ width: `${percent}%` }}
+						/>
+					</div>
+				</>
+			) : null}
+			{progress.followUps ? (
+				<p className="m-0 text-xs text-[var(--muted-text)]">
+					{progress.followUps} follow-up task
+					{progress.followUps === 1 ? "" : "s"} for later
+				</p>
+			) : null}
+		</div>
+	);
+}
+
 const CONVERSATION_LIST_LIMIT = 8;
 
 export function ConversationsCard({
 	pullRequest,
 	onOpenThread,
+	reviewTasks,
+	progress,
+	onTrack,
 }: {
 	pullRequest: PullRequestDetailData;
 	onOpenThread: (thread: PullRequestReviewThread) => void;
+	reviewTasks: Map<string, ReviewTask>;
+	progress: ReturnType<typeof reviewTaskProgress>;
+	onTrack: ((threadIds: string[]) => void) | null;
 }) {
 	const [showAll, setShowAll] = useState(false);
 	const threads = useMemo(
@@ -1102,6 +1208,9 @@ export function ConversationsCard({
 	);
 	const resolved = threads.length - open.length;
 	const listed = showAll ? open : open.slice(0, CONVERSATION_LIST_LIMIT);
+	const untracked = open.filter(
+		(thread) => !reviewTasks.has(thread.id) && !threadStartedByBot(thread),
+	);
 
 	return (
 		<Card>
@@ -1115,6 +1224,21 @@ export function ConversationsCard({
 				) : null}
 			</CardHeader>
 			<CardContent className="text-sm">
+				{progress.total ? <ReviewTaskProgress progress={progress} /> : null}
+				{onTrack && untracked.length ? (
+					<Button
+						type="button"
+						variant="secondary"
+						size="sm"
+						className="mb-3 w-full"
+						onClick={() => onTrack(untracked.map((thread) => thread.id))}
+					>
+						<ListPlus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+						{untracked.length === 1
+							? "Track the open conversation as a task"
+							: `Track ${untracked.length} open conversations as tasks`}
+					</Button>
+				) : null}
 				{!threads.length ? (
 					<p className="m-0 text-[var(--muted-text)]">
 						No comments on code yet.
@@ -1135,12 +1259,13 @@ export function ConversationsCard({
 							{listed.map((thread) => {
 								const first = thread.comments[0];
 								const { file } = fileParts(thread.path);
+								const task = reviewTasks.get(thread.id);
 								return (
-									<li key={thread.id}>
+									<li key={thread.id} className="flex items-start gap-1">
 										<button
 											type="button"
 											onClick={() => onOpenThread(thread)}
-											className="w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+											className="min-w-0 flex-1 rounded-md px-2 py-1.5 text-left hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
 										>
 											<span className="flex min-w-0 items-center gap-1.5 font-mono text-xs text-[var(--text)]">
 												<span className="flex min-w-0" title={thread.path}>
@@ -1170,6 +1295,9 @@ export function ConversationsCard({
 												</span>
 											</span>
 										</button>
+										{task ? (
+											<ReviewTaskChip task={task} className="mt-1" />
+										) : null}
 									</li>
 								);
 							})}

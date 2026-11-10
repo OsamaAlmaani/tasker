@@ -18,6 +18,8 @@ import {
   githubAutomationRuleValidator,
   githubLinkSourceValidator,
   githubPullRequestSnapshotValidator,
+  githubReviewTaskKindValidator,
+  githubReviewTaskSettingsValidator,
   githubTemplatesValidator,
 } from './constants'
 
@@ -147,6 +149,9 @@ export default defineSchema({
         lastDeliveryAt: v.optional(v.number()),
         lastDeliveryEvent: v.optional(v.string()),
         lastError: v.optional(v.string()),
+        // Events the hook was registered with; missing on hooks created
+        // before review thread sync, which the GitHub tab offers to update.
+        events: v.optional(v.array(v.string())),
       }),
     ),
     // Status automation rules mapped to this project's own statuses.
@@ -155,6 +160,7 @@ export default defineSchema({
     // GitHub. Every such action is labelled with their login in activity.
     automationUserId: v.optional(v.id('users')),
     templates: v.optional(githubTemplatesValidator),
+    reviewTaskSettings: v.optional(githubReviewTaskSettingsValidator),
   })
     .index('by_projectId', ['projectId'])
     .index('by_repositoryId', ['repositoryId']),
@@ -179,6 +185,41 @@ export default defineSchema({
     .index('by_projectId', ['projectId'])
     .index('by_projectId_pullNumber', ['projectId', 'pullNumber'])
     .index('by_repositoryId_pullNumber', ['repositoryId', 'pullNumber']),
+
+  // A pull request review conversation tracked as a task. `fix` threads keep
+  // their task in sync (resolved <-> done); `follow_up` threads were resolved
+  // on GitHub when the task was created and stay independent of it.
+  githubReviewThreadLinks: defineTable({
+    projectId: v.id('projects'),
+    repositoryId: v.number(),
+    pullNumber: v.number(),
+    issueId: v.id('issues'),
+    // GraphQL node id of the PullRequestReviewThread.
+    threadId: v.string(),
+    // REST id of the thread's first comment, for matching comment webhooks.
+    rootCommentId: v.optional(v.number()),
+    kind: githubReviewTaskKindValidator,
+    path: v.string(),
+    line: v.optional(v.number()),
+    authorLogin: v.optional(v.string()),
+    isResolved: v.boolean(),
+    isOutdated: v.boolean(),
+    // Status the task had before a resolved thread completed it, restored
+    // when the thread is unresolved.
+    statusBeforeResolve: v.optional(v.string()),
+    // Replies seen through webhooks. Only counts and logins are kept; the
+    // text is always read live with the viewer's own token.
+    replyCount: v.optional(v.number()),
+    lastReplyAt: v.optional(v.number()),
+    lastReplyLogin: v.optional(v.string()),
+    createdBy: v.id('users'),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_issueId', ['issueId'])
+    .index('by_projectId_pullNumber', ['projectId', 'pullNumber'])
+    .index('by_threadId', ['threadId'])
+    .index('by_repositoryId_rootCommentId', ['repositoryId', 'rootCommentId']),
 
   // A branch that belongs to a task, known before any pull request exists.
   githubBranchLinks: defineTable({

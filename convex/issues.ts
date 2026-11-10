@@ -19,6 +19,7 @@ import {
   requireProjectWriteAccess,
 } from './lib/auth'
 import { createActivity } from './lib/activity'
+import { queueReviewThreadSync } from './lib/githubReviewSync'
 import { shouldNotifyAssigneeChange } from './lib/notifications'
 import { matchesIssueFilters, matchesIssueSearch, validateDateFilters } from './lib/issueFilters'
 import { buildDescriptionFields, descriptionDocValidator, type DescriptionDoc } from './lib/issueDescriptions'
@@ -405,6 +406,8 @@ export async function applyIssueUpdate(
   if (changes.description !== undefined || changes.descriptionDoc !== undefined) {
     Object.assign(patch, prepareDescription(changes.description ?? issue.description, changes.descriptionDoc))
   }
+  // Sub-tasks completed together with this task, for review thread sync.
+  let cascadedToDone: Id<'issues'>[] = []
   if (changes.status !== undefined) {
     if (!ensureProjectStatusExists(project, changes.status)) {
       throw new ConvexError({
@@ -444,6 +447,7 @@ export async function applyIssueUpdate(
             }),
           ),
         )
+        cascadedToDone = unfinishedDescendants.map((descendant) => descendant._id)
       }
     } else {
       const visibleAncestors = await getVisibleIssueAncestors(ctx, issue)
@@ -616,6 +620,14 @@ export async function applyIssueUpdate(
         from: issue.status,
         to: changes.status,
       },
+    })
+  }
+
+  if (changes.status !== undefined && (changes.status === 'done') !== (issue.status === 'done')) {
+    await queueReviewThreadSync(ctx, {
+      issueIds: [issue._id, ...cascadedToDone],
+      done: changes.status === 'done',
+      userId: user._id,
     })
   }
 

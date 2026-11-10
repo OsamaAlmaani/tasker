@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "convex/react";
 import { type FormEvent, useMemo, useState } from "react";
+import { useReviewReplyOption } from "#/features/tasker/github/useReviewReplyOption";
 import type { IssueChecklistItem } from "#/features/tasker/issues/checklists";
 import type { IssueDraft } from "#/features/tasker/issues/components/IssueDraftDialog";
 import { useIssueStatusFlow } from "#/features/tasker/issues/useIssueStatusFlow";
@@ -132,6 +133,7 @@ export function useIssueDetailPage({
 	const updateIssue = useMutation(api.issues.update);
 	const deleteIssue = useMutation(api.issues.remove);
 	const createComment = useMutation(api.comments.create);
+	const reviewReply = useReviewReplyOption(issueId);
 	const updateComment = useMutation(api.comments.update);
 
 	const [comment, setComment] = useState("");
@@ -222,6 +224,9 @@ export function useIssueDetailPage({
 			body: parsed.data.body,
 		});
 		setComment("");
+		if (await reviewReply.send(parsed.data.body)) {
+			reviewReply.control?.setSelected(null);
+		}
 	}
 
 	async function confirmDeleteIssue() {
@@ -528,6 +533,7 @@ export function useIssueDetailPage({
 		subIssueError,
 		subIssueForm,
 		subIssueFormOpen,
+		reviewReply: reviewReply.control,
 		submitComment,
 		submitSubIssue,
 		submitTitleEdit,

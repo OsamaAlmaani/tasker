@@ -129,7 +129,7 @@ export function createTaskerServer(backend: TaskerBackend, token: string) {
     'get_task',
     {
       description:
-        'Read task details, project workflow keys, checklist, parent, subtasks, comments, assignee, and current agent claim before working.',
+        'Read task details, project workflow keys, checklist, parent, subtasks, comments, assignee, and current agent claim before working. Tasks created from a pull request review conversation include reviewFeedback (pull request, file, line, conversation URL); the quoted review comment is in the description. Address it on that pull request branch and mention the conversation in your review summary.',
       inputSchema: { issueId },
       annotations: readAnnotations,
     },

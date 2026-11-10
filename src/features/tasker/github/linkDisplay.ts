@@ -157,7 +157,25 @@ export const GITHUB_ACTIVITY_LABELS: Record<string, string> = {
 	"github.webhook_registered": "Registered GitHub webhook",
 	"github.webhook_removed": "Removed GitHub webhook",
 	"github.automation_settings_changed": "Changed GitHub automation settings",
+	"github.review_thread_linked": "Created from a review conversation",
+	"github.review_thread_unlinked": "Stopped tracking a review conversation",
+	"github.review_thread_event": "Review conversation updated",
 };
+
+const REVIEW_THREAD_EVENT_LABELS: Record<string, string> = {
+	resolved: "Review conversation resolved on GitHub",
+	unresolved: "Review conversation reopened on GitHub",
+	replied: "New reply on the review conversation",
+	resolved_on_github: "Resolved the review conversation on GitHub",
+	unresolved_on_github: "Reopened the review conversation on GitHub",
+	sync_failed: "Could not update the review conversation on GitHub",
+};
+
+function threadLocation(meta: GitHubActivityMetadata) {
+	if (!meta.path) return null;
+	const file = meta.path.split("/").pop() || meta.path;
+	return meta.line ? `${file}:${meta.line}` : file;
+}
 
 type GitHubActivityMetadata = {
 	event?: string;
@@ -171,8 +189,11 @@ type GitHubActivityMetadata = {
 	trigger?: string;
 	from?: string;
 	to?: string;
-	reason?: string;
+	reason?: string | null;
 	manual?: boolean;
+	path?: string;
+	line?: number | null;
+	kind?: string;
 };
 
 /** Human wording for a GitHub activity entry, or null for other actions. */
@@ -219,6 +240,40 @@ export function describeGitHubActivity(
 				label: "GitHub automation skipped",
 				detail: `${TRIGGER_LABELS[meta.trigger ?? ""] ?? meta.trigger ?? "rule"}: ${meta.reason ?? "blocked"}`,
 			};
+		case "github.review_thread_linked":
+		case "github.review_thread_unlinked": {
+			const where = [
+				number ? `#${number}` : null,
+				threadLocation(meta),
+				action === "github.review_thread_linked" && meta.kind === "follow_up"
+					? "follow-up"
+					: null,
+			]
+				.filter(Boolean)
+				.join(" · ");
+			return {
+				label: GITHUB_ACTIVITY_LABELS[action],
+				detail: where || null,
+			};
+		}
+		case "github.review_thread_event": {
+			const parts = [threadLocation(meta)];
+			if (meta.from && meta.to) {
+				parts.push(
+					meta.reason
+						? `${meta.from} → ${meta.to} skipped: ${meta.reason}`
+						: `${meta.from} → ${meta.to}`,
+				);
+			} else if (meta.reason) {
+				parts.push(meta.reason);
+			}
+			return {
+				label:
+					REVIEW_THREAD_EVENT_LABELS[meta.event ?? ""] ??
+					"Review conversation updated",
+				detail: `${parts.filter(Boolean).join(" · ")}${by}`.trim() || null,
+			};
+		}
 		case "github.branch_created":
 			return { label: "Created branch", detail: meta.branchName ?? null };
 		case "github.webhook_registered":

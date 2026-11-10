@@ -1,6 +1,13 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { AlertTriangle, Check, Copy, Webhook, Zap } from "lucide-react";
+import {
+	AlertTriangle,
+	Check,
+	Copy,
+	MessageSquareText,
+	Webhook,
+	Zap,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -52,8 +59,106 @@ export function GitHubAutomationSettings({
 			<WebhookCard projectId={projectId} settings={settings} />
 			<IdentityCard projectId={projectId} settings={settings} />
 			<RulesCard projectId={projectId} settings={settings} />
+			<ReviewTasksCard projectId={projectId} settings={settings} />
 			<TemplatesCard projectId={projectId} settings={settings} />
 		</div>
+	);
+}
+
+/** Sync between review conversations tracked as tasks and those tasks. */
+function ReviewTasksCard({
+	projectId,
+	settings,
+}: {
+	projectId: Id<"projects">;
+	settings: Settings;
+}) {
+	const updateSettings = useMutation(api.githubLinks.updateAutomationSettings);
+	const [error, setError] = useState<string | null>(null);
+	const [working, setWorking] = useState(false);
+	const current = settings.reviewTaskSettings;
+
+	async function save(patch: Partial<typeof current>) {
+		setWorking(true);
+		setError(null);
+		try {
+			await updateSettings({
+				projectId,
+				reviewTaskSettings: { ...current, ...patch },
+			});
+		} catch (caught) {
+			setError(getClientErrorMessage(caught, "Could not save the setting."));
+		} finally {
+			setWorking(false);
+		}
+	}
+
+	const options: Array<{
+		key: keyof typeof current;
+		label: string;
+		description: string;
+	}> = [
+		{
+			key: "completeTaskOnResolve",
+			label: "Complete review tasks when their conversation is resolved",
+			description:
+				"Reopening the conversation moves the task back to the status it had.",
+		},
+		{
+			key: "resolveThreadOnDone",
+			label: "Resolve the conversation when its review task is done",
+			description:
+				"Uses the GitHub token of the person who finished the task. Reopening the task reopens the conversation.",
+		},
+	];
+
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle className="flex items-center gap-2">
+					<MessageSquareText className="h-4 w-4" />
+					Review tasks
+				</CardTitle>
+			</CardHeader>
+			<CardContent className="space-y-3">
+				<p className="m-0 text-sm text-[var(--muted-text)]">
+					Review conversations tracked as "fix before merge" tasks stay in step
+					with GitHub. Follow-up tasks are independent once created.
+				</p>
+				<ul className="m-0 list-none space-y-3 p-0">
+					{options.map((option) => (
+						<li key={option.key} className="flex items-start gap-3">
+							<Switch
+								checked={current[option.key]}
+								disabled={!settings.canManage || working}
+								onChange={(next) => void save({ [option.key]: next })}
+							/>
+							<span className="text-sm">
+								<span className="block text-[var(--text)]">{option.label}</span>
+								<span className="block text-xs text-[var(--muted-text)]">
+									{option.description}
+								</span>
+							</span>
+						</li>
+					))}
+				</ul>
+				{settings.webhook?.missingEvents.some((event) =>
+					event.startsWith("pull_request_review_"),
+				) ? (
+					<p className="m-0 text-xs text-amber-700 dark:text-amber-300">
+						The webhook does not send every review conversation event yet, so
+						resolved conversations and replies only reach Tasker when someone
+						opens the pull request here. Update the webhook above.
+					</p>
+				) : !settings.webhook ? (
+					<p className="m-0 text-xs text-[var(--muted-text)]">
+						Without a webhook, tasks follow GitHub when someone opens the pull
+						request in Tasker.
+					</p>
+				) : null}
+				<ErrorText message={error} />
+			</CardContent>
+		</Card>
 	);
 }
 
@@ -69,6 +174,9 @@ function WebhookCard({
 		api.githubLinkActions.createManualWebhook,
 	);
 	const removeWebhook = useAction(api.githubLinkActions.removeWebhook);
+	const updateWebhookEvents = useAction(
+		api.githubLinkActions.updateWebhookEvents,
+	);
 	const [working, setWorking] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [manual, setManual] = useState<{
@@ -132,6 +240,41 @@ function WebhookCard({
 							<p className="m-0 text-xs text-[var(--danger)]">
 								Last error: {settings.webhook.lastError}
 							</p>
+						) : null}
+						{settings.webhook.missingEvents.length ? (
+							<div className="space-y-2 rounded-md border border-amber-300 px-3 py-2 dark:border-amber-800">
+								<p className="m-0 flex items-start gap-2 text-xs text-[var(--text)]">
+									<AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+									<span>
+										This webhook was set up before Tasker handled{" "}
+										{settings.webhook.missingEvents
+											.map((event) => event.replaceAll("_", " "))
+											.join(", ")}{" "}
+										events.{" "}
+										{settings.webhook.hookId
+											? "Update it so resolved review conversations reach Tasker right away."
+											: "Tick them in the repository's webhook settings on GitHub, then confirm here."}
+									</span>
+								</p>
+								{canManage ? (
+									<Button
+										type="button"
+										size="sm"
+										variant="secondary"
+										disabled={working}
+										onClick={() =>
+											void run(
+												() => updateWebhookEvents({ projectId }),
+												"Could not update the webhook.",
+											)
+										}
+									>
+										{settings.webhook.hookId
+											? "Update webhook events"
+											: "I've added the events"}
+									</Button>
+								) : null}
+							</div>
 						) : null}
 						{manual ? <ManualSetup manual={manual} /> : null}
 						{canManage ? (

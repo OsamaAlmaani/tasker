@@ -62,7 +62,12 @@ http.route({
       event: eventName,
       action: typeof (payload as { action?: unknown }).action === 'string' ? ((payload as { action: string }).action) : null,
       pullNumber:
-        event?.kind === 'pull_request' || event?.kind === 'pull_request_review' ? event.pullRequest.number : undefined,
+        event?.kind === 'pull_request' ||
+        event?.kind === 'pull_request_review' ||
+        event?.kind === 'pull_request_review_thread' ||
+        event?.kind === 'pull_request_review_comment'
+          ? event.pullRequest.number
+          : undefined,
       ref: event?.kind === 'push' ? event.ref : undefined,
       sha:
         event?.kind === 'push'

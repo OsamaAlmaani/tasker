@@ -120,4 +120,52 @@ describe("GitHub activity wording", () => {
 				?.detail,
 		).toBe("acme/app");
 	});
+
+	it("describes review conversation activity", () => {
+		expect(
+			describeGitHubActivity("github.review_thread_linked", {
+				pullNumber: 12,
+				path: "src/tax.ts",
+				line: 42,
+				kind: "follow_up",
+			}),
+		).toEqual({
+			label: "Created from a review conversation",
+			detail: "#12 · tax.ts:42 · follow-up",
+		});
+		expect(
+			describeGitHubActivity("github.review_thread_event", {
+				event: "resolved",
+				path: "src/tax.ts",
+				line: 42,
+				from: "in_review",
+				to: "done",
+				actorLogin: "dev",
+			}),
+		).toEqual({
+			label: "Review conversation resolved on GitHub",
+			detail: "tax.ts:42 · in_review → done by dev",
+		});
+		expect(
+			describeGitHubActivity("github.review_thread_event", {
+				event: "replied",
+				path: "src/tax.ts",
+				line: 42,
+				actorLogin: "reviewer",
+			}),
+		).toEqual({
+			label: "New reply on the review conversation",
+			detail: "tax.ts:42 by reviewer",
+		});
+		expect(
+			describeGitHubActivity("github.review_thread_event", {
+				event: "sync_failed",
+				path: "a.ts",
+				reason: "Forbidden",
+			}),
+		).toEqual({
+			label: "Could not update the review conversation on GitHub",
+			detail: "a.ts · Forbidden",
+		});
+	});
 });

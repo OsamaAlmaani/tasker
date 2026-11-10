@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader } from "#/components/ui/card";
 import { Textarea } from "#/components/ui/textarea";
 import { formatRelative } from "#/features/tasker/format";
 import { describeGitHubActivity } from "#/features/tasker/github/linkDisplay";
+import type { ReviewReplyOption } from "#/features/tasker/github/useReviewReplyOption";
 
 const activityLabel: Record<string, string> = {
 	"project.created": "Created project",
@@ -89,6 +90,8 @@ type IssueDiscussionPanelProps = {
 	onCommentSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
 	onSaveComment: (commentId: string) => void | Promise<void>;
 	onStartEditComment: (commentId: string, body: string) => void;
+	/** Offers to post the comment to a review conversation on GitHub too. */
+	reviewReply?: ReviewReplyOption | null;
 	timelineItems: TimelineItem[];
 };
 
@@ -109,6 +112,7 @@ export function IssueDiscussionPanel({
 	onCommentSubmit,
 	onSaveComment,
 	onStartEditComment,
+	reviewReply = null,
 	timelineItems,
 }: IssueDiscussionPanelProps) {
 	const [activeTab, setActiveTab] = useState<"comment" | "activity">("comment");
@@ -313,8 +317,13 @@ export function IssueDiscussionPanel({
 														}
 														placeholder="Add a comment"
 													/>
+													{reviewReply ? (
+														<ReviewReplyControl control={reviewReply} />
+													) : null}
 													<Button type="submit" size="sm">
-														Add comment
+														{reviewReply?.selected
+															? "Comment and reply on GitHub"
+															: "Add comment"}
 													</Button>
 												</form>
 											) : (
@@ -330,6 +339,52 @@ export function IssueDiscussionPanel({
 					})}
 				</CardContent>
 			</Card>
+		</div>
+	);
+}
+
+function ReviewReplyControl({ control }: { control: ReviewReplyOption }) {
+	const id = useId();
+	const single = control.options.length === 1;
+	return (
+		<div className="space-y-1">
+			<div className="flex flex-wrap items-center gap-2 text-sm text-[var(--text)]">
+				<label htmlFor={`${id}-toggle`} className="flex items-center gap-2">
+					<input
+						id={`${id}-toggle`}
+						type="checkbox"
+						className="h-3.5 w-3.5 accent-[var(--accent)]"
+						checked={control.selected !== null}
+						onChange={(event) =>
+							control.setSelected(
+								event.target.checked ? control.options[0].value : null,
+							)
+						}
+					/>
+					{single
+						? `Also reply on GitHub (${control.options[0].label})`
+						: "Also reply on GitHub"}
+				</label>
+				{!single && control.selected !== null ? (
+					<select
+						aria-label="Review conversation to reply to"
+						className="h-7 rounded-md border border-[var(--line)] bg-[var(--surface)] px-2 text-xs"
+						value={control.selected}
+						onChange={(event) => control.setSelected(event.target.value)}
+					>
+						{control.options.map((option) => (
+							<option key={option.value} value={option.value}>
+								{option.label}
+							</option>
+						))}
+					</select>
+				) : null}
+			</div>
+			{control.error ? (
+				<p role="alert" className="m-0 text-xs text-[var(--danger)]">
+					{control.error}
+				</p>
+			) : null}
 		</div>
 	);
 }
