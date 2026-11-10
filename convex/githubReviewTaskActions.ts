@@ -1,31 +1,24 @@
 import { ConvexError, v } from 'convex/values'
 import { api, internal } from './_generated/api'
-import { action, internalAction } from './_generated/server'
-import { githubReviewTaskKindValidator } from './constants'
+import type { Id } from './_generated/dataModel'
+import { type ActionCtx, action, internalAction } from './_generated/server'
+import { type GitHubReviewTaskKind, githubReviewTaskKindValidator } from './constants'
 import type { TrackResult } from './githubReviewTasks'
 import { decryptToken, invalidInput, loadLinkedClient } from './lib/githubAccess'
 import {
-  type GitHubActor,
   githubError,
   githubGraphql,
-  normalizeActor,
   normalizeReviewThread,
   type PullRequestReviewThread,
   REPLY_TO_REVIEW_THREAD_MUTATION,
   RESOLVE_REVIEW_THREAD_MUTATION,
   UNRESOLVE_REVIEW_THREAD_MUTATION,
 } from './lib/githubApi'
+import { parseSeverity, severityPriority } from './lib/githubReviewInbox'
 import {
   followUpReplyBody,
   MAX_TRACKED_THREADS,
   normalizeTrackedThread,
-  OPEN_REVIEW_PULL_REQUESTS,
-  OPEN_REVIEW_PULL_REQUESTS_QUERY,
-  REVIEW_INBOX_BATCH_SIZE,
-  REVIEW_INBOX_THREADS_QUERY,
-  type RawInboxThread,
-  chunk,
-  inboxThreadFromRaw,
   type RawTrackedThread,
   REVIEW_THREAD_DETAILS_QUERY,
   REVIEW_THREADS_QUERY,
@@ -56,9 +49,106 @@ function belongsTo(thread: TrackedThread | null, repository: string, pullNumber:
   )
 }
 
-function errorMessage(error: unknown) {
+export function errorMessage(error: unknown) {
   if (error instanceof ConvexError) return (error.data as { message?: string }).message ?? 'GitHub request failed.'
   return error instanceof Error ? error.message : 'GitHub request failed.'
+}
+
+/** Unique, well-formed thread ids, at most `MAX_TRACKED_THREADS`. */
+export function validateThreadIds(ids: string[]) {
+  const threadIds = [...new Set(ids)]
+  if (!threadIds.length) throw invalidInput('Pick at least one conversation.')
+  if (threadIds.length > MAX_TRACKED_THREADS) {
+    throw invalidInput(`Pick at most ${MAX_TRACKED_THREADS} conversations at once.`)
+  }
+  if (threadIds.some((id) => !id || id.length > MAX_NODE_ID_LENGTH)) {
+    throw invalidInput('That conversation could not be found.')
+  }
+  return threadIds
+}
+
+/**
+ * Loads conversations with the caller's token and confirms each belongs to
+ * the linked repository (and to `pullNumber` when given), so a client cannot
+ * act on conversations elsewhere.
+ */
+export async function loadOwnedThreads(token: string, repository: string, threadIds: string[], pullNumber?: number) {
+  const threads = await loadThreads(token, threadIds)
+  const owned = threads.every(
+    (thread) => thread && belongsTo(thread, repository, pullNumber ?? thread.pullNumber),
+  )
+  if (threads.length !== threadIds.length || !owned) {
+    throw githubError('GITHUB_NOT_FOUND', 'A conversation is not part of this repository or pull request.')
+  }
+  return threads as TrackedThread[]
+}
+
+/**
+ * Creates tasks for loaded conversations of one pull request, then answers
+ * and resolves `follow_up` conversations on GitHub.
+ */
+export async function trackLoadedThreads(
+  ctx: ActionCtx,
+  token: string,
+  args: {
+    projectId: Id<'projects'>
+    kind: GitHubReviewTaskKind
+    parentIssueId?: Id<'issues'>
+    assignToAuthor: boolean
+    priorityFromSeverity: boolean
+    threads: TrackedThread[]
+  },
+): Promise<{ results: TrackResult[]; warnings: string[] }> {
+  const { userId, results } = await ctx.runMutation(internal.githubReviewTasks.recordTrackedThreads, {
+    projectId: args.projectId,
+    kind: args.kind,
+    parentIssueId: args.parentIssueId,
+    assignToAuthor: args.assignToAuthor,
+    threads: args.threads.map((thread) => {
+      const severity = args.priorityFromSeverity ? parseSeverity(thread.body) : null
+      return {
+        threadId: thread.threadId,
+        rootCommentId: thread.rootCommentId ?? undefined,
+        pullNumber: thread.pullNumber,
+        pullAuthorLogin: thread.pullAuthorLogin ?? undefined,
+        path: thread.path,
+        line: thread.line ?? undefined,
+        authorLogin: thread.authorLogin ?? undefined,
+        isResolved: thread.isResolved,
+        isOutdated: thread.isOutdated,
+        url: thread.url,
+        title: reviewTaskTitle(thread.body, thread.path, thread.line),
+        descriptionDoc: reviewTaskDescription(thread),
+        priority: severity ? severityPriority(severity) : undefined,
+      }
+    }),
+  })
+
+  // Follow-ups free the pull request: answer with the task and resolve.
+  const warnings: string[] = []
+  if (args.kind === 'follow_up') {
+    for (const result of results) {
+      if (result.outcome !== 'created' || !result.linkId || !result.issueId || !result.key) continue
+      try {
+        await githubGraphql(token, REPLY_TO_REVIEW_THREAD_MUTATION, {
+          threadId: result.threadId,
+          body: followUpReplyBody(result.key, `${appBaseUrl()}/issues/${result.issueId}`),
+        })
+        if (!result.isResolved) {
+          await githubGraphql(token, RESOLVE_REVIEW_THREAD_MUTATION, { threadId: result.threadId })
+        }
+        await ctx.runMutation(internal.githubReviewTasks.recordThreadSync, {
+          linkId: result.linkId,
+          actorId: userId,
+          resolved: true,
+        })
+        result.isResolved = true
+      } catch (error) {
+        warnings.push(`${result.key}: ${errorMessage(error)}`)
+      }
+    }
+  }
+  return { results, warnings }
 }
 
 /**
@@ -73,76 +163,23 @@ export const trackThreads = action({
     kind: githubReviewTaskKindValidator,
     parentIssueId: v.optional(v.id('issues')),
     assignToAuthor: v.boolean(),
+    priorityFromSeverity: v.optional(v.boolean()),
   },
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ results: TrackResult[]; warnings: string[] }> => {
+  handler: async (ctx, args): Promise<{ results: TrackResult[]; warnings: string[] }> => {
     if (!Number.isInteger(args.pullNumber) || args.pullNumber <= 0) {
       throw invalidInput('Pull request number must be a positive integer.')
     }
-    const threadIds = [...new Set(args.threadIds)]
-    if (!threadIds.length) throw invalidInput('Pick at least one conversation.')
-    if (threadIds.length > MAX_TRACKED_THREADS) {
-      throw invalidInput(`Track at most ${MAX_TRACKED_THREADS} conversations at once.`)
-    }
-    if (threadIds.some((id) => !id || id.length > MAX_NODE_ID_LENGTH)) {
-      throw invalidInput('That conversation could not be found.')
-    }
-
+    const threadIds = validateThreadIds(args.threadIds)
     const { token, repository } = await loadLinkedClient(ctx, args.projectId, 'write')
-    const threads = await loadThreads(token, threadIds)
-    if (threads.length !== threadIds.length || !threads.every((thread) => belongsTo(thread, repository.fullName, args.pullNumber))) {
-      throw githubError('GITHUB_NOT_FOUND', 'A conversation is not part of this pull request.')
-    }
-    const loaded = threads as TrackedThread[]
-
-    const { userId, results } = await ctx.runMutation(internal.githubReviewTasks.recordTrackedThreads, {
+    const threads = await loadOwnedThreads(token, repository.fullName, threadIds, args.pullNumber)
+    return await trackLoadedThreads(ctx, token, {
       projectId: args.projectId,
       kind: args.kind,
       parentIssueId: args.parentIssueId,
       assignToAuthor: args.assignToAuthor,
-      threads: loaded.map((thread) => ({
-        threadId: thread.threadId,
-        rootCommentId: thread.rootCommentId ?? undefined,
-        pullNumber: thread.pullNumber,
-        pullAuthorLogin: thread.pullAuthorLogin ?? undefined,
-        path: thread.path,
-        line: thread.line ?? undefined,
-        authorLogin: thread.authorLogin ?? undefined,
-        isResolved: thread.isResolved,
-        isOutdated: thread.isOutdated,
-        url: thread.url,
-        title: reviewTaskTitle(thread.body, thread.path, thread.line),
-        descriptionDoc: reviewTaskDescription(thread),
-      })),
+      priorityFromSeverity: args.priorityFromSeverity ?? false,
+      threads,
     })
-
-    // Follow-ups free the pull request: answer with the task and resolve.
-    const warnings: string[] = []
-    if (args.kind === 'follow_up') {
-      for (const result of results) {
-        if (result.outcome !== 'created' || !result.linkId || !result.issueId || !result.key) continue
-        try {
-          await githubGraphql(token, REPLY_TO_REVIEW_THREAD_MUTATION, {
-            threadId: result.threadId,
-            body: followUpReplyBody(result.key, `${appBaseUrl()}/issues/${result.issueId}`),
-          })
-          if (!result.isResolved) {
-            await githubGraphql(token, RESOLVE_REVIEW_THREAD_MUTATION, { threadId: result.threadId })
-          }
-          await ctx.runMutation(internal.githubReviewTasks.recordThreadSync, {
-            linkId: result.linkId,
-            actorId: userId,
-            resolved: true,
-          })
-          result.isResolved = true
-        } catch (error) {
-          warnings.push(`${result.key}: ${errorMessage(error)}`)
-        }
-      }
-    }
-    return { results, warnings }
   },
 })
 
@@ -194,142 +231,6 @@ export const getIssueReviewThreads = action({
       })
     }
     return { repository: repository.fullName, threads }
-  },
-})
-
-type RawOpenPullRequest = {
-  number: number
-  title: string
-  url: string
-  isDraft: boolean
-  updatedAt: string
-  author: Parameters<typeof normalizeActor>[0]
-  reviewThreads: {
-    nodes: Array<{ id: string; isResolved: boolean; isOutdated: boolean; resolvedBy: { login: string } | null } | null> | null
-  } | null
-}
-
-export type OpenReviewPullRequest = {
-  number: number
-  title: string
-  url: string
-  isDraft: boolean
-  updatedAt: number
-  author: GitHubActor | null
-  threads: PullRequestReviewThread[]
-}
-
-/** Retries once when GitHub times out (502/504), which large reads sometimes hit. */
-async function withRetry<T>(load: () => Promise<T>): Promise<T> {
-  try {
-    return await load()
-  } catch (error) {
-    const status = error instanceof ConvexError ? (error.data as { status?: number }).status : undefined
-    if (status !== 502 && status !== 504) throw error
-    return await load()
-  }
-}
-
-/**
- * Unresolved review conversations across the most recently updated open pull
- * requests, read with the viewer's own token. A light listing finds the open
- * conversations, then their first comments load in parallel batches, which
- * keeps every request well inside GitHub's time limit. Threads of reviews that
- * are not submitted yet are left out.
- */
-export const listOpenReviewThreads = action({
-  args: { projectId: v.id('projects') },
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{
-    viewerLogin: string
-    totalPullRequests: number
-    checkedPullRequests: number
-    /** Open conversations whose details GitHub did not return. */
-    missingThreads: number
-    pullRequests: OpenReviewPullRequest[]
-  }> => {
-    const { token, repository } = await loadLinkedClient(ctx, args.projectId, 'view')
-    const data = await withRetry(() =>
-      githubGraphql<{
-        viewer: { login: string }
-        repository: { pullRequests: { totalCount: number; nodes: Array<RawOpenPullRequest | null> | null } } | null
-      }>(token, OPEN_REVIEW_PULL_REQUESTS_QUERY, {
-        owner: repository.owner,
-        name: repository.name,
-        first: OPEN_REVIEW_PULL_REQUESTS,
-      }),
-    )
-    if (!data.repository) throw githubError('GITHUB_NOT_FOUND', 'The linked repository was not found.')
-    const pulls = (data.repository.pullRequests.nodes ?? []).filter((pr): pr is RawOpenPullRequest => Boolean(pr))
-    const threadsOf = (pr: RawOpenPullRequest) =>
-      (pr.reviewThreads?.nodes ?? []).filter((node): node is NonNullable<typeof node> => Boolean(node))
-
-    // Keep tracked tasks in step with what GitHub reports.
-    const tracked = new Set(
-      await ctx.runQuery(internal.githubReviewTasks.trackedPullNumbers, { projectId: args.projectId }),
-    )
-    for (const pr of pulls) {
-      if (!tracked.has(pr.number)) continue
-      await ctx.runMutation(internal.githubReviewTasks.reconcileThreads, {
-        projectId: args.projectId,
-        pullNumber: pr.number,
-        threads: threadsOf(pr).map((thread) => ({
-          threadId: thread.id,
-          isResolved: thread.isResolved,
-          isOutdated: thread.isOutdated,
-          resolvedByLogin: thread.resolvedBy?.login ?? undefined,
-        })),
-      })
-    }
-
-    const openIds = pulls.flatMap((pr) => threadsOf(pr).filter((thread) => !thread.isResolved).map((thread) => thread.id))
-    const batches = await Promise.all(
-      chunk(openIds, REVIEW_INBOX_BATCH_SIZE).map(async (ids) => {
-        try {
-          return await withRetry(() =>
-            githubGraphql<{ nodes: Array<RawInboxThread | null> }>(token, REVIEW_INBOX_THREADS_QUERY, { ids }),
-          )
-        } catch {
-          return { nodes: [] as Array<RawInboxThread | null> }
-        }
-      }),
-    )
-    const details = new Map<string, PullRequestReviewThread>()
-    const loaded = new Set<string>()
-    for (const node of batches.flatMap((batch) => batch.nodes ?? [])) {
-      if (!node?.id) continue
-      if (node.pullRequest?.repository.nameWithOwner.toLowerCase() !== repository.fullName.toLowerCase()) continue
-      loaded.add(node.id)
-      const thread = inboxThreadFromRaw(node)
-      if (thread && !thread.isResolved) details.set(node.id, thread)
-    }
-
-    const pullRequests: OpenReviewPullRequest[] = []
-    for (const pr of pulls) {
-      const open = threadsOf(pr)
-        .map((thread) => details.get(thread.id))
-        .filter((thread): thread is PullRequestReviewThread => Boolean(thread))
-        .sort((a, b) => a.createdAt - b.createdAt)
-      if (!open.length) continue
-      pullRequests.push({
-        number: pr.number,
-        title: pr.title,
-        url: pr.url,
-        isDraft: pr.isDraft,
-        updatedAt: Date.parse(pr.updatedAt) || 0,
-        author: normalizeActor(pr.author),
-        threads: open,
-      })
-    }
-    return {
-      viewerLogin: data.viewer.login,
-      totalPullRequests: data.repository.pullRequests.totalCount,
-      checkedPullRequests: pulls.length,
-      missingThreads: openIds.filter((id) => !loaded.has(id)).length,
-      pullRequests,
-    }
   },
 })
 

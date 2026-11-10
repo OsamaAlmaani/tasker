@@ -5,6 +5,7 @@ import {
 	GitPullRequest,
 	History,
 	ListTodo,
+	MessageSquareText,
 	MoreHorizontal,
 	Settings2,
 	Upload,
@@ -17,6 +18,7 @@ import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { ActivityFeed } from "#/features/tasker/components/ActivityFeed";
 import { MemberAvatarStack } from "#/features/tasker/components/MemberAvatarStack";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
+import { ReviewsBadge } from "#/features/tasker/github/components/ProjectGitHubHeader";
 import { useRepositoryAccess } from "#/features/tasker/github/useRepositoryAccess";
 import { IssueBulkActionsBar } from "#/features/tasker/issues/components/IssueBulkActionsBar";
 import { IssueDraftDialog } from "#/features/tasker/issues/components/IssueDraftDialog";
@@ -84,6 +86,9 @@ export function ProjectDetailContent({
 		projectId,
 	});
 	useRepositoryAccess(projectId, pullRequestLinks?.access);
+	const reviewsBadge = useQuery(api.githubReviewInbox.getInboxBadge, {
+		projectId,
+	});
 	const pullRequestsByIssueId = pullRequestLinks?.byIssue;
 	const {
 		addMember,
@@ -433,6 +438,19 @@ export function ProjectDetailContent({
 								Pull requests
 							</Button>
 						</Link>
+						{pullRequestLinks?.linked ? (
+							<Link
+								to="/projects/$projectId/reviews"
+								params={{ projectId }}
+								className="no-underline"
+							>
+								<Button variant="secondary" className="gap-2">
+									<MessageSquareText className="h-4 w-4" />
+									Reviews
+									<ReviewsBadge badge={reviewsBadge} />
+								</Button>
+							</Link>
+						) : null}
 						<Link
 							to="/projects/$projectId/workflows"
 							params={{ projectId }}

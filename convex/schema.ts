@@ -221,6 +221,35 @@ export default defineSchema({
     .index('by_threadId', ['threadId'])
     .index('by_repositoryId_rootCommentId', ['repositoryId', 'rootCommentId']),
 
+  // A user's Reviews inbox in a project: everything older than the baseline
+  // counts as seen, and the last attention count feeds the tab badge. Counts
+  // come from the user's own GitHub reads and are only shown to that user.
+  githubReviewInboxStates: defineTable({
+    userId: v.id('users'),
+    projectId: v.id('projects'),
+    seenBaselineAt: v.number(),
+    attentionCount: v.number(),
+    reviewRequestCount: v.number(),
+    countedAt: v.number(),
+  }).index('by_userId_projectId', ['userId', 'projectId']),
+
+  // When a user last opened a review conversation in the Reviews inbox.
+  githubReviewThreadViews: defineTable({
+    userId: v.id('users'),
+    projectId: v.id('projects'),
+    threadId: v.string(),
+    seenAt: v.number(),
+  })
+    .index('by_userId_projectId', ['userId', 'projectId'])
+    .index('by_userId_threadId', ['userId', 'threadId']),
+
+  // Per-user review preferences, such as saved reply snippets.
+  githubReviewPreferences: defineTable({
+    userId: v.id('users'),
+    replySnippets: v.array(v.string()),
+    updatedAt: v.number(),
+  }).index('by_userId', ['userId']),
+
   // A branch that belongs to a task, known before any pull request exists.
   githubBranchLinks: defineTable({
     projectId: v.id('projects'),

@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
 import {
 	GitPullRequest,
 	ListTodo,
@@ -7,6 +8,8 @@ import {
 	Workflow,
 } from "lucide-react";
 import { PageHeader } from "#/features/tasker/components/PageHeader";
+import { api } from "#convex/_generated/api";
+import type { Id } from "#convex/_generated/dataModel";
 
 const tabClassName =
 	"inline-flex items-center gap-2 border-b-2 border-transparent px-1 pb-2 text-sm font-medium text-[var(--muted-text)] no-underline transition-colors hover:text-[var(--text)] data-[status=active]:border-[var(--accent)] data-[status=active]:text-[var(--text)]";
@@ -23,6 +26,9 @@ export function ProjectGitHubHeader({
 	description?: string;
 	actions?: React.ReactNode;
 }) {
+	const badge = useQuery(api.githubReviewInbox.getInboxBadge, {
+		projectId: projectId as Id<"projects">,
+	});
 	return (
 		<>
 			<PageHeader
@@ -58,6 +64,7 @@ export function ProjectGitHubHeader({
 				>
 					<MessageSquareText className="h-4 w-4" />
 					Reviews
+					<ReviewsBadge badge={badge} />
 				</Link>
 				<Link
 					to="/projects/$projectId/workflows"
@@ -77,5 +84,27 @@ export function ProjectGitHubHeader({
 				</Link>
 			</nav>
 		</>
+	);
+}
+
+/**
+ * Conversations waiting on the viewer plus review requests, as the Reviews
+ * page last counted them for this user.
+ */
+export function ReviewsBadge({
+	badge,
+}: {
+	badge: { attention: number; reviewRequests: number } | null | undefined;
+}) {
+	const count = badge ? badge.attention + badge.reviewRequests : 0;
+	if (!count) return null;
+	return (
+		<span
+			className="rounded-full bg-[var(--accent)] px-1.5 text-[11px] font-semibold leading-4 text-white tabular-nums"
+			title={`${badge?.attention ?? 0} conversation${badge?.attention === 1 ? "" : "s"} need you, ${badge?.reviewRequests ?? 0} review request${badge?.reviewRequests === 1 ? "" : "s"}`}
+		>
+			{count > 99 ? "99+" : count}
+			<span className="sr-only"> waiting on you</span>
+		</span>
 	);
 }

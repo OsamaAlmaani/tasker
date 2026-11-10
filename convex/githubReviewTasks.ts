@@ -8,7 +8,7 @@ import {
   query,
   type QueryCtx,
 } from './_generated/server'
-import { githubReviewTaskKindValidator } from './constants'
+import { githubReviewTaskKindValidator, issuePriorityValidator } from './constants'
 import { findUserByGitHubLogin, getRepositoryLink } from './githubLinks'
 import { applyIssueUpdate, createDefinition } from './issues'
 import { createActivity } from './lib/activity'
@@ -130,6 +130,39 @@ export const listForPullRequest = query({
   },
 })
 
+/** Every tracked conversation of the project with its task, for the Reviews inbox. */
+export const listTrackedThreads = query({
+  args: { projectId: v.id('projects') },
+  handler: async (ctx, args) => {
+    if (!(await ctx.db.get(args.projectId))) return []
+    const { project } = await requireProjectViewAccess(ctx, args.projectId)
+    const normalized = normalizeProject(project)
+    const links = await ctx.db
+      .query('githubReviewThreadLinks')
+      .withIndex('by_projectId_pullNumber', (q) => q.eq('projectId', args.projectId))
+      .collect()
+    const items = await Promise.all(
+      links.map(async (link) => {
+        const issue = await ctx.db.get(link.issueId)
+        if (!issue || issue.deletedAt) return null
+        const assignee = issue.assigneeId ? await ctx.db.get(issue.assigneeId) : null
+        return {
+          linkId: link._id,
+          threadId: link.threadId,
+          pullNumber: link.pullNumber,
+          kind: link.kind,
+          path: link.path,
+          line: link.line ?? null,
+          isResolved: link.isResolved,
+          isOutdated: link.isOutdated,
+          issue: presentIssue(issue, normalized, assignee),
+        }
+      }),
+    )
+    return items.filter((item): item is NonNullable<typeof item> => item !== null)
+  },
+})
+
 /** Review conversations a task was created from, for its Development panel. */
 export const listForIssue = query({
   args: { issueId: v.id('issues') },
@@ -208,6 +241,7 @@ const trackedThreadValidator = v.object({
   url: v.string(),
   title: v.string(),
   descriptionDoc: descriptionDocValidator,
+  priority: v.optional(issuePriorityValidator),
 })
 
 export type TrackResult = {
@@ -311,6 +345,7 @@ export const recordTrackedThreads = internalMutation({
         title: thread.title,
         descriptionDoc: thread.descriptionDoc,
         assigneeId: await assigneeFor(thread.pullAuthorLogin),
+        priority: thread.priority,
         parentIssueId,
       })
       if (!issue) throw new ConvexError({ code: 'INTERNAL_ERROR', message: 'Could not create the task.' })
@@ -499,6 +534,28 @@ export const reconcileThreads = internalMutation({
       })
     }
     return null
+  },
+})
+
+/**
+ * The task review tasks of a pull request go under by default: the first open
+ * top-level task linked to it, as the tracking dialog preselects.
+ */
+export const defaultParentIssue = internalQuery({
+  args: { projectId: v.id('projects'), pullNumber: v.number() },
+  handler: async (ctx, args) => {
+    await requireProjectViewAccess(ctx, args.projectId)
+    const rows = await ctx.db
+      .query('githubPullRequestLinks')
+      .withIndex('by_projectId_pullNumber', (q) => q.eq('projectId', args.projectId).eq('pullNumber', args.pullNumber))
+      .collect()
+    const issues = (await Promise.all(rows.map((row) => ctx.db.get(row.issueId))))
+      .filter(
+        (issue): issue is Doc<'issues'> =>
+          Boolean(issue && !issue.deletedAt && !issue.archived && !issue.parentIssueId && issue.status !== 'done'),
+      )
+      .sort((a, b) => a.issueNumber - b.issueNumber)
+    return issues[0]?._id ?? null
   },
 })
 

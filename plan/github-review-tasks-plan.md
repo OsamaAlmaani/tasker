@@ -122,6 +122,59 @@ Decisions:
 - [x] `get_task` returns `reviewFeedback` for MCP agents; tool description and
       `docs/agent-workspace.md` explain the flow.
 
+## Reviews inbox (started 2026-11-10)
+
+The first Reviews tab was a read-only list. It becomes a triage inbox: pick a
+conversation, read it with its code and replies, and act without leaving the
+page.
+
+Decisions:
+
+- **Views (who):** Feedback I gave (conversations I started), Feedback I
+  received (conversations on my pull requests started by others), Everyone,
+  and Review requests (open pull requests waiting on my review).
+- **States (what next), computed per conversation from who spoke last:**
+  - Needs attention: my turn. As the reviewer: someone replied after me, or
+    the code changed under the comment (outdated, probably fixed). As the PR
+    author: the last word is not mine.
+  - Waiting: their turn, or a conversation I am not part of.
+  - Resolved: resolved conversations on the open pull requests checked.
+  "Quiet" (no activity for 3 days) is a badge, not a state.
+- **Loading:** the light pull request listing (now with review requests and
+  review decision), then first and last comment of every conversation in
+  parallel batches of 15 (measured 2026-11-10 on a 25-PR, 185-conversation
+  repository: about 1.5 s plus 1 s, every request under 1.1 s). The selected
+  conversation loads in full (rendered HTML, code, replies) on demand.
+- **Unseen replies:** per user and project, a baseline time (first visit or
+  "Mark all seen") plus per-conversation seen times. A conversation is new
+  when its last comment is someone else's and newer than both.
+- **Tab count:** the attention count plus review requests is computed by the
+  page and stored per user, so the Reviews tab and the project page can show
+  it without calling GitHub. It refreshes whenever Reviews loads.
+- **Bulk actions across pull requests:** track as fix or follow-up (parent is
+  each pull request's own open task, assignee its author), resolve, reply.
+- **Severity:** bot labels like Critical, Major, Minor and Nitpick (and a
+  leading "nit:") set task priority (urgent, high, medium, low) when tracking,
+  on by default and switchable in the dialog.
+- **Reply snippets:** saved per user, with sensible defaults until edited.
+- **Keyboard:** `j`/`k` move, `x` select, `t` track as fix, `f` follow-up,
+  `r` reply, `e` resolve or reopen, `o` open in the pull request, `?` help.
+- **Mobile:** the list only; the selected conversation opens under its row.
+
+- [x] Inbox listing action with first and last comment per conversation.
+- [x] Classification, filters, grouping and unseen logic (pure, tested).
+- [x] Detail pane: full conversation, code, reply with snippets, resolve,
+      track, open in pull request; marks the conversation seen.
+- [x] Views, state tabs with counts, filters (search, reviewer, PR author,
+      hide bots, untracked, outdated, new replies).
+- [x] Review requests view.
+- [x] Bulk bar: track as fix or follow-up, resolve, reply.
+- [x] Keyboard shortcuts and help.
+- [x] Reply snippets, unseen markers, "Mark all seen", tab counts.
+- [x] Severity to priority when tracking.
+- [x] Per pull request header: author, review decision, oldest open
+      conversation, review task progress.
+
 ## Phase 3 (later)
 
 - [ ] Optional auto-tracking rule (for example every thread of a "changes

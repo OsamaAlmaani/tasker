@@ -70,34 +70,3 @@ export function trackSummary(
 			warnings.length > 0 || (created.length === 0 && existing.length === 0),
 	};
 }
-
-export type ReviewInboxScope = "mine" | "all";
-
-type InboxThread = { comments: Array<{ author: { login: string } | null }> };
-
-/**
- * Pull requests with the conversations a scope shows: all of them, or only
- * those the viewer started. Pull requests left with none are dropped.
- */
-export function filterReviewInbox<
-	T extends { threads: ReadonlyArray<InboxThread> },
->(
-	pullRequests: ReadonlyArray<T>,
-	scope: ReviewInboxScope,
-	viewerLogin: string,
-): T[] {
-	if (scope === "all") return pullRequests.filter((pr) => pr.threads.length);
-	const login = viewerLogin.toLowerCase();
-	return pullRequests
-		.map(
-			(pr) =>
-				({
-					...pr,
-					threads: pr.threads.filter(
-						(thread) =>
-							thread.comments[0]?.author?.login.toLowerCase() === login,
-					),
-				}) as T,
-		)
-		.filter((pr) => pr.threads.length);
-}

@@ -309,7 +309,7 @@ function CommentCard({
 // ---------------------------------------------------------------------------
 // Inline review threads
 
-function DiffSnippet({ thread }: { thread: PullRequestReviewThread }) {
+export function DiffSnippet({ thread }: { thread: PullRequestReviewThread }) {
 	const lines = useMemo(
 		() =>
 			parseDiffHunk(thread.diffHunk ?? "").filter(

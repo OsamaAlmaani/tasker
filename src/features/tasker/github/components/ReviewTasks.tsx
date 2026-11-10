@@ -10,6 +10,7 @@ import { cn, getClientErrorMessage } from "#/lib/utils";
 import { api } from "#convex/_generated/api";
 import type { Id } from "#convex/_generated/dataModel";
 import type { PullRequestReviewThread } from "#convex/lib/githubApi";
+import { parseSeverity } from "#convex/lib/githubReviewInbox";
 import { githubHtmlToText } from "../githubHtml";
 import {
 	reviewTaskProgress,
@@ -113,6 +114,7 @@ export function TrackThreadsDialog({
 	pullNumber,
 	threads,
 	initialSelected,
+	initialKind,
 	data,
 	onClose,
 	onTracked,
@@ -122,6 +124,8 @@ export function TrackThreadsDialog({
 	/** Conversations that are not tracked yet. */
 	threads: PullRequestReviewThread[];
 	initialSelected: string[];
+	/** Preselected kind, for example from a keyboard shortcut. */
+	initialKind?: ReviewTaskKind;
 	data: ReviewTasksData;
 	onClose: () => void;
 	onTracked: (result: { message: string; failed: boolean }) => void;
@@ -132,8 +136,14 @@ export function TrackThreadsDialog({
 	const allResolved =
 		chosen.length > 0 && chosen.every((thread) => thread.isResolved);
 	const [kind, setKind] = useState<ReviewTaskKind>(
-		allResolved ? "follow_up" : "fix",
+		initialKind ?? (allResolved ? "follow_up" : "fix"),
 	);
+	const severities = chosen
+		.map((thread) =>
+			parseSeverity(githubHtmlToText(thread.comments[0]?.bodyHtml ?? "", 200)),
+		)
+		.filter(Boolean);
+	const [priorityFromSeverity, setPriorityFromSeverity] = useState(true);
 	const [parentId, setParentId] = useState<string>(
 		data.parentCandidates[0]?._id ?? "",
 	);
@@ -167,6 +177,7 @@ export function TrackThreadsDialog({
 				parentIssueId:
 					kind === "fix" && parentId ? (parentId as Id<"issues">) : undefined,
 				assignToAuthor,
+				priorityFromSeverity: severities.length > 0 && priorityFromSeverity,
 			});
 			onTracked(trackSummary(result.results, result.warnings));
 			onClose();
@@ -304,6 +315,25 @@ export function TrackThreadsDialog({
 						the tasks start unassigned.
 					</p>
 				)}
+
+				{severities.length ? (
+					<label className="flex items-start gap-2 text-[var(--text)]">
+						<input
+							type="checkbox"
+							className="mt-1 h-3.5 w-3.5 accent-[var(--accent)]"
+							checked={priorityFromSeverity}
+							onChange={(event) =>
+								setPriorityFromSeverity(event.target.checked)
+							}
+						/>
+						<span>
+							Set priority from severity labels
+							<span className="block text-xs text-[var(--muted-text)]">
+								Critical → Urgent, Major → High, Minor → Medium, Nitpick → Low.
+							</span>
+						</span>
+					</label>
+				) : null}
 
 				{skippedResolved ? (
 					<p className="m-0 text-xs text-amber-700 dark:text-amber-300">
