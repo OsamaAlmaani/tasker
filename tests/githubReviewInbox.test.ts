@@ -146,8 +146,31 @@ describe('inbox helpers', () => {
       '```',
       '</details>',
     ].join('\n')
-    expect(inboxPreview(body)).toBe('Major · Quick win Fix')
+    expect(inboxPreview(body)).toBe('Major · Quick win')
     expect(inboxPreview('x'.repeat(900))).toHaveLength(500)
+  })
+
+  it('drops collapsed blocks and the severity label for the readable sentence', () => {
+    const body = [
+      'Major · Functional Correctness · Quick win',
+      '',
+      '<details>',
+      '<summary>🔍 Supported by static analysis</summary>',
+      'Script executed: Repository: acme/app Length of output: 11783',
+      '<details><summary>nested</summary>more output</details>',
+      '</details>',
+      '',
+      '**Include actual job links in supervisor history scope.**',
+      '',
+      'An unassigned collection can have a null id.',
+      '',
+      '<details><summary>Suggested fix</summary>```diff',
+      '- a',
+      '+ b',
+      '```</details>',
+    ].join('\n')
+    expect(inboxPreview(body)).toBe('Include actual job links in supervisor history scope. An unassigned collection can have a null id.')
+    expect(parseSeverity(body)).toBe('major')
   })
 
   it('splits ids into request-sized batches', () => {

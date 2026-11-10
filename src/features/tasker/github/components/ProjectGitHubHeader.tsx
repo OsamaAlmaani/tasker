@@ -14,76 +14,98 @@ import type { Id } from "#convex/_generated/dataModel";
 const tabClassName =
 	"inline-flex items-center gap-2 border-b-2 border-transparent px-1 pb-2 text-sm font-medium text-[var(--muted-text)] no-underline transition-colors hover:text-[var(--text)] data-[status=active]:border-[var(--accent)] data-[status=active]:text-[var(--text)]";
 
-/** Header and section tabs shared by the project's GitHub pages. */
+/**
+ * Header and section tabs shared by the project's GitHub pages. `compact`
+ * puts the project name and the tabs on one row, for full-height pages such
+ * as Reviews where vertical space belongs to the content.
+ */
 export function ProjectGitHubHeader({
 	projectId,
 	project,
 	description,
 	actions,
+	compact = false,
 }: {
 	projectId: string;
 	project: { key: string; name: string } | null | undefined;
 	description?: string;
 	actions?: React.ReactNode;
+	compact?: boolean;
 }) {
+	const title = project ? `${project.key} · ${project.name}` : "Project";
+	if (compact) {
+		return (
+			<div className="mb-3 flex flex-wrap items-end gap-x-6 gap-y-1 border-b border-[var(--line)]">
+				<h1
+					className="m-0 max-w-[16rem] truncate pb-2 text-base font-semibold text-[var(--text)]"
+					title={title}
+				>
+					{title}
+				</h1>
+				<ProjectSectionTabs projectId={projectId} />
+				{actions ? <div className="ml-auto pb-1.5">{actions}</div> : null}
+			</div>
+		);
+	}
+	return (
+		<>
+			<PageHeader title={title} description={description} actions={actions} />
+			<div className="mb-5 border-b border-[var(--line)]">
+				<ProjectSectionTabs projectId={projectId} />
+			</div>
+		</>
+	);
+}
+
+function ProjectSectionTabs({ projectId }: { projectId: string }) {
 	const badge = useQuery(api.githubReviewInbox.getInboxBadge, {
 		projectId: projectId as Id<"projects">,
 	});
 	return (
-		<>
-			<PageHeader
-				title={project ? `${project.key} · ${project.name}` : "Project"}
-				description={description}
-				actions={actions}
-			/>
-			<nav
-				aria-label="Project sections"
-				className="mb-5 flex flex-wrap gap-5 border-b border-[var(--line)]"
+		<nav aria-label="Project sections" className="-mb-px flex flex-wrap gap-5">
+			<Link
+				to="/projects/$projectId"
+				params={{ projectId }}
+				className={tabClassName}
+				activeOptions={{ exact: true }}
 			>
-				<Link
-					to="/projects/$projectId"
-					params={{ projectId }}
-					className={tabClassName}
-					activeOptions={{ exact: true }}
-				>
-					<ListTodo className="h-4 w-4" />
-					Tasks
-				</Link>
-				<Link
-					to="/projects/$projectId/pulls"
-					params={{ projectId }}
-					className={tabClassName}
-				>
-					<GitPullRequest className="h-4 w-4" />
-					Pull requests
-				</Link>
-				<Link
-					to="/projects/$projectId/reviews"
-					params={{ projectId }}
-					className={tabClassName}
-				>
-					<MessageSquareText className="h-4 w-4" />
-					Reviews
-					<ReviewsBadge badge={badge} />
-				</Link>
-				<Link
-					to="/projects/$projectId/workflows"
-					params={{ projectId }}
-					className={tabClassName}
-				>
-					<Workflow className="h-4 w-4" />
-					Workflows
-				</Link>
-				<Link
-					to="/projects/$projectId/github"
-					params={{ projectId }}
-					className={tabClassName}
-				>
-					<Plug className="h-4 w-4" />
-					GitHub
-				</Link>
-			</nav>
-		</>
+				<ListTodo className="h-4 w-4" />
+				Tasks
+			</Link>
+			<Link
+				to="/projects/$projectId/pulls"
+				params={{ projectId }}
+				className={tabClassName}
+			>
+				<GitPullRequest className="h-4 w-4" />
+				Pull requests
+			</Link>
+			<Link
+				to="/projects/$projectId/reviews"
+				params={{ projectId }}
+				className={tabClassName}
+			>
+				<MessageSquareText className="h-4 w-4" />
+				Reviews
+				<ReviewsBadge badge={badge} />
+			</Link>
+			<Link
+				to="/projects/$projectId/workflows"
+				params={{ projectId }}
+				className={tabClassName}
+			>
+				<Workflow className="h-4 w-4" />
+				Workflows
+			</Link>
+			<Link
+				to="/projects/$projectId/github"
+				params={{ projectId }}
+				className={tabClassName}
+			>
+				<Plug className="h-4 w-4" />
+				GitHub
+			</Link>
+		</nav>
 	);
 }
 

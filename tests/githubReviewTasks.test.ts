@@ -51,6 +51,21 @@ describe('review task text', () => {
     expect(title.endsWith('…')).toBe(true)
   })
 
+  it('titles bot comments by their headline, not their severity label', () => {
+    const body = [
+      '_⚠️ Potential issue_ | _🟠 Major_',
+      '',
+      '<details><summary>Analysis</summary>Script executed</details>',
+      '',
+      '**Guard the null schedule id.**',
+      '',
+      'Details follow.',
+    ].join('\n')
+    expect(reviewTaskTitle(body, 'src/a.ts')).toBe('Guard the null schedule id.')
+    // A nit prefix is part of the sentence and stays.
+    expect(reviewTaskTitle('nit: rename this\nmore', 'src/a.ts')).toBe('nit: rename this')
+  })
+
   it('falls back to the location for suggestion-only or empty comments', () => {
     expect(reviewTaskTitle('```suggestion\nconst b = 2\n```', 'src/a.ts', 7)).toBe('Apply suggested change in a.ts:7')
     expect(reviewTaskTitle('', 'src/a.ts')).toBe('Address review comment in a.ts')

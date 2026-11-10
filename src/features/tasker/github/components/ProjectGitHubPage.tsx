@@ -18,10 +18,16 @@ export function ProjectGitHubPage({
 	projectId,
 	description,
 	actions,
+	workspace = false,
 	children,
 }: {
 	projectId: Id<"projects">;
 	description?: string;
+	/**
+	 * Fill the window below the top bar with a one-row header; the page does
+	 * not scroll and the content manages its own scrolling.
+	 */
+	workspace?: boolean;
 	actions?: (integration: LoadedIntegration) => React.ReactNode;
 	children: (integration: LoadedIntegration) => React.ReactNode;
 }) {
@@ -52,12 +58,13 @@ export function ProjectGitHubPage({
 	}
 
 	return (
-		<div>
+		<div className={workspace ? "github-workspace" : undefined}>
 			<ProjectGitHubHeader
 				projectId={projectId}
 				project={integration.project}
 				description={description}
 				actions={actions?.(integration)}
+				compact={workspace}
 			/>
 			{children(integration)}
 		</div>

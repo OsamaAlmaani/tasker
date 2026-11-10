@@ -1,9 +1,22 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { CheckCheck, Keyboard, RefreshCw, Search, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	CheckCheck,
+	Keyboard,
+	RefreshCw,
+	Search,
+	SlidersHorizontal,
+	X,
+} from "lucide-react";
+import {
+	useCallback,
+	useEffect,
+	useId,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { Button } from "#/components/ui/button";
-import { Card, CardContent } from "#/components/ui/card";
 import { Input } from "#/components/ui/input";
 import { Select } from "#/components/ui/select";
 import { cn, getClientErrorMessage } from "#/lib/utils";
@@ -148,6 +161,7 @@ export function ReviewInbox({
 	const [now, setNow] = useState(() => Date.now());
 	const wide = useMediaQuery("(min-width: 1024px)");
 	const replyRef = useRef<HTMLTextAreaElement>(null);
+	const listRef = useRef<HTMLDivElement>(null);
 	const actionsRef = useRef<{ toggleResolved: () => void } | null>(null);
 
 	// Remembered choices.
@@ -287,6 +301,13 @@ export function ReviewInbox({
 	const onSeen = useCallback((threadId: string) => {
 		setLocalSeen((previous) => new Map(previous).set(threadId, Date.now()));
 	}, []);
+
+	// Confirmations fade after a while; errors stay until dismissed.
+	useEffect(() => {
+		if (!notice || notice.failed) return;
+		const timer = window.setTimeout(() => setNotice(null), 8000);
+		return () => window.clearTimeout(timer);
+	}, [notice]);
 
 	function select(threadId: string | null) {
 		setCurrentId(threadId);
@@ -434,7 +455,7 @@ export function ReviewInbox({
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [navigate, projectId]);
 
-	const renderDetail = (entry: InboxEntry) => (
+	const renderDetail = (entry: InboxEntry, onBack?: () => void) => (
 		<ReviewInboxDetail
 			key={entry.thread.id}
 			projectId={projectId}
@@ -446,6 +467,7 @@ export function ReviewInbox({
 			replyRef={replyRef}
 			actionsRef={actionsRef}
 			now={now}
+			onBack={onBack}
 			onTrack={(kind) =>
 				setDialog({ type: "track", threadId: entry.thread.id, kind })
 			}
@@ -468,358 +490,309 @@ export function ReviewInbox({
 		dialog?.type === "track"
 			? (entriesById.get(dialog.threadId) ?? null)
 			: null;
-	const reviewers = inbox?.reviewers ?? [];
-	const authors = inbox?.authors ?? [];
-	const filtersActive =
-		filters.search ||
-		filters.reviewer ||
-		filters.author ||
-		filters.untrackedOnly ||
-		filters.outdatedOnly ||
-		filters.unseenOnly;
+	const showBulk = checked.size > 0 && canWrite && view !== "requests";
+	const activeFilters = [
+		filters.reviewer,
+		filters.author,
+		filters.hideBots,
+		filters.untrackedOnly,
+		filters.outdatedOnly,
+		filters.unseenOnly,
+	].filter(Boolean).length;
+	const filtersActive = Boolean(filters.search) || activeFilters > 0;
+	const emptyMessage = filtersActive
+		? "No conversations match these filters."
+		: STATES.find((option) => option.value === stateTab)?.empty;
 
 	return (
-		<div className="space-y-4">
-			<div className="flex flex-wrap items-center justify-between gap-3">
-				<fieldset className="m-0 inline-flex flex-wrap rounded-md border border-[var(--line)] p-0.5">
-					<legend className="sr-only">Whose conversations</legend>
-					{VIEWS.map((option) => (
-						<button
-							key={option.value}
-							type="button"
-							aria-pressed={view === option.value}
-							onClick={() => setView(option.value)}
-							className={cn(
-								"inline-flex items-center gap-1.5 rounded px-3 py-1 text-sm",
-								view === option.value
-									? "bg-[var(--surface-muted)] font-medium text-[var(--text)]"
-									: "text-[var(--muted-text)] hover:text-[var(--text)]",
-							)}
-						>
-							{option.label}
-							{option.value === "requests" && requests.length ? (
-								<span className="rounded-full bg-[var(--accent)] px-1.5 text-[11px] font-semibold text-white tabular-nums">
-									{requests.length}
-								</span>
-							) : null}
-						</button>
-					))}
-				</fieldset>
-				<div className="flex items-center gap-1.5">
-					<Button
-						variant="ghost"
-						size="sm"
-						title="Mark everything as seen"
-						onClick={() => {
-							setLocalSeen(new Map());
-							void markAllSeen({ projectId }).catch(() => {});
-						}}
-					>
-						<CheckCheck className="mr-1.5 h-4 w-4" />
-						Mark all seen
-					</Button>
-					<Button
-						variant="ghost"
-						size="sm"
-						aria-label="Keyboard shortcuts"
-						title="Keyboard shortcuts (?)"
-						onClick={() => setDialog({ type: "help" })}
-					>
-						<Keyboard className="h-4 w-4" />
-					</Button>
-					<Button
-						variant="secondary"
-						size="sm"
-						onClick={() => void live.refetch()}
-						disabled={live.isLoading}
-						aria-label="Refresh"
-						title="Refresh"
-					>
-						<RefreshCw
-							className={cn("h-4 w-4", live.isLoading && "animate-spin")}
-						/>
-					</Button>
-				</div>
-			</div>
-
-			{view !== "requests" ? (
-				<>
-					<div
-						role="tablist"
-						aria-label="Conversation state"
-						className="flex flex-wrap gap-5 border-b border-[var(--line)]"
-					>
-						{STATES.map((option) => (
-							<button
-								key={option.value}
-								type="button"
-								role="tab"
-								aria-selected={stateTab === option.value}
-								onClick={() => setStateTab(option.value)}
-								className={cn(
-									"-mb-px inline-flex items-center gap-1.5 border-b-2 px-1 pb-2 text-sm font-medium",
-									stateTab === option.value
-										? "border-[var(--accent)] text-[var(--text)]"
-										: "border-transparent text-[var(--muted-text)] hover:text-[var(--text)]",
-								)}
-							>
-								{option.label}
-								{inbox ? (
-									<span
-										className={cn(
-											"rounded-full px-1.5 text-[11px] tabular-nums",
-											option.value === "attention" && inbox.counts.attention
-												? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-												: "bg-[var(--surface-muted)] text-[var(--muted-text)]",
-										)}
-									>
-										{inbox.counts[option.value]}
-									</span>
-								) : null}
-							</button>
-						))}
-					</div>
-
-					<div className="flex flex-wrap items-center gap-2">
-						<div className="relative min-w-48 flex-1 sm:max-w-xs">
-							<Search
-								className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-[var(--muted-text)]"
-								aria-hidden="true"
-							/>
-							<Input
-								aria-label="Search conversations"
-								placeholder="Search file, text, PR"
-								className="pl-8"
-								value={filters.search}
-								onChange={(event) =>
-									setFilters({ ...filters, search: event.target.value })
-								}
-							/>
-						</div>
-						<Select
-							aria-label="Reviewer"
-							className="h-9 w-auto"
-							value={filters.reviewer ?? ""}
-							onChange={(event) =>
-								setFilters({ ...filters, reviewer: event.target.value || null })
-							}
-						>
-							<option value="">Any reviewer</option>
-							{reviewers.map((login) => (
-								<option key={login} value={login}>
-									{login}
-								</option>
-							))}
-						</Select>
-						<Select
-							aria-label="Pull request author"
-							className="h-9 w-auto"
-							value={filters.author ?? ""}
-							onChange={(event) =>
-								setFilters({ ...filters, author: event.target.value || null })
-							}
-						>
-							<option value="">Any PR author</option>
-							{authors.map((login) => (
-								<option key={login} value={login}>
-									{login}
-								</option>
-							))}
-						</Select>
-						{(
-							[
-								["hideBots", "Hide bots"],
-								["untrackedOnly", "Untracked"],
-								["outdatedOnly", "Outdated"],
-								["unseenOnly", "New"],
-							] as const
-						).map(([key, label]) => (
-							<button
-								key={key}
-								type="button"
-								aria-pressed={filters[key]}
-								onClick={() => setFilters({ ...filters, [key]: !filters[key] })}
-								className={cn(
-									"inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium",
-									filters[key]
-										? "border-[color-mix(in_oklab,var(--accent)_55%,var(--line))] bg-[color-mix(in_oklab,var(--accent)_12%,transparent)] text-[var(--text)]"
-										: "border-[var(--line)] text-[var(--muted-text)] hover:text-[var(--text)]",
-								)}
-							>
-								{label}
-							</button>
-						))}
-						{filtersActive ? (
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={() =>
-									setFilters({ ...DEFAULT_FILTERS, hideBots: filters.hideBots })
-								}
-							>
-								<X className="mr-1 h-3.5 w-3.5" />
-								Clear
-							</Button>
-						) : null}
-					</div>
-				</>
-			) : null}
-
-			{notice ? (
-				<p
-					role={notice.failed ? "alert" : "status"}
-					className={cn(
-						"m-0 rounded-md border px-3 py-2 text-sm",
-						notice.failed
-							? "border-[color-mix(in_oklab,var(--danger)_45%,var(--line))] text-[var(--danger)]"
-							: "border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300",
-					)}
-				>
-					{notice.message}
-				</p>
-			) : null}
-			{live.error ? (
-				<p role="alert" className="m-0 text-sm text-[var(--danger)]">
-					{live.error}
-				</p>
-			) : null}
-
-			{checked.size && canWrite && view !== "requests" ? (
-				<div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 shadow-[0_8px_24px_rgba(8,12,26,0.12)]">
+		<div className="github-workspace-body flex flex-col gap-2">
+			{showBulk ? (
+				<div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[color-mix(in_oklab,var(--accent)_45%,var(--line))] bg-[color-mix(in_oklab,var(--accent)_8%,var(--surface))] px-3 py-1">
 					<span className="text-sm font-medium text-[var(--text)]">
 						{checked.size} selected
 					</span>
-					<div className="flex flex-wrap gap-1.5">
-						<Button
-							size="sm"
-							disabled={busy}
-							onClick={() => setDialog({ type: "bulkTrack", kind: "fix" })}
-						>
-							Track as fix
-						</Button>
-						<Button
-							size="sm"
-							variant="secondary"
-							disabled={busy}
-							onClick={() =>
-								setDialog({ type: "bulkTrack", kind: "follow_up" })
-							}
-						>
-							Follow up
-						</Button>
-						<Button
-							size="sm"
-							variant="secondary"
-							disabled={busy}
-							onClick={() => void resolveChecked()}
-						>
-							{busy ? "Resolving…" : "Resolve"}
-						</Button>
-						<Button
-							size="sm"
-							variant="secondary"
-							disabled={busy}
-							onClick={() => setDialog({ type: "bulkReply" })}
-						>
-							Reply
-						</Button>
-					</div>
+					<Button
+						size="sm"
+						disabled={busy}
+						onClick={() => setDialog({ type: "bulkTrack", kind: "fix" })}
+					>
+						Track as fix
+					</Button>
+					<Button
+						size="sm"
+						variant="secondary"
+						disabled={busy}
+						onClick={() => setDialog({ type: "bulkTrack", kind: "follow_up" })}
+					>
+						Follow up
+					</Button>
+					<Button
+						size="sm"
+						variant="secondary"
+						disabled={busy}
+						onClick={() => void resolveChecked()}
+					>
+						{busy ? "Resolving…" : "Resolve"}
+					</Button>
+					<Button
+						size="sm"
+						variant="secondary"
+						disabled={busy}
+						onClick={() => setDialog({ type: "bulkReply" })}
+					>
+						Reply
+					</Button>
 					<Button
 						size="sm"
 						variant="ghost"
 						className="ml-auto"
+						title="Clear the selection (Esc)"
 						onClick={() => setChecked(new Set())}
 					>
+						<X className="mr-1 h-3.5 w-3.5" />
 						Clear
 					</Button>
 				</div>
-			) : null}
+			) : (
+				<div className="flex min-h-10 flex-wrap items-center gap-2">
+					<Select
+						aria-label="Whose conversations"
+						className="h-8 w-auto py-0 text-sm"
+						value={view}
+						onChange={(event) => setView(event.target.value as InboxView)}
+					>
+						{VIEWS.map((option) => (
+							<option key={option.value} value={option.value}>
+								{option.value === "requests" && requests.length
+									? `${option.label} (${requests.length})`
+									: option.label}
+							</option>
+						))}
+					</Select>
+					{view !== "requests" ? (
+						<div
+							role="tablist"
+							aria-label="Conversation state"
+							className="inline-flex rounded-md border border-[var(--line)] p-0.5"
+						>
+							{STATES.map((option) => {
+								const count = inbox?.counts[option.value];
+								const urgent = option.value === "attention" && Boolean(count);
+								return (
+									<button
+										key={option.value}
+										type="button"
+										role="tab"
+										aria-selected={stateTab === option.value}
+										onClick={() => setStateTab(option.value)}
+										className={cn(
+											"inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-[13px]",
+											stateTab === option.value
+												? "bg-[var(--surface-muted)] font-medium text-[var(--text)]"
+												: "text-[var(--muted-text)] hover:text-[var(--text)]",
+										)}
+									>
+										{option.label}
+										{count !== undefined ? (
+											<span
+												className={cn(
+													"rounded-full px-1.5 text-[11px] tabular-nums",
+													urgent
+														? "bg-amber-500/15 font-semibold text-amber-700 dark:text-amber-300"
+														: "text-[var(--muted-text)]",
+												)}
+											>
+												{count}
+											</span>
+										) : null}
+									</button>
+								);
+							})}
+						</div>
+					) : null}
+					{view !== "requests" ? (
+						<>
+							<div className="relative min-w-40 flex-1 sm:max-w-64">
+								<Search
+									className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-[var(--muted-text)]"
+									aria-hidden="true"
+								/>
+								<Input
+									aria-label="Search conversations"
+									placeholder="Search file, text, PR"
+									className="h-8 pl-8 text-sm"
+									value={filters.search}
+									onChange={(event) =>
+										setFilters({ ...filters, search: event.target.value })
+									}
+								/>
+							</div>
+							<FiltersMenu
+								filters={filters}
+								activeCount={activeFilters}
+								reviewers={inbox?.reviewers ?? []}
+								authors={inbox?.authors ?? []}
+								onChange={setFilters}
+							/>
+						</>
+					) : null}
+					<div className="ml-auto flex items-center gap-1">
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-8 w-8 p-0"
+							aria-label="Mark everything as seen"
+							title="Mark everything as seen"
+							onClick={() => {
+								setLocalSeen(new Map());
+								void markAllSeen({ projectId }).catch(() => {});
+							}}
+						>
+							<CheckCheck className="h-4 w-4" />
+						</Button>
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-8 w-8 p-0"
+							aria-label="Keyboard shortcuts"
+							title="Keyboard shortcuts (?)"
+							onClick={() => setDialog({ type: "help" })}
+						>
+							<Keyboard className="h-4 w-4" />
+						</Button>
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-8 w-8 p-0"
+							onClick={() => void live.refetch()}
+							disabled={live.isLoading}
+							aria-label="Refresh"
+							title="Refresh"
+						>
+							<RefreshCw
+								className={cn("h-4 w-4", live.isLoading && "animate-spin")}
+							/>
+						</Button>
+					</div>
+				</div>
+			)}
 
-			{!live.data ? (
-				live.error ? null : (
-					<div className="page-loading">Loading review conversations…</div>
-				)
-			) : view === "requests" ? (
-				<ReviewRequestsList
-					projectId={projectId}
-					pullRequests={requests}
-					now={now}
-				/>
-			) : groups.length ? (
-				<div
+			{notice || live.error ? (
+				<p
+					role={notice?.failed || live.error ? "alert" : "status"}
 					className={cn(
-						"grid gap-4",
-						wide && "grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] items-start",
+						"m-0 flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm",
+						notice?.failed || live.error
+							? "border-[color-mix(in_oklab,var(--danger)_45%,var(--line))] text-[var(--danger)]"
+							: "border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300",
 					)}
 				>
-					<ReviewInboxList
-						projectId={projectId}
-						groups={groups}
-						tasksByThread={tasksByThread}
-						tasksByPull={tasksByPull}
-						currentId={currentId}
-						checked={checked}
-						canSelect={canWrite}
-						now={now}
-						onSelect={(threadId) =>
-							select(!wide && threadId === currentId ? null : threadId)
-						}
-						onToggleChecked={toggleChecked}
-						onToggleGroup={(ids, selectAll) =>
-							setChecked((previous) => {
-								const next = new Set(previous);
-								for (const id of ids) {
-									if (selectAll) next.add(id);
-									else next.delete(id);
-								}
-								return next;
-							})
-						}
-						renderInlineDetail={wide ? null : renderDetail}
-					/>
-					{wide ? (
-						<div className="sticky top-4 max-h-[calc(100dvh-2rem)] overflow-auto">
-							{current && currentInTab ? (
-								renderDetail(current)
-							) : (
-								<Card>
-									<CardContent className="p-6 text-sm text-[var(--muted-text)]">
-										Pick a conversation to read and answer it.
-									</CardContent>
-								</Card>
-							)}
+					<span className="min-w-0 flex-1">
+						{notice?.message ?? live.error}
+					</span>
+					{notice ? (
+						<button
+							type="button"
+							className="shrink-0 bg-transparent p-0 text-current opacity-70 hover:opacity-100"
+							aria-label="Dismiss"
+							onClick={() => setNotice(null)}
+						>
+							<X className="h-3.5 w-3.5" />
+						</button>
+					) : null}
+				</p>
+			) : null}
+
+			<div
+				className={cn(
+					"grid min-h-0 flex-1 gap-3",
+					wide &&
+						view !== "requests" &&
+						"grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]",
+				)}
+			>
+				<div
+					ref={listRef}
+					className="min-h-0 overflow-y-auto overscroll-contain rounded-xl border border-[var(--line)] bg-[var(--surface)]"
+				>
+					{!live.data ? (
+						live.error ? null : (
+							<p className="m-0 p-6 text-center text-sm text-[var(--muted-text)]">
+								Loading review conversations…
+							</p>
+						)
+					) : view === "requests" ? (
+						<ReviewRequestsList
+							projectId={projectId}
+							pullRequests={requests}
+							now={now}
+						/>
+					) : groups.length ? (
+						<ReviewInboxList
+							projectId={projectId}
+							groups={groups}
+							tasksByThread={tasksByThread}
+							tasksByPull={tasksByPull}
+							currentId={currentId}
+							checked={checked}
+							canSelect={canWrite}
+							now={now}
+							onSelect={(threadId) => select(threadId)}
+							onToggleChecked={toggleChecked}
+							onToggleGroup={(ids, selectAll) =>
+								setChecked((previous) => {
+									const next = new Set(previous);
+									for (const id of ids) {
+										if (selectAll) next.add(id);
+										else next.delete(id);
+									}
+									return next;
+								})
+							}
+						/>
+					) : (
+						<p className="m-0 p-6 text-center text-sm text-[var(--muted-text)]">
+							{emptyMessage}
+						</p>
+					)}
+					{live.data &&
+					(live.data.totalPullRequests > live.data.checkedPullRequests ||
+						live.data.missingThreads) ? (
+						<div className="space-y-0.5 border-t border-[var(--line)] px-3 py-2 text-[11px] text-[var(--muted-text)]">
+							{live.data.totalPullRequests > live.data.checkedPullRequests ? (
+								<p className="m-0">
+									From the {live.data.checkedPullRequests} most recently updated
+									of {live.data.totalPullRequests} open pull requests.
+								</p>
+							) : null}
+							{live.data.missingThreads ? (
+								<p className="m-0 text-amber-700 dark:text-amber-300">
+									GitHub did not return {live.data.missingThreads} conversation
+									{live.data.missingThreads === 1 ? "" : "s"}. Refresh to try
+									again.
+								</p>
+							) : null}
 						</div>
 					) : null}
 				</div>
-			) : (
-				<Card>
-					<CardContent className="p-6 text-center text-sm text-[var(--muted-text)]">
-						{filtersActive
-							? "No conversations match these filters."
-							: STATES.find((option) => option.value === stateTab)?.empty}
-					</CardContent>
-				</Card>
-			)}
+				{wide && view !== "requests" ? (
+					<div className="min-h-0">
+						{current && currentInTab ? (
+							renderDetail(current)
+						) : (
+							<div className="flex h-full items-center justify-center rounded-xl border border-dashed border-[var(--line)] p-6 text-center text-sm text-[var(--muted-text)]">
+								{live.data
+									? "Pick a conversation to read and answer it. Press ? for shortcuts."
+									: null}
+							</div>
+						)}
+					</div>
+				) : null}
+			</div>
 
-			{live.data ? (
-				<div className="space-y-1 text-xs text-[var(--muted-text)]">
-					{live.data.totalPullRequests > live.data.checkedPullRequests ? (
-						<p className="m-0">
-							Showing the {live.data.checkedPullRequests} most recently updated
-							of {live.data.totalPullRequests} open pull requests.
-						</p>
-					) : null}
-					{live.data.missingThreads ? (
-						<p className="m-0 text-amber-700 dark:text-amber-300">
-							GitHub did not return {live.data.missingThreads} conversation
-							{live.data.missingThreads === 1 ? "" : "s"}. Refresh to try again.
-						</p>
-					) : null}
-					{view !== "requests" && wide ? (
-						<p className="m-0">
-							Press <kbd className="font-mono">?</kbd> for keyboard shortcuts.
-						</p>
-					) : null}
+			{!wide && view !== "requests" && current && currentInTab ? (
+				<div className="fixed inset-0 z-40 flex flex-col bg-[var(--bg,var(--surface))] p-2">
+					{renderDetail(current, () => setCurrentId(null))}
 				</div>
 			) : null}
 
@@ -884,6 +857,155 @@ export function ReviewInbox({
 			) : null}
 			{dialog?.type === "help" ? (
 				<ShortcutsDialog onClose={() => setDialog(null)} />
+			) : null}
+		</div>
+	);
+}
+
+/** Reviewer, author and toggle filters in one menu, so the toolbar stays one row. */
+function FiltersMenu({
+	filters,
+	activeCount,
+	reviewers,
+	authors,
+	onChange,
+}: {
+	filters: InboxFilters;
+	activeCount: number;
+	reviewers: string[];
+	authors: string[];
+	onChange: (filters: InboxFilters) => void;
+}) {
+	const [open, setOpen] = useState(false);
+	const ref = useRef<HTMLDivElement>(null);
+	const id = useId();
+
+	useEffect(() => {
+		if (!open) return;
+		const onPointerDown = (event: PointerEvent) => {
+			if (!ref.current?.contains(event.target as Node)) setOpen(false);
+		};
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key === "Escape") setOpen(false);
+		};
+		window.addEventListener("pointerdown", onPointerDown);
+		window.addEventListener("keydown", onKeyDown);
+		return () => {
+			window.removeEventListener("pointerdown", onPointerDown);
+			window.removeEventListener("keydown", onKeyDown);
+		};
+	}, [open]);
+
+	const toggles = [
+		["hideBots", "Hide bots"],
+		["untrackedOnly", "Untracked only"],
+		["outdatedOnly", "Outdated only"],
+		["unseenOnly", "New replies only"],
+	] as const;
+
+	return (
+		<div className="relative" ref={ref}>
+			<Button
+				type="button"
+				size="sm"
+				variant={activeCount ? "secondary" : "ghost"}
+				className="h-8 gap-1.5 px-2.5"
+				aria-haspopup="dialog"
+				aria-expanded={open}
+				onClick={() => setOpen((value) => !value)}
+			>
+				<SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+				Filters
+				{activeCount ? (
+					<span className="rounded-full bg-[var(--accent)] px-1.5 text-[11px] font-semibold text-white tabular-nums">
+						{activeCount}
+					</span>
+				) : null}
+			</Button>
+			{open ? (
+				<div
+					role="dialog"
+					aria-label="Filters"
+					className="absolute top-full left-0 z-30 mt-1 w-72 space-y-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 shadow-[0_12px_32px_rgba(8,12,26,0.18)]"
+				>
+					<div className="space-y-1">
+						<label
+							htmlFor={`${id}-reviewer`}
+							className="block text-xs text-[var(--muted-text)]"
+						>
+							Reviewer
+						</label>
+						<Select
+							id={`${id}-reviewer`}
+							className="h-8 w-full py-0 text-sm"
+							value={filters.reviewer ?? ""}
+							onChange={(event) =>
+								onChange({ ...filters, reviewer: event.target.value || null })
+							}
+						>
+							<option value="">Anyone</option>
+							{reviewers.map((login) => (
+								<option key={login} value={login}>
+									{login}
+								</option>
+							))}
+						</Select>
+					</div>
+					<div className="space-y-1">
+						<label
+							htmlFor={`${id}-author`}
+							className="block text-xs text-[var(--muted-text)]"
+						>
+							Pull request author
+						</label>
+						<Select
+							id={`${id}-author`}
+							className="h-8 w-full py-0 text-sm"
+							value={filters.author ?? ""}
+							onChange={(event) =>
+								onChange({ ...filters, author: event.target.value || null })
+							}
+						>
+							<option value="">Anyone</option>
+							{authors.map((login) => (
+								<option key={login} value={login}>
+									{login}
+								</option>
+							))}
+						</Select>
+					</div>
+					<div className="space-y-1.5">
+						{toggles.map(([key, label]) => (
+							<label
+								key={key}
+								className="flex items-center gap-2 text-sm text-[var(--text)]"
+							>
+								<input
+									type="checkbox"
+									className="h-3.5 w-3.5 accent-[var(--accent)]"
+									checked={filters[key]}
+									onChange={() =>
+										onChange({ ...filters, [key]: !filters[key] })
+									}
+								/>
+								{label}
+							</label>
+						))}
+					</div>
+					{activeCount ? (
+						<Button
+							type="button"
+							size="sm"
+							variant="ghost"
+							className="w-full"
+							onClick={() =>
+								onChange({ ...DEFAULT_FILTERS, search: filters.search })
+							}
+						>
+							Clear filters
+						</Button>
+					) : null}
+				</div>
 			) : null}
 		</div>
 	);

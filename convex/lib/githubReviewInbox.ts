@@ -1,5 +1,13 @@
 import type { GitHubActor } from './githubApi'
-import { plainCommentText } from './githubReviewTasks'
+import {
+  meaningfulLines,
+  plainCommentText,
+  type ReviewSeverity,
+  severityOfLine,
+  withoutCollapsedBlocks,
+} from './githubReviewTasks'
+
+export type { ReviewSeverity }
 
 // Pure parts of the Reviews inbox: the GitHub queries, the lean conversation
 // shape the list uses, previews and severity labels. No I/O.
@@ -107,8 +115,6 @@ export type RawInboxPullRequest = {
   } | null
 }
 
-export type ReviewSeverity = 'critical' | 'major' | 'minor' | 'nitpick'
-
 /** A conversation as the inbox list shows it: first comment preview and last activity. */
 export type InboxThread = {
   id: string
@@ -151,33 +157,17 @@ const MAX_PREVIEW_LENGTH = 500
 
 /** Markdown reduced to a short plain-text preview. */
 export function inboxPreview(body: string) {
-  const text = plainCommentText(body)
-    .split('\n')
-    .map((line) => line.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-    .join(' ')
+  const text = meaningfulLines(body).join(' ')
   return text.length > MAX_PREVIEW_LENGTH ? `${text.slice(0, MAX_PREVIEW_LENGTH - 1).trimEnd()}…` : text
 }
 
-/**
- * Severity label of a review comment, as review bots write them at the start
- * ("Major · Stability", "⚠️ Potential issue | 🟠 Major", "🧹 Nitpick") or as
- * people prefix nitpicks ("nit: rename"). Only the short first line counts,
- * so a sentence that merely mentions "a major refactor" is not a label.
- */
+/** Severity label of a review comment, read from its first line (see `severityOfLine`). */
 export function parseSeverity(body: string): ReviewSeverity | null {
-  const first = plainCommentText(body)
+  const first = plainCommentText(withoutCollapsedBlocks(body))
     .split('\n')
     .map((line) => line.trim())
     .find(Boolean)
-  if (!first) return null
-  if (/^(nit|nitpick)\b/i.test(first)) return 'nitpick'
-  if (first.length > 80) return null
-  if (/\bcritical\b/i.test(first)) return 'critical'
-  if (/\bmajor\b/i.test(first)) return 'major'
-  if (/\bminor\b/i.test(first)) return 'minor'
-  if (/\b(nitpick|trivial)\b/i.test(first)) return 'nitpick'
-  return null
+  return first ? severityOfLine(first) : null
 }
 
 const SEVERITY_PRIORITY: Record<ReviewSeverity, 'urgent' | 'high' | 'medium' | 'low'> = {

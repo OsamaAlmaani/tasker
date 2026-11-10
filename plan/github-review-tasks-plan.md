@@ -159,7 +159,8 @@ Decisions:
 - **Reply snippets:** saved per user, with sensible defaults until edited.
 - **Keyboard:** `j`/`k` move, `x` select, `t` track as fix, `f` follow-up,
   `r` reply, `e` resolve or reopen, `o` open in the pull request, `?` help.
-- **Mobile:** the list only; the selected conversation opens under its row.
+- **Mobile:** the list only; the selected conversation opens as a full-screen sheet with a back button.
+- **Layout (revised 2026-11-10 after review):** the page fills the window and never scrolls; the list and the conversation each scroll on their own. The project title and section tabs share one row, and view, state, search and a Filters menu share the toolbar row, which turns into the bulk bar while conversations are selected. Rows are two lines, pull request headers stick within the list, and off-screen groups use `content-visibility: auto`. Previews and task titles skip collapsed `<details>` blocks and a leading bot severity label.
 
 - [x] Inbox listing action with first and last comment per conversation.
 - [x] Classification, filters, grouping and unseen logic (pure, tested).

@@ -174,12 +174,58 @@ export function plainCommentText(body: string) {
     .replace(/(^|[\s(])[*_]([^*_\n]+)[*_](?=[\s).,!?:;]|$)/gm, '$1$2')
 }
 
-/** Title for a review task: the first meaningful line of the comment. */
-export function reviewTaskTitle(body: string, path: string, line?: number | null) {
-  const lines = plainCommentText(body)
+/**
+ * Removes collapsed `<details>` blocks. Review bots put their analysis,
+ * suggested fixes and agent prompts there; it is noise in titles and previews.
+ */
+export function withoutCollapsedBlocks(body: string) {
+  let text = body.replace(/\r\n?/g, '\n')
+  let previous: string
+  do {
+    previous = text
+    // Innermost first, so nested blocks come out whole.
+    text = text.replace(/<details\b[^>]*>(?:(?!<details\b)[\s\S])*?<\/details>/gi, '\n')
+  } while (text !== previous)
+  return text
+}
+
+export type ReviewSeverity = 'critical' | 'major' | 'minor' | 'nitpick'
+
+/**
+ * Severity of a comment's first line, as review bots write them at the start
+ * ("Major · Stability", "⚠️ Potential issue | 🟠 Major", "🧹 Nitpick") or as
+ * people prefix nitpicks ("nit: rename"). A longer line is a sentence, not a
+ * label, so "a major refactor" never counts.
+ */
+export function severityOfLine(line: string): ReviewSeverity | null {
+  const first = line.trim()
+  if (!first) return null
+  if (/^(nit|nitpick)\b/i.test(first)) return 'nitpick'
+  if (first.length > 80) return null
+  if (/\bcritical\b/i.test(first)) return 'critical'
+  if (/\bmajor\b/i.test(first)) return 'major'
+  if (/\bminor\b/i.test(first)) return 'minor'
+  if (/\b(nitpick|trivial)\b/i.test(first)) return 'nitpick'
+  return null
+}
+
+/**
+ * The comment as plain lines worth reading: without collapsed blocks, and
+ * without a leading bot severity label when something follows it (the label
+ * is shown as a badge instead).
+ */
+export function meaningfulLines(body: string) {
+  const lines = plainCommentText(withoutCollapsedBlocks(body))
     .split('\n')
     .map((value) => value.replace(/\s+/g, ' ').trim())
     .filter(Boolean)
+  const labelOnly = lines.length > 1 && severityOfLine(lines[0]) && !/^nit\b\s*:/i.test(lines[0])
+  return labelOnly ? lines.slice(1) : lines
+}
+
+/** Title for a review task: the first meaningful line of the comment. */
+export function reviewTaskTitle(body: string, path: string, line?: number | null) {
+  const lines = meaningfulLines(body)
   const first = lines[0]
   if (!first) {
     const where = locationLabel(fileName(path), line)

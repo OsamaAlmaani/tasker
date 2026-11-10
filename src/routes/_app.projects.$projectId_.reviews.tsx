@@ -14,10 +14,7 @@ function ProjectReviewsPage() {
 	const projectId = Route.useParams().projectId as Id<"projects">;
 
 	return (
-		<ProjectGitHubPage
-			projectId={projectId}
-			description="Open review conversations across pull requests. Track the ones that need work as tasks."
-		>
+		<ProjectGitHubPage projectId={projectId} workspace>
 			{(integration) =>
 				integration.account && integration.repository ? (
 					<ReviewInbox

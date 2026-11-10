@@ -700,6 +700,43 @@ html[data-theme='chaos'] .app-topbar {
   min-height: 0;
 }
 
+/*
+ * Full-height GitHub pages (Reviews): the window never scrolls; the page's
+ * own panes do. The header row and toolbar keep their height, the rest of
+ * the workspace takes what is left.
+ */
+.app-main:has(.github-workspace) {
+  height: 100dvh;
+  min-height: 0;
+}
+
+.app-main:has(.github-workspace) > .app-topbar {
+  flex-shrink: 0;
+}
+
+.app-content:has(.github-workspace) {
+  display: flex;
+  overflow: hidden;
+  padding: 10px 18px 12px;
+}
+
+.github-workspace {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.github-workspace > * {
+  flex-shrink: 0;
+}
+
+.github-workspace > .github-workspace-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 /* Task views share the space left below the actual header and filters. */
 .app-main:has(.project-workspace) {
   height: 100dvh;
