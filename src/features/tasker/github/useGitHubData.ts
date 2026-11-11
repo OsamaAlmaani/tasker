@@ -1,5 +1,7 @@
+import { useConvex } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getClientErrorMessage } from "#/lib/utils";
+import { loadWithReconnectRetry, waitForConnection } from "./reconnect";
 
 type GitHubDataState<T> = {
 	key: string | null;
@@ -22,6 +24,9 @@ export function useGitHubData<T>(
 ) {
 	const loadRef = useRef(load);
 	loadRef.current = load;
+	const convex = useConvex();
+	const convexRef = useRef(convex);
+	convexRef.current = convex;
 	const requestIdRef = useRef(0);
 	const [state, setState] = useState<GitHubDataState<T>>({
 		key: null,
@@ -39,7 +44,11 @@ export function useGitHubData<T>(
 				: { key, data: undefined, error: null, isLoading: true },
 		);
 		try {
-			const data = await loadRef.current();
+			const data = await loadWithReconnectRetry(
+				() => loadRef.current(),
+				convexRef.current,
+				() => requestId !== requestIdRef.current,
+			);
 			if (requestId !== requestIdRef.current) return;
 			setState({ key, data, error: null, isLoading: false });
 		} catch (error) {
@@ -70,18 +79,24 @@ export function useGitHubData<T>(
 	}, [liveVersion, key, refetch]);
 
 	// GitHub changes outside Tasker, so refresh when the tab regains focus.
+	// A page coming back from the background may still be reconnecting, so
+	// wait for the connection first.
 	useEffect(() => {
 		if (key === null) return;
 		let lastFocusRefresh = Date.now();
+		let active = true;
 		const onFocus = () => {
 			if (document.visibilityState !== "visible") return;
 			if (Date.now() - lastFocusRefresh < 30_000) return;
 			lastFocusRefresh = Date.now();
-			void refetch();
+			void waitForConnection(convexRef.current).then(() => {
+				if (active) void refetch();
+			});
 		};
 		window.addEventListener("focus", onFocus);
 		document.addEventListener("visibilitychange", onFocus);
 		return () => {
+			active = false;
 			window.removeEventListener("focus", onFocus);
 			document.removeEventListener("visibilitychange", onFocus);
 		};
