@@ -26,6 +26,17 @@ export function normalizePath(path: string) {
   return parts.join('/')
 }
 
+/** True when `..` segments climb above the repository root, which `normalizePath` would hide. */
+function escapesRoot(path: string) {
+  let depth = 0
+  for (const part of path.replace(/\\/g, '/').split('/')) {
+    if (part === '' || part === '.') continue
+    depth += part === '..' ? -1 : 1
+    if (depth < 0) return true
+  }
+  return false
+}
+
 export function joinPath(directory: string, path: string) {
   if (path.startsWith('/')) return normalizePath(path)
   return normalizePath(directory ? `${directory}/${path}` : path)
@@ -288,13 +299,21 @@ export type ProjectReferences = {
   projects: string[]
   /** Props/targets files imported by path. */
   imports: string[]
-  /** Source folders outside the project directory, such as linked files. */
+  /** Source folders outside the project directory, from glob includes such as `..\Shared\**\*.cs`. */
   linkedDirectories: string[]
+  /** Single files outside the project directory, such as a linked `.dockerignore`. */
+  linkedFiles: string[]
+  /** Linked includes whose `..` segments climb above the repository root. */
+  unresolvedLinks: string[]
+}
+
+function emptyReferences(projects: string[] = []): ProjectReferences {
+  return { projects, imports: [], linkedDirectories: [], linkedFiles: [], unresolvedLinks: [] }
 }
 
 export function parseProjectFile(text: string, projectPath: string): ProjectReferences {
   const directory = dirname(projectPath)
-  const result: ProjectReferences = { projects: [], imports: [], linkedDirectories: [] }
+  const result = emptyReferences()
   for (const match of text.matchAll(/<ProjectReference\b[^>]*\bInclude\s*=\s*"([^"]+)"/gi)) {
     if (!match[1].includes('$(')) result.projects.push(joinPath(directory, match[1]))
   }
@@ -307,8 +326,15 @@ export function parseProjectFile(text: string, projectPath: string): ProjectRefe
     const include = match[2].replace(/\\/g, '/')
     if (!include.startsWith('..') || include.includes('$(')) continue
     for (const part of include.split(';')) {
+      if (!part.trim()) continue
+      if (escapesRoot(directory ? `${directory}/${part}` : part)) {
+        result.unresolvedLinks.push(part)
+        continue
+      }
+      // A single linked file only depends on that file, not on its folder.
       const base = globBase(joinPath(directory, part))
-      result.linkedDirectories.push(base.isGlob ? base.path : dirname(base.path))
+      if (base.isGlob) result.linkedDirectories.push(base.path)
+      else result.linkedFiles.push(base.path)
     }
   }
   return result
@@ -572,12 +598,12 @@ export async function analyzeWorkflows(
     for (const project of frontier) {
       const text = contents.get(project)
       if (typeof text !== 'string') {
-        references.set(project, { projects: [], imports: [], linkedDirectories: [] })
+        references.set(project, emptyReferences())
         continue
       }
       if (/\.(sln|slnx)$/i.test(project)) {
         const projects = parseSolutionFile(text, project)
-        references.set(project, { projects, imports: [], linkedDirectories: [] })
+        references.set(project, emptyReferences(projects))
         next.push(...projects)
         continue
       }
@@ -624,6 +650,12 @@ export async function analyzeWorkflows(
       }
       for (const linked of refs.linkedDirectories) {
         rules.push({ kind: 'directory', path: linked, label: `Files linked by ${name}` })
+      }
+      for (const linked of refs.linkedFiles) {
+        rules.push({ kind: 'file', path: linked, label: `File linked by ${name}` })
+      }
+      for (const link of refs.unresolvedLinks) {
+        workflowNotes.push(`${name} links ${link}, which points outside the repository.`)
       }
     }
     // Shared settings apply to every project below them.

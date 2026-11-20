@@ -155,6 +155,33 @@ describe('parseProjectFile', () => {
     expect(refs.projects).toEqual(['src/Core/Common/Common.csproj'])
     expect(refs.linkedDirectories).toEqual(['src/APIs/Shared'])
   })
+
+  it('tracks a single linked file without watching its folder', () => {
+    const refs = parseProjectFile(
+      `<Project>
+        <ItemGroup>
+          <Content Include="..\\..\\..\\.dockerignore">
+            <Link>.dockerignore</Link>
+          </Content>
+          <Compile Include="../../../../src/Core/Shared/Helper.cs" />
+        </ItemGroup>
+      </Project>`,
+      'src/Services/Parsers/X1Parser/X1Parser.csproj',
+    )
+    expect(refs.linkedDirectories).toEqual([])
+    expect(refs.linkedFiles).toEqual(['src/.dockerignore', 'src/Core/Shared/Helper.cs'])
+    expect(refs.unresolvedLinks).toEqual([])
+  })
+
+  it('reports linked files that climb above the repository root', () => {
+    const refs = parseProjectFile(
+      `<Project><ItemGroup><Content Include="..\\..\\..\\.dockerignore" /></ItemGroup></Project>`,
+      'src/Api/Api.csproj',
+    )
+    expect(refs.linkedFiles).toEqual([])
+    expect(refs.linkedDirectories).toEqual([])
+    expect(refs.unresolvedLinks).toEqual(['../../../.dockerignore'])
+  })
 })
 
 const FILES: Record<string, string> = {
