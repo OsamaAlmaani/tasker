@@ -326,13 +326,27 @@ export default defineSchema({
       v.object({
         workflowId: v.number(),
         workflowName: v.string(),
-        reason: v.union(v.literal('unchanged'), v.literal('removed')),
+        reason: v.union(v.literal('unchanged'), v.literal('unaffected'), v.literal('removed')),
       }),
     ),
     status: v.union(v.literal('starting'), v.literal('started')),
     startedBy: v.id('users'),
     startedAt: v.number(),
   }).index('by_projectId_startedAt', ['projectId', 'startedAt']),
+
+  // Cached C# index entries for deep workflow analysis, one per repository
+  // and git blob SHA (exact file contents). Derived identifiers only, never
+  // source text; internal to convex/githubCsharpIndex.ts and read only for
+  // blob SHAs the caller's own token just listed (see AGENT.md).
+  githubCsharpIndex: defineTable({
+    repositoryId: v.number(),
+    blobSha: v.string(),
+    version: v.number(),
+    data: v.string(),
+    usedAt: v.number(),
+  })
+    .index('by_repositoryId_blobSha', ['repositoryId', 'blobSha'])
+    .index('by_usedAt', ['usedAt']),
 
   projectCounters: defineTable({
     projectId: v.id('projects'),

@@ -119,7 +119,7 @@ export type TaskerRelease = {
 	skipped: Array<{
 		workflowId: number;
 		workflowName: string;
-		reason: "unchanged" | "removed";
+		reason: "unchanged" | "unaffected" | "removed";
 	}>;
 	status: "starting" | "started";
 	startedAt: number;

@@ -6,10 +6,13 @@ import {
 	FileDiff,
 	GitBranch,
 	GitCommitHorizontal,
+	ListChecks,
 	Play,
 	RefreshCw,
+	ScanSearch,
 	TriangleAlert,
 	Undo2,
+	Unlink,
 } from "lucide-react";
 import {
 	useCallback,
@@ -35,7 +38,14 @@ export type PlannerRequest = {
 	name: string;
 };
 
-type SectionKey = "changed" | "unknown" | "unchanged" | "blocked";
+type SectionKey =
+	| "changed"
+	| "unknown"
+	| "unaffected"
+	| "unchanged"
+	| "blocked";
+
+type CheckMode = RunPlan["analysis"];
 
 const SECTIONS: Array<{
 	key: SectionKey;
@@ -53,6 +63,11 @@ const SECTIONS: Array<{
 		hint: "Never built, or Tasker could not tell what they depend on.",
 	},
 	{
+		key: "unaffected",
+		title: "Changes don't reach it",
+		hint: "Projects they reference changed, but deep analysis found no changed type that their own code uses. Running them rebuilds the same behaviour.",
+	},
+	{
 		key: "unchanged",
 		title: "No code changes",
 		hint: "Nothing they build changed since their last successful build. Running them again rebuilds the same code.",
@@ -64,11 +79,22 @@ const SECTIONS: Array<{
 	},
 ];
 
+/** Sections whose workflows start left out; one key adds them back. */
+const SKIPPABLE: SectionKey[] = ["unaffected", "unchanged"];
+
 function sectionOf(workflow: PlannedWorkflow): SectionKey {
 	if (!workflow.dispatchable) return "blocked";
 	if (workflow.impact.state === "changed") return "changed";
 	if (workflow.impact.state === "unchanged") return "unchanged";
+	if (workflow.impact.state === "unaffected") return "unaffected";
 	return "unknown";
+}
+
+function isSkippable(workflow: PlannedWorkflow) {
+	return (
+		workflow.impact.state === "unchanged" ||
+		workflow.impact.state === "unaffected"
+	);
 }
 
 function defaultInputs(workflow: PlannedWorkflow) {
@@ -101,6 +127,8 @@ export function RunPlannerDialog({
 	onStarted: (result: { releaseId: string; runIds: number[] }) => void;
 }) {
 	const planRun = useAction(api.githubWorkflows.planRun);
+	const planDeepRun = useAction(api.githubWorkflowsDeep.planDeepRun);
+	const getPlanOptions = useAction(api.githubWorkflows.getPlanOptions);
 	const startRun = useAction(api.githubWorkflows.startRun);
 	const listBranches = useAction(api.githubWorkflows.listBranches);
 
@@ -111,6 +139,9 @@ export function RunPlannerDialog({
 	const [plan, setPlan] = useState<RunPlan | null>(null);
 	const [planError, setPlanError] = useState<string | null>(null);
 	const [planning, setPlanning] = useState(false);
+	// C# repositories offer two checks and wait for a choice; others run the usual check.
+	const [deepAvailable, setDeepAvailable] = useState<boolean | null>(null);
+	const [mode, setMode] = useState<CheckMode | null>(null);
 	const [included, setIncluded] = useState<Set<number>>(new Set());
 	const [inputs, setInputs] = useState<Record<number, Record<string, string>>>(
 		{},
@@ -126,17 +157,20 @@ export function RunPlannerDialog({
 	const open = request !== null;
 
 	const loadPlan = useCallback(
-		async (branch: string, keepSelection: boolean) => {
+		async (branch: string, keepSelection: boolean, checkMode: CheckMode) => {
 			if (!request) return;
 			const id = ++planRequest.current;
+			setMode(checkMode);
 			setPlanning(true);
 			setPlanError(null);
 			try {
-				const result = await planRun({
+				const args = {
 					projectId,
 					workflowIds: request.workflowIds,
 					ref: branch,
-				});
+				};
+				const result =
+					checkMode === "deep" ? await planDeepRun(args) : await planRun(args);
 				if (id !== planRequest.current) return;
 				setPlan(result);
 				setIncluded((current) => {
@@ -146,8 +180,8 @@ export function RunPlannerDialog({
 						const wasIncluded = current.has(workflow.workflowId);
 						if (keepSelection && current.size) {
 							if (wasIncluded) next.add(workflow.workflowId);
-						} else if (workflow.impact.state !== "unchanged") {
-							// Unchanged workflows start left out; one key adds them back.
+						} else if (!isSkippable(workflow)) {
+							// Unchanged and unaffected workflows start left out; one key adds them back.
 							next.add(workflow.workflowId);
 						}
 					}
@@ -172,23 +206,48 @@ export function RunPlannerDialog({
 				if (id === planRequest.current) setPlanning(false);
 			}
 		},
-		[planRun, projectId, request],
+		[planRun, planDeepRun, projectId, request],
 	);
 
-	// Reset whenever a new request opens the dialog.
+	/** Clears the current result and runs the chosen check. */
+	const runCheck = useCallback(
+		(checkMode: CheckMode) => {
+			setPlan(null);
+			setIncluded(new Set());
+			setExpanded(new Set());
+			setStartError(null);
+			setNotice(null);
+			void loadPlan(ref, false, checkMode);
+		},
+		[loadPlan, ref],
+	);
+
+	// Reset whenever a new request opens the dialog, then decide which checks to offer.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: runs only when a new request opens the dialog
 	useEffect(() => {
 		if (!request) return;
+		const id = ++planRequest.current;
 		setRef(defaultBranch);
 		setRefDraft(defaultBranch);
 		setName(request.name);
 		setPlan(null);
+		setPlanError(null);
 		setIncluded(new Set());
 		setInputs({});
 		setExpanded(new Set());
 		setStartError(null);
 		setNotice(null);
-		void loadPlan(defaultBranch, false);
+		setMode(null);
+		setDeepAvailable(null);
+		setPlanning(true);
+		getPlanOptions({ projectId })
+			.catch(() => ({ deepAnalysis: false }))
+			.then((options) => {
+				if (id !== planRequest.current) return;
+				setDeepAvailable(options.deepAnalysis);
+				if (options.deepAnalysis) setPlanning(false);
+				else void loadPlan(defaultBranch, false, "standard");
+			});
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- only when the request changes
 	}, [request]);
 
@@ -203,6 +262,7 @@ export function RunPlannerDialog({
 		const result: Record<SectionKey, PlannedWorkflow[]> = {
 			changed: [],
 			unknown: [],
+			unaffected: [],
 			unchanged: [],
 			blocked: [],
 		};
@@ -217,25 +277,27 @@ export function RunPlannerDialog({
 		return result;
 	}, [plan]);
 
-	const unchangedIds = sections.unchanged.map(
-		(workflow) => workflow.workflowId,
+	const skippableIds = useMemo(
+		() =>
+			SKIPPABLE.flatMap((key) =>
+				sections[key].map((workflow) => workflow.workflowId),
+			),
+		[sections],
 	);
-	const unchangedIncluded = unchangedIds.filter((id) =>
-		included.has(id),
-	).length;
 	const startCount = included.size;
 
-	const toggleUnchanged = useCallback(() => {
+	/** Removes the given workflows if any is included, otherwise adds them all back. */
+	const toggleIds = useCallback((ids: number[]) => {
 		setIncluded((current) => {
 			const next = new Set(current);
-			const anyIncluded = unchangedIds.some((id) => next.has(id));
-			for (const id of unchangedIds) {
+			const anyIncluded = ids.some((id) => next.has(id));
+			for (const id of ids) {
 				if (anyIncluded) next.delete(id);
 				else next.add(id);
 			}
 			return next;
 		});
-	}, [unchangedIds]);
+	}, []);
 
 	const start = useCallback(async () => {
 		if (!plan || !request || !included.size || starting) return;
@@ -261,7 +323,9 @@ export function RunPlannerDialog({
 					reason:
 						workflow.impact.state === "unchanged"
 							? ("unchanged" as const)
-							: ("removed" as const),
+							: workflow.impact.state === "unaffected"
+								? ("unaffected" as const)
+								: ("removed" as const),
 				}));
 			const result = await startRun({
 				projectId,
@@ -282,7 +346,7 @@ export function RunPlannerDialog({
 			const parsed = parseConvexError(error);
 			if (parsed?.code === "GITHUB_REF_MOVED") {
 				setNotice(parsed.message ?? "The branch moved. Checked again.");
-				void loadPlan(plan.ref, true);
+				void loadPlan(plan.ref, true, plan.analysis);
 			} else {
 				setStartError(
 					getClientErrorMessage(error, "GitHub did not start the workflows."),
@@ -304,7 +368,7 @@ export function RunPlannerDialog({
 		loadPlan,
 	]);
 
-	// U toggles unchanged workflows; Cmd/Ctrl + Enter starts.
+	// U toggles unchanged and unaffected workflows; Cmd/Ctrl + Enter starts.
 	useEffect(() => {
 		if (!open) return;
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -318,14 +382,14 @@ export function RunPlannerDialog({
 				return;
 			}
 			if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
-			if (event.key.toLowerCase() === "u" && unchangedIds.length) {
+			if (event.key.toLowerCase() === "u" && skippableIds.length) {
 				event.preventDefault();
-				toggleUnchanged();
+				toggleIds(skippableIds);
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [open, start, toggleUnchanged, unchangedIds.length]);
+	}, [open, start, toggleIds, skippableIds]);
 
 	function commitRef(value: string) {
 		const next = value.trim();
@@ -334,7 +398,8 @@ export function RunPlannerDialog({
 			return;
 		}
 		setRef(next);
-		void loadPlan(next, false);
+		// Before a C# repository's check is chosen, changing the branch only remembers it.
+		if (mode) void loadPlan(next, false, mode);
 	}
 
 	const mainBase = useMemo(() => {
@@ -375,8 +440,12 @@ export function RunPlannerDialog({
 			title="Review and start"
 			description={
 				<span>
-					{total} {total === 1 ? "workflow" : "workflows"} selected. Tasker
-					checked which ones the latest changes affect.
+					{total} {total === 1 ? "workflow" : "workflows"} selected.{" "}
+					{deepAvailable && !mode
+						? "Choose how Tasker checks which ones the latest changes affect."
+						: mode === "deep"
+							? "Tasker traced which ones the latest changes reach."
+							: "Tasker checked which ones the latest changes affect."}
 				</span>
 			}
 			footer={
@@ -388,9 +457,14 @@ export function RunPlannerDialog({
 							</span>{" "}
 							of {total} will start
 						</span>
-						{unchangedIds.length ? (
+						{skippableIds.length ? (
 							<span className="hidden items-center gap-1 sm:inline-flex">
-								<Kbd>U</Kbd> toggles unchanged
+								<Kbd>U</Kbd> toggles{" "}
+								{sections.unaffected.length && sections.unchanged.length
+									? "unchanged and unaffected"
+									: sections.unaffected.length
+										? "unaffected"
+										: "unchanged"}
 							</span>
 						) : null}
 						<span className="hidden items-center gap-1 sm:inline-flex">
@@ -485,6 +559,15 @@ export function RunPlannerDialog({
 					</div>
 				) : null}
 
+				{deepAvailable ? (
+					<CheckChooser
+						mode={mode}
+						hasResult={plan !== null}
+						disabled={planning || starting}
+						onChoose={runCheck}
+					/>
+				) : null}
+
 				{plan ? (
 					<HeadSummary
 						plan={plan}
@@ -501,14 +584,25 @@ export function RunPlannerDialog({
 						<Button
 							size="sm"
 							variant="secondary"
-							onClick={() => void loadPlan(ref, false)}
+							onClick={() => void loadPlan(ref, false, mode ?? "standard")}
 						>
 							Try again
 						</Button>
 					</div>
 				) : null}
 
-				{planning && !plan ? <PlanSkeleton count={Math.min(total, 6)} /> : null}
+				{planning && !plan ? (
+					<PlanSkeleton
+						count={Math.min(total, 6)}
+						message={
+							deepAvailable === null
+								? "Checking the repository…"
+								: mode === "deep"
+									? "Tracing which changed C# types each workflow's own code uses… The first deep analysis of a repository reads every C# file and can take about a minute."
+									: undefined
+						}
+					/>
+				) : null}
 
 				{plan ? (
 					<div
@@ -518,9 +612,16 @@ export function RunPlannerDialog({
 						)}
 					>
 						<CountsBar plan={plan} />
+						{plan.deep ? <DeepSummary stats={plan.deep} /> : null}
 						{SECTIONS.map((section) => {
 							const list = sections[section.key];
 							if (!list.length) return null;
+							const sectionIds = list
+								.filter((workflow) => workflow.dispatchable)
+								.map((workflow) => workflow.workflowId);
+							const sectionIncluded = sectionIds.filter((id) =>
+								included.has(id),
+							).length;
 							return (
 								<PlanSection
 									key={section.key}
@@ -536,23 +637,24 @@ export function RunPlannerDialog({
 									headSha={plan.head.sha}
 									disabled={starting}
 									unchangedAction={
-										section.key === "unchanged" ? (
+										SKIPPABLE.includes(section.key) && sectionIds.length ? (
 											<Button
 												size="sm"
 												variant="secondary"
 												className="h-7 gap-1.5 px-2.5 text-xs"
-												onClick={toggleUnchanged}
+												onClick={() => toggleIds(sectionIds)}
 												disabled={starting}
 											>
-												{unchangedIncluded ? (
-													<>Remove unchanged ({unchangedIncluded})</>
+												{sectionIncluded ? (
+													<>
+														Remove {section.key} ({sectionIncluded})
+													</>
 												) : (
 													<>
 														<Undo2 className="h-3.5 w-3.5" />
-														Add back ({unchangedIds.length})
+														Add back ({sectionIds.length})
 													</>
 												)}
-												<Kbd>U</Kbd>
 											</Button>
 										) : null
 									}
@@ -670,12 +772,141 @@ function HeadSummary({
 	);
 }
 
+const CHECKS: Array<{
+	mode: CheckMode;
+	title: string;
+	detail: string;
+	icon: typeof ListChecks;
+}> = [
+	{
+		mode: "standard",
+		title: "Usual check",
+		detail:
+			"Folders and project files: any change in a project a workflow builds counts. Takes a few seconds.",
+		icon: ListChecks,
+	},
+	{
+		mode: "deep",
+		title: "Deep analysis",
+		detail:
+			"Also traces which changed C# types each service's own code uses, so shared-library changes it never touches are left out. The first run on a repository can take about a minute.",
+		icon: ScanSearch,
+	},
+];
+
+/** The two checks offered for C# repositories. Choosing one clears the current result. */
+function CheckChooser({
+	mode,
+	hasResult,
+	disabled,
+	onChoose,
+}: {
+	mode: CheckMode | null;
+	hasResult: boolean;
+	disabled: boolean;
+	onChoose: (mode: CheckMode) => void;
+}) {
+	if (!mode) {
+		return (
+			<div className="space-y-2">
+				<p className="m-0 text-sm text-[var(--muted-text)]">
+					This repository has C# code. Choose how Tasker checks which workflows
+					the changes affect.
+				</p>
+				<div className="grid gap-2 sm:grid-cols-2">
+					{CHECKS.map((check) => (
+						<button
+							key={check.mode}
+							type="button"
+							disabled={disabled}
+							onClick={() => onChoose(check.mode)}
+							className="flex items-start gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3 text-left transition-colors hover:border-[var(--accent)] disabled:opacity-60"
+						>
+							<check.icon className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent)]" />
+							<span className="min-w-0">
+								<span className="block text-sm font-semibold text-[var(--text)]">
+									{check.title}
+								</span>
+								<span className="mt-0.5 block text-xs text-[var(--muted-text)]">
+									{check.detail}
+								</span>
+							</span>
+						</button>
+					))}
+				</div>
+			</div>
+		);
+	}
+	return (
+		<div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted-text)]">
+			<span>Check</span>
+			<div className="inline-flex overflow-hidden rounded-md border border-[var(--line)]">
+				{CHECKS.map((check) => {
+					const active = check.mode === mode;
+					return (
+						<button
+							key={check.mode}
+							type="button"
+							disabled={disabled}
+							aria-pressed={active}
+							title={
+								active && hasResult
+									? `Run the ${check.title.toLowerCase()} again`
+									: check.detail
+							}
+							onClick={() => onChoose(check.mode)}
+							className={cn(
+								"inline-flex items-center gap-1.5 px-2.5 py-1 font-medium transition-colors disabled:opacity-60",
+								active
+									? "bg-[color-mix(in_oklab,var(--accent)_14%,transparent)] text-[var(--accent)]"
+									: "text-[var(--muted-text)] hover:text-[var(--text)]",
+							)}
+						>
+							<check.icon className="h-3.5 w-3.5" />
+							{check.title}
+						</button>
+					);
+				})}
+			</div>
+		</div>
+	);
+}
+
+function DeepSummary({ stats }: { stats: NonNullable<RunPlan["deep"]> }) {
+	if (!stats.traced) {
+		return (
+			<p className="m-0 text-xs text-[var(--muted-text)]">
+				Deep analysis had nothing to trace: no workflow the usual check marks as
+				changed builds .NET code Tasker can follow.
+			</p>
+		);
+	}
+	return (
+		<p className="m-0 text-xs text-[var(--muted-text)]">
+			Deep analysis traced {stats.traced}{" "}
+			{stats.traced === 1 ? "workflow" : "workflows"} through{" "}
+			{stats.indexedFiles.toLocaleString()} C# files (
+			{stats.cachedFiles.toLocaleString()} already indexed) in{" "}
+			{(stats.durationMs / 1000).toFixed(1)} s.{" "}
+			<span className="font-medium text-[var(--text)]">
+				{stats.unaffected} of {stats.traced}
+			</span>{" "}
+			are not reached by the changes.
+		</p>
+	);
+}
+
 function CountsBar({ plan }: { plan: RunPlan }) {
 	const items = [
 		{
 			label: "will change",
 			count: plan.counts.changed,
 			className: "text-[var(--accent)]",
+		},
+		{
+			label: "not reached",
+			count: plan.counts.unaffected,
+			className: "text-[var(--muted-text)]",
 		},
 		{
 			label: "never built",
@@ -752,7 +983,7 @@ function PlanSection({
 			<header
 				className={cn(
 					"flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--line)] px-3 py-2",
-					section.key === "unchanged"
+					SKIPPABLE.includes(section.key)
 						? "bg-[var(--surface-muted)]"
 						: "bg-[color-mix(in_oklab,var(--surface-muted)_60%,var(--surface))]",
 				)}
@@ -862,6 +1093,14 @@ function ImpactBadge({ workflow }: { workflow: PlannedWorkflow }) {
 			</span>
 		);
 	}
+	if (state === "unaffected") {
+		return (
+			<span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] text-[var(--muted-text)]">
+				<Unlink className="h-3 w-3" />
+				Not reached
+			</span>
+		);
+	}
 	return (
 		<span className="inline-flex items-center gap-1 rounded-full border border-amber-300 px-1.5 py-0.5 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-300">
 			<CircleHelp className="h-3 w-3" />
@@ -896,6 +1135,7 @@ function PlanRow({
 	const hasDetails =
 		workflow.impact.files.length > 0 ||
 		workflow.impact.notes.length > 0 ||
+		workflow.impact.trace !== undefined ||
 		workflow.startsOthers.length > 0 ||
 		workflow.inputs.length > 0 ||
 		workflow.base !== null;
@@ -984,10 +1224,20 @@ function PlanRow({
 							disabled={disabled}
 						/>
 					) : null}
+					{workflow.impact.trace ? (
+						<TraceEvidence
+							trace={workflow.impact.trace}
+							unaffected={workflow.impact.state === "unaffected"}
+							repositoryUrl={repositoryUrl}
+							headSha={headSha}
+						/>
+					) : null}
 					{workflow.impact.files.length ? (
 						<div>
 							<p className="m-0 mb-1 font-medium text-[var(--text)]">
-								Changed files it builds
+								{workflow.impact.state === "unaffected"
+									? "Changed files in projects it references"
+									: "Changed files it builds"}
 							</p>
 							<ul className="m-0 list-none space-y-0.5 p-0">
 								{workflow.impact.files.map((file) => (
@@ -1041,6 +1291,62 @@ function PlanRow({
 				</div>
 			) : null}
 		</li>
+	);
+}
+
+const MAX_TRACED_NAMES = 12;
+
+/** What deep analysis found: the path that reaches the workflow, or the names it traced. */
+function TraceEvidence({
+	trace,
+	unaffected,
+	repositoryUrl,
+	headSha,
+}: {
+	trace: NonNullable<PlannedWorkflow["impact"]["trace"]>;
+	unaffected: boolean;
+	repositoryUrl: string;
+	headSha: string;
+}) {
+	return (
+		<div className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-2.5 py-2">
+			<p className="m-0 mb-0.5 flex items-center gap-1.5 font-medium text-[var(--text)]">
+				<ScanSearch className="h-3.5 w-3.5 text-[var(--accent)]" />
+				Deep analysis
+			</p>
+			{unaffected ? (
+				<p className="m-0 text-[var(--muted-text)]">
+					Traced{" "}
+					{trace.traced.slice(0, MAX_TRACED_NAMES).map((name, index) => (
+						<span key={name}>
+							{index ? ", " : ""}
+							<code className="text-[11px] text-[var(--text)]">{name}</code>
+						</span>
+					))}
+					{trace.traced.length > MAX_TRACED_NAMES
+						? ` and ${trace.traced.length - MAX_TRACED_NAMES} more`
+						: ""}
+					. None of them reach its own code.
+				</p>
+			) : (
+				<p className="m-0 break-words text-[var(--muted-text)]">
+					{trace.reason}
+					{trace.path ? (
+						<>
+							{" "}
+							<a
+								href={`${repositoryUrl}/blob/${headSha}/${trace.path}`}
+								target="_blank"
+								rel="noreferrer"
+								className="text-[var(--accent)]"
+							>
+								Open file
+							</a>
+						</>
+					) : null}
+				</p>
+			)}
+		</div>
 	);
 }
 
@@ -1115,12 +1421,13 @@ function WorkflowInputs({
 	);
 }
 
-function PlanSkeleton({ count }: { count: number }) {
+function PlanSkeleton({ count, message }: { count: number; message?: string }) {
 	return (
 		<div className="space-y-3" aria-live="polite">
-			<p className="m-0 flex items-center gap-2 text-sm text-[var(--muted-text)]">
-				<RefreshCw className="h-4 w-4 animate-spin" />
-				Checking what changed since each workflow's last successful build…
+			<p className="m-0 flex items-start gap-2 text-sm text-[var(--muted-text)]">
+				<RefreshCw className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+				{message ??
+					"Checking what changed since each workflow's last successful build…"}
 			</p>
 			<div className="overflow-hidden rounded-lg border border-[var(--line)]">
 				{Array.from({ length: Math.max(count, 3) }, (_, index) => (

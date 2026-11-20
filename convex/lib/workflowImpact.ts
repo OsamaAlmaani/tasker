@@ -374,8 +374,13 @@ export type DependencyRule = {
   label: string
 }
 
+/** Where a project's sources live; `root` marks the projects the workflow itself builds. */
+export type SourceScope = { kind: 'directory' | 'file'; path: string; root: boolean }
+
 export type WorkflowAnalysis = {
   rules: DependencyRule[]
+  /** Source locations of every project in the build graph, for deep analysis. */
+  sources: SourceScope[]
   /** False when part of the workflow could not be followed. */
   complete: boolean
   notes: string[]
@@ -620,20 +625,25 @@ export async function analyzeWorkflows(
     const workflowNotes = notes.get(path) ?? []
     const workflowRoots = roots.get(path) ?? []
     const visited = new Set<string>()
-    const queue = [...workflowRoots]
+    // Projects a workflow builds directly, or through a solution it builds, are its own code.
+    const queue = workflowRoots.map((project) => ({ project, root: true }))
+    const rootProjects = new Set<string>()
     const projectDirectories = new Set<string>()
+    const sources: SourceScope[] = []
     while (queue.length) {
-      const project = queue.shift() as string
+      const { project, root } = queue.shift() as { project: string; root: boolean }
+      if (root) rootProjects.add(project)
       if (visited.has(project)) continue
       visited.add(project)
       const isRoot = workflowRoots.includes(project)
+      const isSolution = /\.(sln|slnx)$/i.test(project)
       const name = basename(project).replace(DOTNET_PROJECT, '')
       if (!reader.files.has(project)) {
         workflowNotes.push(`A referenced project is missing: ${project}`)
         continue
       }
       rules.push({ kind: 'file', path: project, label: isRoot ? `${name} (project file)` : `${name} (referenced project)` })
-      if (!/\.(sln|slnx)$/i.test(project)) {
+      if (!isSolution) {
         const directory = dirname(project)
         projectDirectories.add(directory)
         rules.push({
@@ -644,7 +654,7 @@ export async function analyzeWorkflows(
       }
       const refs = references.get(project)
       if (!refs) continue
-      queue.push(...refs.projects)
+      queue.push(...refs.projects.map((child) => ({ project: child, root: root && isSolution })))
       for (const imported of refs.imports) {
         rules.push({ kind: 'file', path: imported, label: 'Imported build file' })
       }
@@ -656,6 +666,22 @@ export async function analyzeWorkflows(
       }
       for (const link of refs.unresolvedLinks) {
         workflowNotes.push(`${name} links ${link}, which points outside the repository.`)
+      }
+    }
+    for (const project of visited) {
+      if (/\.(sln|slnx)$/i.test(project) || !reader.files.has(project)) continue
+      const root = rootProjects.has(project)
+      const refs = references.get(project)
+      sources.push({ kind: 'directory', path: dirname(project), root })
+      for (const linked of refs?.linkedDirectories ?? []) sources.push({ kind: 'directory', path: linked, root })
+      for (const linked of refs?.linkedFiles ?? []) sources.push({ kind: 'file', path: linked, root })
+    }
+    // SDK projects compile every file below their folder, so a project nested
+    // inside a root project's folder may be compiled into it too.
+    const rootDirectories = sources.filter((scope) => scope.root && scope.kind === 'directory').map((scope) => scope.path)
+    for (const scope of sources) {
+      if (!scope.root && rootDirectories.some((directory) => directory === '' || scope.path.startsWith(`${directory}/`))) {
+        scope.root = true
       }
     }
     // Shared settings apply to every project below them.
@@ -676,6 +702,7 @@ export async function analyzeWorkflows(
     }
     results.set(path, {
       rules: dedupeRules(rules),
+      sources,
       complete: workflowNotes.length === 0,
       notes: [...new Set(workflowNotes)],
       builds: [...(builds.get(path) ?? []), ...workflowRoots],
@@ -717,7 +744,11 @@ export function matchRule(rules: DependencyRule[], path: string): DependencyRule
 
 export type ChangedFile = { path: string; previousPath: string | null }
 
-export type ImpactState = 'changed' | 'unchanged' | 'unknown' | 'never-built'
+/**
+ * `unaffected` comes only from deep analysis: files it builds changed, but
+ * none of the changes reach its own code.
+ */
+export type ImpactState = 'changed' | 'unchanged' | 'unaffected' | 'unknown' | 'never-built'
 
 export type WorkflowImpact = {
   state: ImpactState
@@ -727,9 +758,21 @@ export type WorkflowImpact = {
   /** Matched files beyond `files`. */
   moreFiles: number
   notes: string[]
+  /** Deep analysis evidence: why it is affected, or which changed names were traced. */
+  trace?: { reason: string; path: string | null; traced: string[] }
 }
 
 const MAX_LISTED_FILES = 40
+
+/** Changed files that a workflow's rules depend on, with the rule that matched each. */
+export function matchChanges(rules: DependencyRule[], files: ChangedFile[]) {
+  const matched: Array<{ file: ChangedFile; rule: DependencyRule }> = []
+  for (const file of files) {
+    const rule = matchRule(rules, file.path) ?? (file.previousPath ? matchRule(rules, file.previousPath) : null)
+    if (rule) matched.push({ file, rule })
+  }
+  return matched
+}
 
 export function computeImpact({
   analysis,
@@ -761,11 +804,10 @@ export function computeImpact({
       notes: [],
     }
   }
-  const matched: Array<{ path: string; label: string }> = []
-  for (const file of changes?.files ?? []) {
-    const rule = matchRule(analysis.rules, file.path) ?? (file.previousPath ? matchRule(analysis.rules, file.previousPath) : null)
-    if (rule) matched.push({ path: file.path, label: rule.label })
-  }
+  const matched = matchChanges(analysis.rules, changes?.files ?? []).map(({ file, rule }) => ({
+    path: file.path,
+    label: rule.label,
+  }))
   const files = matched.slice(0, MAX_LISTED_FILES)
   const moreFiles = matched.length - files.length
   if (matched.length) {

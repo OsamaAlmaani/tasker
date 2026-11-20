@@ -216,7 +216,7 @@ export const createRelease = internalMutation({
       v.object({
         workflowId: v.number(),
         workflowName: v.string(),
-        reason: v.union(v.literal('unchanged'), v.literal('removed')),
+        reason: v.union(v.literal('unchanged'), v.literal('unaffected'), v.literal('removed')),
       }),
     ),
   },

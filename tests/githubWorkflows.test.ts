@@ -270,6 +270,35 @@ describe('analyzeWorkflows', () => {
     expect(paths).not.toContain('directory:')
     expect(matchRule(search.rules, 'src/Core/Logging/Log.cs')?.label).toBe('Logging (referenced project)')
     expect(matchRule(search.rules, 'README.md')).toBeNull()
+    expect(search.sources).toEqual([
+      { kind: 'directory', path: 'src/APIs/Search', root: true },
+      { kind: 'directory', path: 'src/Core/Common', root: false },
+      { kind: 'directory', path: 'src/Core/Logging', root: false },
+    ])
+  })
+
+  it('treats projects in a built solution, and nested projects, as the workflow own code', async () => {
+    const files: Record<string, string> = {
+      '.github/workflows/all.yml': 'on: workflow_dispatch\njobs:\n  b:\n    steps:\n      - run: dotnet build App.sln',
+      'App.sln': 'Project("{X}") = "Api", "src\\Api\\Api.csproj", "{1}"\nEndProject',
+      'src/Api/Api.csproj':
+        '<ProjectReference Include="..\\Lib\\Lib.csproj" /><ProjectReference Include="Tools\\Tools.csproj" /><Compile Include="..\\Shared\\Link.cs" />',
+      'src/Api/Tools/Tools.csproj': '',
+      'src/Lib/Lib.csproj': '',
+      'src/Shared/Link.cs': '',
+    }
+    const results = await analyzeWorkflows(new Map([['.github/workflows/all.yml', files['.github/workflows/all.yml']]]), {
+      files: new Set(Object.keys(files)),
+      read: async (paths) => new Map(paths.map((path) => [path, files[path] ?? null])),
+    })
+    expect(results.get('.github/workflows/all.yml')?.sources).toEqual(
+      expect.arrayContaining([
+        { kind: 'directory', path: 'src/Api', root: true },
+        { kind: 'file', path: 'src/Shared/Link.cs', root: true },
+        { kind: 'directory', path: 'src/Api/Tools', root: true },
+        { kind: 'directory', path: 'src/Lib', root: false },
+      ]),
+    )
   })
 
   it('uses copies for non-.NET images', async () => {
@@ -294,6 +323,7 @@ describe('computeImpact', () => {
       { kind: 'directory', path: 'src/api', label: 'Api' },
       { kind: 'file', path: 'Directory.Build.props', label: 'Shared build settings' },
     ],
+    sources: [],
     complete: true,
     notes: [],
     builds: [],

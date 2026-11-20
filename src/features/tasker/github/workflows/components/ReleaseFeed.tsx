@@ -394,7 +394,9 @@ function ReleaseCard({
 											·{" "}
 											{entry.reason === "unchanged"
 												? "no code changes"
-												: "removed before start"}
+												: entry.reason === "unaffected"
+													? "changes don't reach it"
+													: "removed before start"}
 										</span>
 									</li>
 								))}
